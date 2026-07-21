@@ -28,6 +28,22 @@ from batch.output import writer
 log = logging.getLogger("batch")
 
 
+def repair_gaps(codes: list[str], target_date: str) -> None:
+    """캐시가 없거나 target_date보다 뒤처진 종목을 fdr로 백필한다.
+
+    첫 실행(빈 캐시) 부트스트랩과, 수집 실패로 생긴 공백 보정을 겸한다.
+    공공 API는 하루치만 주므로 과거 구간은 여기서 채워야 한다.
+    """
+    stale = []
+    for code in codes:
+        cached = backfill.load_cached(code)
+        if cached is None or len(cached) == 0 or cached["date"].iloc[-1] < target_date:
+            stale.append(code)
+    if stale:
+        log.info("캐시 없음/공백 %d종목 → fdr 백필", len(stale))
+        backfill.update_all(stale)
+
+
 def collect(codes: list[str]) -> None:
     """일별 수집. 공공 API 우선, 실패/키 없음이면 fdr 증분 갱신."""
     if daily.api_key():
@@ -37,6 +53,7 @@ def collect(codes: list[str]) -> None:
             day = daily.fetch_day(bas_dt)
             if not day.empty:
                 daily.merge_into_cache(day)
+                repair_gaps(codes, day["date"].max())
                 return
         log.warning("공공 API 최근 5일 데이터 없음 — fdr 폴백")
     else:
@@ -110,6 +127,10 @@ def main() -> None:
 
     stats = compute_and_write(stocks)
     log.info("완료: %s (%.0f초)", stats, time.time() - t0)
+
+    # 산출이 비면 조용히 성공 처리하지 않고 실패시킨다 (CI에서 빨간불로 보이게)
+    if stats["written"] == 0:
+        raise SystemExit("산출 0종목 — 데이터 수집이 정상인지 확인 필요")
 
 
 if __name__ == "__main__":
