@@ -73,6 +73,16 @@ def test_hidden_bearish():
     assert {e.kind for e in ev} >= {"div_hid_bear"}
 
 
+def test_zone_filter_rejects_midrange():
+    # 형태는 상승 다이버전스지만 RSI 피벗이 중간 지대(42→52)면 잡음으로 제외
+    # (이웃 봉 포함 전부 40~60 존 안에 있도록 값 선택)
+    ev = _detect(price_low_vals=(100, 95), rsi_vals=(42, 52), lows=True)
+    assert ev == []
+    # 하락형도 마찬가지 (58→48은 과매수권 아님)
+    ev = _detect(price_high_vals=(100, 105), rsi_vals=(58, 48), lows=False)
+    assert ev == []
+
+
 def test_no_divergence_when_same_direction():
     # 가격 LL + RSI LL → 다이버전스 아님
     ev = _detect(price_low_vals=(100, 95), rsi_vals=(33, 28), lows=True)

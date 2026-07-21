@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import StockSearch from "@/components/StockSearch";
 import { loadLatest } from "@/lib/data";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default async function RootLayout({
               <Link href="/">스크리너</Link>
               <Link href="/guide">지표 가이드</Link>
             </nav>
+            <StockSearch />
             {date && <span className="data-date">전일({date}) 기준 데이터</span>}
           </div>
         </header>

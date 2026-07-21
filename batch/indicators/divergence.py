@@ -8,6 +8,10 @@ RSI에서 피벗 고점/저점을 찾고(좌우 lookback), 연속한 피벗 쌍�
 - regular bearish : 가격 고점 상승(HH) + RSI 고점 하락(LH)
 - hidden  bearish : 가격 고점 하락(LH) + RSI 고점 상승(HH)
 
+RSI 존 필터: bull형은 RSI 피벗이 과매도권(DIV_RSI_BULL_ZONE 미만)에 걸쳐야,
+bear형은 과매수권(DIV_RSI_BEAR_ZONE 초과)에 걸쳐야 유효한 신호로 본다.
+중간 지대(40~60)에서 생기는 약한 다이버전스는 잡음이 많아 제외.
+
 피벗은 우측 lookback 만큼 지나야 확정되므로, 이벤트 확정 시점은
 두 번째 피벗 + PIVOT_RIGHT 봉이다.
 """
@@ -64,6 +68,8 @@ def detect_divergences(
     right: int = config.PIVOT_RIGHT,
     min_bars: int = config.DIV_MIN_BARS,
     max_bars: int = config.DIV_MAX_BARS,
+    bull_zone: float = config.DIV_RSI_BULL_ZONE,
+    bear_zone: float = config.DIV_RSI_BEAR_ZONE,
 ) -> list[Divergence]:
     """전체 구간의 다이버전스 이벤트 목록 (시간순)."""
     rsi_highs, rsi_lows = find_pivots(rsi, left, right)
@@ -82,6 +88,8 @@ def detect_divergences(
             if dp == 0 or dr == 0:
                 continue
             if is_low:
+                if min(rv[a], rv[b]) >= bull_zone:  # 존 필터: 과매도권 밖은 잡음
+                    continue
                 if dp < 0 and dr > 0:
                     kind = "div_reg_bull"
                 elif dp > 0 and dr < 0:
@@ -89,6 +97,8 @@ def detect_divergences(
                 else:
                     continue
             else:
+                if max(rv[a], rv[b]) <= bear_zone:  # 존 필터: 과매수권 밖은 잡음
+                    continue
                 if dp > 0 and dr < 0:
                     kind = "div_reg_bear"
                 elif dp < 0 and dr > 0:

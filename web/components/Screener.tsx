@@ -35,15 +35,15 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       .catch(() => setError(true));
   }, []);
 
-  // 선택 상태 → URL 동기화 (공유 가능한 /screen?flags=...)
-  useEffect(() => {
-    const flags = [...selected].join(",");
+  // 사용자가 필터를 바꿨을 때만 URL 동기화 (프리셋 페이지 /screen/[slug]의
+  // 예쁜 URL은 사용자가 손대기 전까지 유지)
+  function syncUrl(next: Set<FlagKey>) {
+    const flags = [...next].join(",");
     const target = flags ? `/screen?flags=${flags}` : "/";
     const current =
       pathname + (searchParams.size ? `?${searchParams.toString()}` : "");
     if (target !== current) router.replace(target, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -65,6 +65,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      syncUrl(next);
       return next;
     });
   }
