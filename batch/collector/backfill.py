@@ -10,7 +10,6 @@
 
 import datetime as dt
 import logging
-import time
 
 import pandas as pd
 
@@ -110,25 +109,32 @@ def rebuild_one(code: str) -> int:
 
 def update_all(
     codes: list[str],
-    sleep_every: int = 50,
-    sleep_sec: float = 1.0,
     rebuild: bool = False,
+    max_workers: int = 6,
 ) -> dict:
     """전 종목 백필/증분 갱신. {code: added_rows} 실패 종목은 -1.
 
     rebuild=True면 증분이 아니라 전체 기간을 새로 받아 교체한다 (주 1회 정합성 보정).
+    네트워크 왕복 지연이 지배적이라(특히 GitHub 러너는 해외) 스레드 병렬로 수집한다.
+    종목당 파일이 분리돼 있어 쓰기 충돌 없음. 동시 6은 네이버에 부담 없는 수준.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     fetch = rebuild_one if rebuild else update_one
     result: dict[str, int] = {}
-    for i, code in enumerate(codes, 1):
-        try:
-            result[code] = fetch(code)
-        except Exception as e:
-            log.warning("%s 수집 실패: %s", code, e)
-            result[code] = -1
-        if i % sleep_every == 0:
-            log.info("진행 %d/%d", i, len(codes))
-            time.sleep(sleep_sec)
+    done = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(fetch, code): code for code in codes}
+        for fut in as_completed(futures):
+            code = futures[fut]
+            try:
+                result[code] = fut.result()
+            except Exception as e:
+                log.warning("%s 수집 실패: %s", code, e)
+                result[code] = -1
+            done += 1
+            if done % 200 == 0:
+                log.info("진행 %d/%d", done, len(codes))
     ok = sum(1 for v in result.values() if v >= 0)
     log.info("백필 완료: 성공 %d / 실패 %d", ok, len(codes) - ok)
     return result

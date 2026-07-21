@@ -32,7 +32,7 @@ concurrency:
 jobs:
   batch:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90  # 평시 ~5분. 전체 재백필(병렬)도 ~15분이지만 여유를 둔다
     steps:
       - uses: actions/checkout@v4
 
