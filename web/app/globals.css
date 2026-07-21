@@ -320,10 +320,94 @@ a {
   font-weight: 700;
 }
 .chart-wrap {
-  margin: 16px 0;
+  margin: 0 0 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  /* 가로 드래그·핀치는 차트가, 세로 스와이프는 페이지 스크롤이 갖는다 */
+  touch-action: pan-y;
+}
+
+/* chart toolbar */
+.chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 14px 0 10px;
+  font-size: 12.5px;
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.toolbar-label {
+  color: var(--muted);
+  margin-right: 2px;
+}
+.chart-toolbar button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.chart-toolbar button:hover {
+  border-color: var(--accent);
+}
+.chart-toolbar button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+}
+.toolbar-toggle.on {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.toolbar-toggle input {
+  accent-color: var(--accent);
+}
+.ma-legend {
+  gap: 8px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* 패널 좌상단 라벨 */
+.pane-label {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  z-index: 3;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* 모바일: 광고를 차트보다 먼저 */
+.mobile-top-ad {
+  display: none;
+}
+@media (max-width: 640px) {
+  .mobile-top-ad {
+    display: block;
+  }
 }
 .notice {
   font-size: 12.5px;

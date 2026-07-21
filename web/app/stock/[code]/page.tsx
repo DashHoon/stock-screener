@@ -58,6 +58,10 @@ export default async function StockPage({
         <span className="notice">전일({data.dates[last]}) 기준</span>
       </div>
 
+      <div className="mobile-top-ad">
+        <AdSlot id="stock-mobile-top" />
+      </div>
+
       <StockChart data={data} />
 
       {recentDivs.length > 0 && (
