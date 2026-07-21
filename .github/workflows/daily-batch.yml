@@ -41,7 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: Restore OHLCV cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: batch/data/cache
           key: ohlcv-cache-${{ github.run_id }}
@@ -59,6 +59,14 @@ jobs:
           else
             uv run python -m batch.run
           fi
+
+      # 이후 단계가 실패해도 백필 결과는 보존한다 (기본 cache 액션은 잡 실패 시 저장 안 함)
+      - name: Save OHLCV cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: batch/data/cache
+          key: ohlcv-cache-${{ github.run_id }}
 
       - name: Check output freshness
         id: fresh
@@ -79,6 +87,10 @@ jobs:
           git config user.name "batch-bot"
           git config user.email "actions@users.noreply.github.com"
           git checkout -B data
+          # GITHUB_TOKEN은 워크플로 파일이 든 새 브랜치를 만들 수 없다 →
+          # data 브랜치에서는 .github를 제거 (Vercel 빌드에 불필요)
+          rm -rf .github
+          git add -A
           git add -f web/public/data
           git commit -m "data: ${{ steps.fresh.outputs.date }}" || exit 0
           git push -f origin data
