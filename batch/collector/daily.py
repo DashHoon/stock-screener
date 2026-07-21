@@ -13,6 +13,8 @@ import os
 import pandas as pd
 import requests
 
+from batch import config
+from batch.collector import backfill
 from batch.collector.backfill import cache_path, load_cached
 
 log = logging.getLogger(__name__)
@@ -85,14 +87,33 @@ def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+def is_discontinuous(prev_close: float, new_close: float) -> bool:
+    """전일 종가 대비 변동이 임계치를 넘는가 (기업행위로 인한 수정주가 의심).
+
+    한국 주식은 가격제한폭(±30%)이 있어 그 이상의 변동은 정상 거래로 불가능하다.
+    임계치(REBUILD_JUMP_PCT)와 오탐 비용은 config 주석 참고.
+    """
+    if prev_close <= 0:
+        return False
+    return abs(new_close / prev_close - 1) * 100 >= config.REBUILD_JUMP_PCT
+
+
 def merge_into_cache(day: pd.DataFrame) -> int:
-    """하루치 수집분을 종목별 parquet 캐시에 병합. 갱신한 종목 수를 돌려준다."""
+    """하루치 수집분을 종목별 parquet 캐시에 병합. 갱신한 종목 수를 돌려준다.
+
+    전일 대비 비정상 급변 종목은 병합하지 않고 캐시를 통째로 재수집한다
+    (기업행위로 과거 가격이 소급 수정됐을 가능성 — 섞어 붙이면 가짜 시그널 발생).
+    """
     updated = 0
+    suspects: list[str] = []
     for code, g in day.groupby("code"):
         cached = load_cached(code)
         if cached is None:
             continue  # 백필된 적 없는 종목(신규상장 등)은 다음 백필에서 처리
         if g["date"].iloc[-1] <= cached["date"].iloc[-1]:
+            continue
+        if is_discontinuous(cached["close"].iloc[-1], g["close"].iloc[-1]):
+            suspects.append(code)
             continue
         merged = (
             pd.concat([cached, g[cached.columns]])
@@ -102,5 +123,16 @@ def merge_into_cache(day: pd.DataFrame) -> int:
         )
         merged.to_parquet(cache_path(code), index=False)
         updated += 1
+
+    rebuilt = 0
+    for code in suspects:
+        try:
+            if backfill.rebuild_one(code):
+                rebuilt += 1
+        except Exception as e:
+            log.warning("%s 캐시 재구축 실패: %s", code, e)
+    if suspects:
+        log.info("급변 감지 %d종목 → 재구축 %d종목 성공: %s",
+                 len(suspects), rebuilt, ",".join(suspects))
     log.info("캐시 병합: %d종목 갱신", updated)
     return updated

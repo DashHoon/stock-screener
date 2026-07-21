@@ -86,12 +86,43 @@ def update_one(code: str, start: str | None = None) -> int:
     return len(new)
 
 
-def update_all(codes: list[str], sleep_every: int = 50, sleep_sec: float = 1.0) -> dict:
-    """전 종목 백필/증분 갱신. {code: added_rows} 실패 종목은 -1."""
+def rebuild_one(code: str) -> int:
+    """전체 기간을 새로 받아 캐시를 통째로 교체한다 (수정주가 재반영).
+
+    기업행위(증자·분할 등)로 과거 가격이 소급 수정된 종목에 사용.
+    수신 실패나 빈 응답이면 기존 캐시를 그대로 보존한다.
+    """
+    import FinanceDataReader as fdr
+
+    start = (
+        dt.date.today() - dt.timedelta(days=365 * config.BACKFILL_YEARS)
+    ).isoformat()
+    raw = fdr.DataReader(code, start)
+    if raw is None or raw.empty:
+        return 0
+    new = _normalize(raw)
+    if new.empty:
+        return 0
+    config.OHLCV_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    new.to_parquet(cache_path(code), index=False)
+    return len(new)
+
+
+def update_all(
+    codes: list[str],
+    sleep_every: int = 50,
+    sleep_sec: float = 1.0,
+    rebuild: bool = False,
+) -> dict:
+    """전 종목 백필/증분 갱신. {code: added_rows} 실패 종목은 -1.
+
+    rebuild=True면 증분이 아니라 전체 기간을 새로 받아 교체한다 (주 1회 정합성 보정).
+    """
+    fetch = rebuild_one if rebuild else update_one
     result: dict[str, int] = {}
     for i, code in enumerate(codes, 1):
         try:
-            result[code] = update_one(code)
+            result[code] = fetch(code)
         except Exception as e:
             log.warning("%s 수집 실패: %s", code, e)
             result[code] = -1

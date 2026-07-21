@@ -2,7 +2,8 @@
 
 사용:
   python -m batch.run                  # 전체 (수집 갱신 → 계산 → JSON 산출)
-  python -m batch.run --backfill       # 백필만 (최초 1회 또는 캐시 재구축)
+  python -m batch.run --backfill       # 백필만 (최초 1회)
+  python -m batch.run --rebuild-all    # 전 종목 캐시 전체 재수집 후 계산·산출 (주 1회 수정주가 보정)
   python -m batch.run --no-collect     # 캐시 그대로 계산·산출만
   python -m batch.run --limit 50      # 앞 50종목만 (개발용)
 
@@ -77,6 +78,10 @@ def compute_and_write(stocks) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backfill", action="store_true", help="백필만 수행")
+    parser.add_argument(
+        "--rebuild-all", action="store_true",
+        help="전 종목 캐시를 새로 받아 교체 (수정주가 보정) 후 계산·산출",
+    )
     parser.add_argument("--no-collect", action="store_true", help="수집 생략")
     parser.add_argument("--limit", type=int, default=0, help="앞 N종목만 (개발용)")
     args = parser.parse_args()
@@ -98,7 +103,9 @@ def main() -> None:
         log.info("백필 완료 (%.0f초)", time.time() - t0)
         return
 
-    if not args.no_collect:
+    if args.rebuild_all:
+        backfill.update_all(codes, rebuild=True)
+    elif not args.no_collect:
         collect(codes)
 
     stats = compute_and_write(stocks)

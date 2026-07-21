@@ -14,7 +14,13 @@ on:
   schedule:
     - cron: "0 13 * * 1-5"  # KST 22:00 (UTC 13:00) 평일
     - cron: "0 0 * * 2-6"   # KST 09:00 익일 오전 재시도
+    - cron: "0 16 * * 5"    # KST 토 01:00 — 전 종목 재백필 (수정주가 정합성 보정)
   workflow_dispatch:
+    inputs:
+      rebuild:
+        description: "전 종목 캐시 재수집 (수정주가 보정)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,7 +55,12 @@ jobs:
       - name: Run batch
         env:
           DATA_GO_KR_API_KEY: ${{ secrets.DATA_GO_KR_API_KEY }}
-        run: uv run python -m batch.run
+        run: |
+          if [[ "${{ github.event.schedule }}" == "0 16 * * 5" || "${{ inputs.rebuild }}" == "true" ]]; then
+            uv run python -m batch.run --rebuild-all
+          else
+            uv run python -m batch.run
+          fi
 
       - name: Check output freshness
         id: fresh
