@@ -1,0 +1,26 @@
+# secrets
+.env
+.env.local
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# 데이터 캐시 (백필/일별 수집 원본 — 용량 큼, 재생성 가능)
+batch/data/cache/
+
+# 배치 산출물 (~63MB) — main에는 커밋하지 않는다.
+# GitHub Actions가 매일 data 브랜치에 force-push (daily-batch.yml 참고)
+web/public/data/
+
+# node
+node_modules/
+web/.next/
+web/out/
+.vercel/
+
+# os
+.DS_Store

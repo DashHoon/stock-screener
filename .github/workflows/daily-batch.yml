@@ -1,0 +1,81 @@
+# 일별 배치: 수집 → 지표 계산 → JSON 산출 → 데이터 커밋 → Vercel 재배포
+#
+# 사전 준비 (GitHub Secrets):
+#   DATA_GO_KR_API_KEY     — 공공데이터포털 인증키 (없으면 fdr 폴백으로도 동작)
+#   VERCEL_DEPLOY_HOOK_URL — Vercel 프로젝트의 Deploy Hook (Phase 3에서 등록)
+#
+# 데이터 커밋 전략: 산출 JSON(web/public/data)은 매일 덮어쓰며 data 브랜치에
+# force-push 한다 (main 이력 오염 방지). Vercel은 data 브랜치를 배포 대상으로 연결.
+# ※ ohlcv 캐시(batch/data/cache)는 Actions cache에 보관해 매일 증분 수집만 한다.
+
+name: daily-batch
+
+on:
+  schedule:
+    - cron: "0 13 * * 1-5"  # KST 22:00 (UTC 13:00) 평일
+    - cron: "0 0 * * 2-6"   # KST 09:00 익일 오전 재시도
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-batch
+  cancel-in-progress: false
+
+jobs:
+  batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore OHLCV cache
+        uses: actions/cache@v4
+        with:
+          path: batch/data/cache
+          key: ohlcv-cache-${{ github.run_id }}
+          restore-keys: ohlcv-cache-
+
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install 'setuptools<81'  # pykrx의 pkg_resources 의존
+
+      - name: Run batch
+        env:
+          DATA_GO_KR_API_KEY: ${{ secrets.DATA_GO_KR_API_KEY }}
+        run: uv run python -m batch.run
+
+      - name: Check output freshness
+        id: fresh
+        run: |
+          DATE=$(python -c "import json;print(json.load(open('web/public/data/signals/latest.json'))['date'])")
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+          # 최근 5일 안의 데이터가 아니면 배포 스킵 (휴장 연휴 감안)
+          LIMIT=$(date -d '5 days ago' +%F)
+          if [[ "$DATE" < "$LIMIT" ]]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push data branch
+        if: steps.fresh.outputs.stale == 'false'
+        run: |
+          git config user.name "batch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -B data
+          git add -f web/public/data
+          git commit -m "data: ${{ steps.fresh.outputs.date }}" || exit 0
+          git push -f origin data
+
+      - name: Trigger Vercel deploy
+        if: steps.fresh.outputs.stale == 'false' && env.HOOK != ''
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$HOOK" > /dev/null

@@ -1,0 +1,23 @@
+[project]
+name = "stock-screener-batch"
+version = "0.1.0"
+description = "국내주식 기술적 지표 스크리너 - 일별 배치 파이프라인"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "pyarrow>=16",
+    "requests>=2.32",
+    "pykrx>=1.0.45",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["batch/tests"]
+
+[tool.uv]
+package = false
