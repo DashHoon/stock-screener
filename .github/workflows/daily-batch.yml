@@ -85,8 +85,15 @@ jobs:
           git commit -m "data: ${{ steps.fresh.outputs.date }}" || exit 0
           git push -f origin data
 
-      - name: Trigger Vercel deploy
-        if: steps.fresh.outputs.stale == 'false' && env.HOOK != ''
+      # Vercel이 data 브랜치 push를 감지해 자동 배포하므로 Hook은 선택사항.
+      # (자동 배포를 껐거나 별도 트리거가 필요할 때만 Secret 등록)
+      - name: Trigger Vercel deploy (optional)
+        if: steps.fresh.outputs.stale == 'false'
         env:
           HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: curl -fsS -X POST "$HOOK" > /dev/null
+        run: |
+          if [[ -n "$HOOK" ]]; then
+            curl -fsS -X POST "$HOOK" > /dev/null
+          else
+            echo "Deploy Hook 미설정 — Vercel 자동 배포에 위임"
+          fi

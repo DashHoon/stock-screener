@@ -64,9 +64,9 @@
 ## Phase 3 — 자동화
 
 - [x] GitHub Actions 워크플로 작성 (`daily-batch.yml`: KST 22시 + 익일 9시 재시도, 캐시, 신선도 검사, data 브랜치 push, Deploy Hook)
-- [ ] 👤 GitHub 저장소 생성 + push
-- [ ] 👤 GitHub Secrets 등록: `DATA_GO_KR_API_KEY`, `VERCEL_DEPLOY_HOOK_URL`
-- [ ] 👤 Vercel 배포 브랜치를 `data`로 설정 + Deploy Hook 생성
+- [ ] 👤 GitHub 저장소 생성 + push — **[SETUP_GUIDE.md](SETUP_GUIDE.md) A단계**
+- [ ] 👤 GitHub Secrets 등록: `DATA_GO_KR_API_KEY` — 가이드 A-4 (Deploy Hook은 불필요해짐 — Vercel 자동 배포 사용)
+- [ ] 👤 Vercel 프로젝트 생성(Root Directory=`web`) + Production Branch를 `data`로 — 가이드 B단계
 - [ ] Supabase 이력 적재 (선택 — MVP에는 불필요, 이력 API 필요해질 때):
   - [ ] 👤 Supabase 프로젝트 생성
   - [ ] `ohlcv`/`indicators` 테이블 DDL + 배치 upsert
