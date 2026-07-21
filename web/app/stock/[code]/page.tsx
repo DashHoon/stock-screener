@@ -32,15 +32,16 @@ export default async function StockPage({
   params: { code: string };
 }) {
   const data = await loadChart(params.code);
-  if (!data) notFound();
+  if (!data?.tf?.d) notFound(); // 구버전(v1) 잔존 파일 방어 포함
 
-  const last = data.dates.length - 1;
-  const close = data.close[last];
-  const prev = last > 0 ? data.close[last - 1] : close;
+  const daily = data.tf.d;
+  const last = daily.dates.length - 1;
+  const close = daily.close[last];
+  const prev = last > 0 ? daily.close[last - 1] : close;
   const changePct = prev ? ((close / prev - 1) * 100).toFixed(2) : null;
   const up = close >= prev;
 
-  const recentDivs = data.divergences.slice(-3).reverse();
+  const recentDivs = daily.divergences.slice(-3).reverse();
 
   return (
     <>
@@ -55,7 +56,7 @@ export default async function StockPage({
             {changePct}%
           </span>
         )}
-        <span className="notice">전일({data.dates[last]}) 기준</span>
+        <span className="notice">전일({daily.dates[last]}) 기준</span>
       </div>
 
       <div className="mobile-top-ad">

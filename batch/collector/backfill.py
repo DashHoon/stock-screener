@@ -118,7 +118,12 @@ def update_all(
     네트워크 왕복 지연이 지배적이라(특히 GitHub 러너는 해외) 스레드 병렬로 수집한다.
     종목당 파일이 분리돼 있어 쓰기 충돌 없음. 동시 6은 네이버에 부담 없는 수준.
     """
+    import socket
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # fdr 내부 요청에 타임아웃이 없어 응답 없는 연결이 스레드를 영원히 물고 있을
+    # 수 있다 → 소켓 기본 타임아웃으로 방어 (타임아웃 나면 해당 종목만 실패 처리)
+    socket.setdefaulttimeout(20)
 
     fetch = rebuild_one if rebuild else update_one
     result: dict[str, int] = {}

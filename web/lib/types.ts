@@ -36,9 +36,7 @@ export interface DivergenceMark {
   rsi_to: number;
 }
 
-export interface ChartData {
-  code: string;
-  name: string;
+export interface TimeframeData {
   dates: string[];
   open: number[];
   high: number[];
@@ -53,4 +51,12 @@ export interface ChartData {
   bb_mid: (number | null)[];
   bb_lower: (number | null)[];
   divergences: DivergenceMark[];
+}
+
+export type TimeframeKey = "d" | "w" | "m";
+
+export interface ChartData {
+  code: string;
+  name: string;
+  tf: Partial<Record<TimeframeKey, TimeframeData>> & { d: TimeframeData };
 }

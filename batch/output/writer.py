@@ -1,4 +1,4 @@
-"""정적 JSON 산출: signals/latest.json + chart/{code}.json"""
+"""정적 JSON 산출: signals/latest.json + chart/{code}.json (v2: 일/주/월 타임프레임)"""
 
 import json
 import math
@@ -12,6 +12,8 @@ from batch.indicators.divergence import Divergence
 def _round(v, nd=2):
     if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
         return None
+    if nd == 0:
+        return int(round(float(v)))
     return round(float(v), nd)
 
 
@@ -43,22 +45,24 @@ def write_latest(date: str, stocks: list[dict]) -> None:
     )
 
 
-def write_chart(
-    code: str, name: str, ind: pd.DataFrame, events: list[Divergence]
-) -> None:
-    """종목 상세 차트용 json. 최근 CHART_DAYS 일 + 다이버전스 마킹."""
-    tail = ind.iloc[-config.CHART_DAYS:].reset_index(drop=True)
-    offset = len(ind) - len(tail)  # 이벤트 인덱스를 tail 기준으로 변환
+def timeframe_payload(
+    ind: pd.DataFrame, events: list[Divergence], bars: int
+) -> dict:
+    """한 타임프레임 분량의 차트 데이터. 최근 `bars`개 봉 + 다이버전스 마킹.
 
+    지표값은 가격 축 스케일이라 정수로 반올림해 용량을 줄인다 (RSI만 소수 1자리).
+    """
+    tail = ind.iloc[-bars:].reset_index(drop=True)
+    offset = len(ind) - len(tail)
     dates = tail["date"].tolist()
 
-    def col(name_, nd=2):
+    def col(name_, nd=0):
         return [_round(v, nd) for v in tail[name_]]
 
     divs = []
     for e in events:
         i, j = e.idx_from - offset, e.idx_to - offset
-        if i < 0:  # 차트 범위 밖에서 시작한 이벤트는 제외
+        if i < 0:
             continue
         divs.append(
             {
@@ -72,9 +76,7 @@ def write_chart(
             }
         )
 
-    payload = {
-        "code": code,
-        "name": name,
+    return {
         "dates": dates,
         "open": tail["open"].tolist(),
         "high": tail["high"].tolist(),
@@ -90,6 +92,11 @@ def write_chart(
         "bb_lower": col("bb_lower"),
         "divergences": divs,
     }
+
+
+def write_chart(code: str, name: str, tf: dict[str, dict]) -> None:
+    """종목 상세 차트 json v2. tf = {"d": payload, "w": payload, "m": payload}"""
+    payload = {"code": code, "name": name, "tf": tf}
     config.CHART_DIR.mkdir(parents=True, exist_ok=True)
     (config.CHART_DIR / f"{code}.json").write_text(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),

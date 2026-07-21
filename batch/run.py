@@ -22,7 +22,9 @@ from dotenv import load_dotenv
 from batch import config
 from batch.collector import backfill, daily, master
 from batch.indicators.core import compute_indicators
+from batch.indicators.divergence import detect_divergences
 from batch.indicators.flags import compute_flags
+from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
 
 log = logging.getLogger("batch")
@@ -67,6 +69,12 @@ def compute_and_write(stocks) -> dict:
     skipped = failed = 0
     latest_date = ""
 
+    tf_specs = [  # (키, 리샘플 주기, 담을 봉 수)
+        ("d", None, config.CHART_DAILY_BARS),
+        ("w", "w", config.CHART_WEEKLY_BARS),
+        ("m", "m", config.CHART_MONTHLY_BARS),
+    ]
+
     for row in stocks.itertuples():
         ohlcv = backfill.load_cached(row.code)
         if ohlcv is None or len(ohlcv) < config.MIN_ROWS_FOR_INDICATORS:
@@ -76,7 +84,23 @@ def compute_and_write(stocks) -> dict:
             ind = compute_indicators(ohlcv)
             flags, events = compute_flags(ind)
             entries.append(writer.stock_entry(row.code, row.name, ind, flags))
-            writer.write_chart(row.code, row.name, ind, events)
+
+            tf: dict[str, dict] = {}
+            for key, freq, bars in tf_specs:
+                if freq is None:
+                    tf_ind, tf_events = ind, events
+                else:
+                    resampled = resample_ohlcv(ohlcv, freq)
+                    if len(resampled) < 30:  # 지표 워밍업(RSI14+BB20)에 못 미치면 생략
+                        continue
+                    tf_ind = compute_indicators(resampled)
+                    tf_events = detect_divergences(
+                        tf_ind["high"].astype(float),
+                        tf_ind["low"].astype(float),
+                        tf_ind["rsi"],
+                    )
+                tf[key] = writer.timeframe_payload(tf_ind, tf_events, bars)
+            writer.write_chart(row.code, row.name, tf)
             latest_date = max(latest_date, ind["date"].iloc[-1])
         except Exception:
             log.exception("%s(%s) 계산 실패", row.name, row.code)

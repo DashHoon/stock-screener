@@ -14,7 +14,10 @@ SIGNALS_DIR = OUTPUT_DIR / "signals"
 CHART_DIR = OUTPUT_DIR / "chart"
 
 # --- 수집 ---
-BACKFILL_YEARS = 2          # 백필 기간
+# 10년 확장은 보류 상태 (CHART_PLAN.md C2 참고). 수집 소스가 장기간 요청에서
+# 간헐적으로 지연·행업을 보여, 우선 2년 범위에서 운영하고 마이그레이션은 별도 진행.
+# 주봉/월봉 차트는 있는 기간만큼 리샘플되므로 이 값과 무관하게 동작한다.
+BACKFILL_YEARS = 2
 MIN_ROWS_FOR_INDICATORS = 60  # 이보다 짧은 종목(신규상장 등)은 지표 계산 스킵
 
 # --- RSI ---
@@ -53,4 +56,8 @@ DIV_RSI_BEAR_ZONE = 60.0
 REBUILD_JUMP_PCT = 25.0
 
 # --- 차트 산출 ---
-CHART_DAYS = 250            # 종목별 chart json에 담을 일수 (~1년)
+# 타임프레임 계층화: 일봉은 최근 2년, 장기(10년)는 주봉/월봉으로 본다.
+# (10년 일봉을 그대로 담으면 전체 ~700MB로 정적 서빙에 부적합)
+CHART_DAILY_BARS = 500      # 일봉 ~2년
+CHART_WEEKLY_BARS = 520     # 주봉 ~10년
+CHART_MONTHLY_BARS = 120    # 월봉 10년

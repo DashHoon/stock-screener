@@ -12,7 +12,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { ChartData } from "@/lib/types";
+import type { ChartData, TimeframeData, TimeframeKey } from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
   div_reg_bull: "상승 다이버전스",
@@ -21,7 +21,7 @@ const DIV_LABEL: Record<string, string> = {
   div_hid_bear: "히든 하락",
 };
 
-// 이동평균선 기간·색 (범례와 공유)
+// 이동평균선 기간·색 (봉 개수 기준 — 주봉이면 N주, 월봉이면 N개월 평균)
 const MA_DEFS = [
   { period: 5, color: "#f59e0b" },
   { period: 20, color: "#10b981" },
@@ -32,21 +32,36 @@ const MA_DEFS = [
 const HEIGHTS = { md: 520, lg: 720, xl: 920 } as const;
 type HeightKey = keyof typeof HEIGHTS;
 
-const PERIODS: { label: string; days: number | null }[] = [
-  { label: "1주", days: 7 },
-  { label: "1M", days: 31 },
-  { label: "3M", days: 92 },
-  { label: "6M", days: 183 },
-  { label: "1Y", days: 366 },
-  { label: "전체", days: null },
-];
+const TF_LABEL: Record<TimeframeKey, string> = { d: "일봉", w: "주봉", m: "월봉" };
+
+// 타임프레임별 기간 버튼 (days=null → 전체)
+const TF_PERIODS: Record<TimeframeKey, { label: string; days: number | null }[]> = {
+  d: [
+    { label: "1주", days: 7 },
+    { label: "1M", days: 31 },
+    { label: "3M", days: 92 },
+    { label: "6M", days: 183 },
+    { label: "1Y", days: 366 },
+    { label: "전체", days: null },
+  ],
+  w: [
+    { label: "1Y", days: 366 },
+    { label: "3Y", days: 1096 },
+    { label: "5Y", days: 1827 },
+    { label: "전체", days: null },
+  ],
+  m: [
+    { label: "5Y", days: 1827 },
+    { label: "전체", days: null },
+  ],
+};
 
 interface Settings {
   height: HeightKey;
-  div: boolean; // 다이버전스 화살표
-  macdCross: boolean; // MACD 골든/데드 화살표
-  ma: boolean; // 이동평균선
-  bb: boolean; // 볼린저밴드
+  div: boolean;
+  macdCross: boolean;
+  ma: boolean;
+  bb: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -92,7 +107,7 @@ function sma(values: number[], period: number): (number | null)[] {
 
 /** MACD선-시그널선 교차 마커 (골든 ▲ / 데드 ▼) */
 function macdCrossMarkers(
-  data: ChartData,
+  data: TimeframeData,
   upColor: string,
   downColor: string,
 ): SeriesMarker<Time>[] {
@@ -146,7 +161,11 @@ export default function StockChart({ data }: { data: ChartData }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [tfKey, setTfKey] = useState<TimeframeKey>("d");
   const [ready, setReady] = useState(false);
+
+  const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
+  const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -168,7 +187,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chart.timeScale().fitContent();
       return;
     }
-    const last = data.dates[data.dates.length - 1];
+    const last = current.dates[current.dates.length - 1];
     const from = new Date(Date.parse(last) - days * 86400_000);
     chart.timeScale().setVisibleRange({
       from: (from.getTime() / 1000) as UTCTimestamp,
@@ -205,12 +224,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       rightPriceScale: { borderColor: color.border },
       timeScale: { borderColor: color.border },
       crosshair: { mode: 0 },
-      // 모바일 핀치줌/드래그 명시 활성화
-      handleScale: {
-        pinch: true,
-        mouseWheel: true,
-        axisPressedMouseMove: true,
-      },
+      handleScale: { pinch: true, mouseWheel: true, axisPressedMouseMove: true },
       handleScroll: {
         horzTouchDrag: true,
         vertTouchDrag: false, // 세로 스와이프는 페이지 스크롤에 양보
@@ -234,34 +248,33 @@ export default function StockChart({ data }: { data: ChartData }) {
       wickDownColor: color.down,
     });
     candles.setData(
-      data.dates.map((d, i) => ({
+      current.dates.map((d, i) => ({
         time: ts(d),
-        open: data.open[i],
-        high: data.high[i],
-        low: data.low[i],
-        close: data.close[i],
+        open: current.open[i],
+        high: current.high[i],
+        low: current.low[i],
+        close: current.close[i],
       })),
     );
 
     const thin = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false };
     if (settings.bb) {
       chart.addSeries(LineSeries, { color: color.muted, ...thin })
-        .setData(lineData(data.dates, data.bb_upper));
+        .setData(lineData(current.dates, current.bb_upper));
       chart.addSeries(LineSeries, { color: color.border, ...thin })
-        .setData(lineData(data.dates, data.bb_mid));
+        .setData(lineData(current.dates, current.bb_mid));
       chart.addSeries(LineSeries, { color: color.muted, ...thin })
-        .setData(lineData(data.dates, data.bb_lower));
+        .setData(lineData(current.dates, current.bb_lower));
     }
     if (settings.ma) {
       for (const { period, color: c } of MA_DEFS) {
         chart.addSeries(LineSeries, { color: c, ...thin })
-          .setData(lineData(data.dates, sma(data.close, period)));
+          .setData(lineData(current.dates, sma(current.close, period)));
       }
     }
 
-    // 다이버전스 마커
     if (settings.div) {
-      const markers: SeriesMarker<Time>[] = data.divergences.map((dv) => {
+      const markers: SeriesMarker<Time>[] = current.divergences.map((dv) => {
         const bull = dv.kind.endsWith("bull");
         return {
           time: ts(dv.date_to),
@@ -282,26 +295,26 @@ export default function StockChart({ data }: { data: ChartData }) {
       1,
     );
     volume.setData(
-      data.dates.map((d, i) => ({
+      current.dates.map((d, i) => ({
         time: ts(d),
-        value: data.volume[i],
-        color: data.close[i] >= data.open[i] ? color.up + "66" : color.down + "66",
+        value: current.volume[i],
+        color: current.close[i] >= current.open[i] ? color.up + "66" : color.down + "66",
       })),
     );
 
-    // pane 2: RSI + 30/70 기준선 (진하게)
+    // pane 2: RSI + 30/70 기준선
     const rsiSeries = chart.addSeries(
       LineSeries,
       { color: color.accent, lineWidth: 2, priceLineVisible: false },
       2,
     );
-    rsiSeries.setData(lineData(data.dates, data.rsi));
+    rsiSeries.setData(lineData(current.dates, current.rsi));
     for (const level of [30, 70]) {
       rsiSeries.createPriceLine({
         price: level,
         color: color.fg,
         lineWidth: 1,
-        lineStyle: 0, // 실선
+        lineStyle: 0,
         axisLabelVisible: true,
         title: "",
       });
@@ -314,7 +327,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       3,
     );
     macdHist.setData(
-      lineData(data.dates, data.macd_hist).map((p) => ({
+      lineData(current.dates, current.macd_hist).map((p) => ({
         ...p,
         color: p.value >= 0 ? color.up + "88" : color.down + "88",
       })),
@@ -324,18 +337,17 @@ export default function StockChart({ data }: { data: ChartData }) {
       { color: color.fg, lineWidth: 1, priceLineVisible: false, lastValueVisible: false },
       3,
     );
-    macdLine.setData(lineData(data.dates, data.macd));
+    macdLine.setData(lineData(current.dates, current.macd));
     chart.addSeries(
       LineSeries,
       { color: color.accent, lineWidth: 1, priceLineVisible: false, lastValueVisible: false },
       3,
-    ).setData(lineData(data.dates, data.macd_signal));
+    ).setData(lineData(current.dates, current.macd_signal));
 
     if (settings.macdCross) {
-      createSeriesMarkers(macdLine, macdCrossMarkers(data, color.up, color.down));
+      createSeriesMarkers(macdLine, macdCrossMarkers(current, color.up, color.down));
     }
 
-    // pane 비율
     const panes = chart.panes();
     if (panes.length >= 4) {
       panes[0].setStretchFactor(3);
@@ -344,8 +356,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       panes[3].setStretchFactor(1);
     }
 
-    // 폭 0(숨김 탭·레이아웃 미확정)으로 만들어진 차트는 폭이 생기는 순간
-    // 전체 구간을 다시 맞춰야 한다 → 폭이 0→양수로 바뀔 때 fitContent 재실행
+    // 폭 0(숨김 탭 등)으로 만들어진 차트는 폭이 생기는 순간 다시 맞춘다
     let fitted = false;
     const resize = () => {
       const w = el.clientWidth;
@@ -372,13 +383,26 @@ export default function StockChart({ data }: { data: ChartData }) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data, settings, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, settings, ready, tfKey]);
 
   return (
     <div>
       <div className="chart-toolbar">
         <div className="toolbar-group">
-          {PERIODS.map((p) => (
+          {availableTfs.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={tfKey === k ? "on" : ""}
+              onClick={() => setTfKey(k)}
+            >
+              {TF_LABEL[k]}
+            </button>
+          ))}
+        </div>
+        <div className="toolbar-group">
+          {TF_PERIODS[tfKey].map((p) => (
             <button key={p.label} type="button" onClick={() => setPeriod(p.days)}>
               {p.label}
             </button>
