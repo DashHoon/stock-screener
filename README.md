@@ -4,7 +4,8 @@
 하루 1회 배치로 계산하고, 조건 조합으로 스크리닝하는 웹 서비스.
 하루 지연 시세 기반, 상시 서버 없음(배치 + 정적 서빙).
 
-- 계획서: [PLAN.md](PLAN.md) · 할 일: [TODO.md](TODO.md) · 스펙: [CLAUDE.md](CLAUDE.md)
+- **라이브**: https://stock-screener-flame-omega.vercel.app
+- 계획서: [PLAN.md](PLAN.md) · 할 일: [TODO.md](TODO.md) · 스펙: [CLAUDE.md](CLAUDE.md) · 배포 셋업: [SETUP_GUIDE.md](SETUP_GUIDE.md)
 
 ## 구조
 

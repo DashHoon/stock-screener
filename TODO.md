@@ -57,21 +57,21 @@
 - [x] 종목 상세 `/stock/[code]` SSG + lightweight-charts (캔들+BB, 거래량, RSI, MACD 4패널, 다이버전스 마커)
 - [x] 지표 가이드 페이지 초안 (`/guide`)
 - [x] 모바일 레이아웃 (테이블 가로 스크롤)
-- [ ] 종목 검색 (이름/코드) — 헤더 검색창
-- [ ] 주요 필터 조합 정적 페이지 5~10개 (SEO)
-- [ ] 👤 Vercel 계정 연결 + 첫 배포 (`*.vercel.app`)
+- [x] 종목 검색 (이름/코드) — 헤더 검색창 (자동완성, 키보드 내비게이션)
+- [x] 주요 필터 조합 정적 페이지 8개 (`/screen/[slug]`) + sitemap/robots
+- [x] 👤 Vercel 계정 연결 + 배포 — https://stock-screener-flame-omega.vercel.app
 
 ## Phase 3 — 자동화
 
 - [x] GitHub Actions 워크플로 작성 (`daily-batch.yml`: KST 22시 + 익일 9시 재시도, 캐시, 신선도 검사, data 브랜치 push, Deploy Hook)
-- [ ] 👤 GitHub 저장소 생성 + push — **[SETUP_GUIDE.md](SETUP_GUIDE.md) A단계**
-- [ ] 👤 GitHub Secrets 등록: `DATA_GO_KR_API_KEY` — 가이드 A-4 (Deploy Hook은 불필요해짐 — Vercel 자동 배포 사용)
-- [ ] 👤 Vercel 프로젝트 생성(Root Directory=`web`) + Production Branch를 `data`로 — 가이드 B단계
+- [x] 👤 GitHub 저장소 생성 + push — github.com/DashHoon/stock-screener
+- [x] 👤 GitHub Secrets 등록: `DATA_GO_KR_API_KEY`
+- [x] 👤 Vercel 프로젝트 생성(Root Directory=`web`) + Production Branch를 `data`로
 - [ ] Supabase 이력 적재 (선택 — MVP에는 불필요, 이력 API 필요해질 때):
   - [ ] 👤 Supabase 프로젝트 생성
   - [ ] `ohlcv`/`indicators` 테이블 DDL + 배치 upsert
-- [ ] workflow_dispatch로 수동 1회 실행 검증
-- [ ] 2~3일 연속 무개입 자동 갱신 확인
+- [x] workflow_dispatch로 수동 실행 검증 — 성공 (7분 30초, data 브랜치 → Vercel 자동 배포 → 사이트 반영 확인)
+- [ ] 2~3일 연속 무개입 자동 갱신 확인 (평일 크론 KST 22시 — 첫 자동 실행은 오늘 밤)
 
 ## Phase 4 — 공개 준비
 
