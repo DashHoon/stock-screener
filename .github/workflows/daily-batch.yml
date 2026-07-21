@@ -48,9 +48,7 @@ jobs:
           restore-keys: ohlcv-cache-
 
       - name: Install dependencies
-        run: |
-          uv sync
-          uv pip install 'setuptools<81'  # pykrx의 pkg_resources 의존
+        run: uv sync  # setuptools<81 포함 (pyproject 의존성으로 관리)
 
       - name: Run batch
         env:

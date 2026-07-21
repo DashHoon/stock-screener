@@ -9,6 +9,8 @@ dependencies = [
     "requests>=2.32",
     "pykrx>=1.0.45",
     "python-dotenv>=1.0",
+    "finance-datareader>=0.9.90",
+    "setuptools<81",  # pykrx의 pkg_resources 의존 (81부터 제거됨)
 ]
 
 [dependency-groups]
