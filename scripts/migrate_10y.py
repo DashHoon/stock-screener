@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from batch.collector import master  # noqa: E402
 from batch.collector.backfill import _normalize, cache_path, load_cached  # noqa: E402
+from batch.collector.httpguard import install_timeout_guard  # noqa: E402
 
 YEARS = 10
 SLICE_DAYS = 730            # 검증된 요청 크기 (2년)
@@ -109,6 +110,8 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
     socket.setdefaulttimeout(20)
+    # requests는 timeout 미지정 시 소켓 기본값을 무시한다 → 어댑터 레벨 강제
+    install_timeout_guard(15)
 
     stocks = master.load_or_fetch_master(refresh=False)
     codes = stocks["code"].tolist()

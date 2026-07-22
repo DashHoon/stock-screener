@@ -14,10 +14,9 @@ SIGNALS_DIR = OUTPUT_DIR / "signals"
 CHART_DIR = OUTPUT_DIR / "chart"
 
 # --- 수집 ---
-# 10년 확장은 보류 상태 (CHART_PLAN.md C2 참고). 수집 소스가 장기간 요청에서
-# 간헐적으로 지연·행업을 보여, 우선 2년 범위에서 운영하고 마이그레이션은 별도 진행.
-# 주봉/월봉 차트는 있는 기간만큼 리샘플되므로 이 값과 무관하게 동작한다.
-BACKFILL_YEARS = 2
+# 10년: 주봉/월봉 10년 차트·백테스팅용. 긴 구간 수집은 2년 조각으로 분할된다
+# (backfill._fetch_range — 수집원이 대용량 요청 연타를 조르는 문제 대응).
+BACKFILL_YEARS = 10
 MIN_ROWS_FOR_INDICATORS = 60  # 이보다 짧은 종목(신규상장 등)은 지표 계산 스킵
 
 # --- RSI ---

@@ -44,8 +44,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: batch/data/cache
-          key: ohlcv-cache-${{ github.run_id }}
-          restore-keys: ohlcv-cache-
+          # 10y 접두어: 2년→10년 전환 시 구 캐시를 버리고 전체 재수집하도록 키를 올림
+          key: ohlcv-cache-10y-${{ github.run_id }}
+          restore-keys: ohlcv-cache-10y-
 
       - name: Install dependencies
         run: uv sync  # setuptools<81 포함 (pyproject 의존성으로 관리)
@@ -66,7 +67,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: batch/data/cache
-          key: ohlcv-cache-${{ github.run_id }}
+          key: ohlcv-cache-10y-${{ github.run_id }}
 
       - name: Check output freshness
         id: fresh
