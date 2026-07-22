@@ -208,8 +208,10 @@ a {
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 13.5px;
+  font-family: inherit;
   cursor: pointer;
   background: var(--bg);
+  color: var(--fg); /* button 요소는 색을 상속하지 않음 — 다크모드에서 검정 글씨 방지 */
   user-select: none;
 }
 .filter-chip input {

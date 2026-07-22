@@ -12,9 +12,10 @@ name: daily-batch
 
 on:
   schedule:
-    - cron: "0 13 * * 1-5"  # KST 22:00 (UTC 13:00) 평일
-    - cron: "0 0 * * 2-6"   # KST 09:00 익일 오전 재시도
-    - cron: "0 16 * * 5"    # KST 토 01:00 — 전 종목 재백필 (수정주가 정합성 보정)
+    # 정각 크론은 GitHub에서 지연·누락이 잦아 어중간한 분으로 설정
+    - cron: "7 13 * * 1-5"   # KST 22:07 평일
+    - cron: "23 0 * * 2-6"   # KST 09:23 익일 오전 재시도
+    - cron: "11 16 * * 5"    # KST 토 01:11 — 전 종목 재백필 (수정주가 정합성 보정)
   workflow_dispatch:
     inputs:
       rebuild:
@@ -55,7 +56,7 @@ jobs:
         env:
           DATA_GO_KR_API_KEY: ${{ secrets.DATA_GO_KR_API_KEY }}
         run: |
-          if [[ "${{ github.event.schedule }}" == "0 16 * * 5" || "${{ inputs.rebuild }}" == "true" ]]; then
+          if [[ "${{ github.event.schedule }}" == "11 16 * * 5" || "${{ inputs.rebuild }}" == "true" ]]; then
             uv run python -m batch.run --rebuild-all
           else
             uv run python -m batch.run
