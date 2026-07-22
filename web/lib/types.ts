@@ -17,7 +17,8 @@ export interface StockSignal {
   name: string;
   close: number;
   change_pct: number | null;
-  flags: Record<FlagKey, boolean>;
+  /** 시그널별 마지막 발생이 몇 봉 전인지 (0=오늘). 63봉(~3개월) 초과는 생략 */
+  sig: Partial<Record<FlagKey, number>>;
   rsi: number | null;
 }
 

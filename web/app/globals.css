@@ -303,6 +303,16 @@ a {
   background: color-mix(in srgb, var(--bear) 12%, transparent);
   color: var(--bear);
 }
+.badge-ago {
+  font-style: normal;
+  font-weight: 400;
+  opacity: 0.65;
+  margin-left: 3px;
+  font-size: 10.5px;
+}
+.window-chip {
+  border-radius: 7px;
+}
 
 /* stock detail */
 .stock-header {

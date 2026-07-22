@@ -24,6 +24,7 @@ from batch.collector import backfill, daily, master
 from batch.indicators.core import compute_indicators
 from batch.indicators.divergence import detect_divergences
 from batch.indicators.flags import compute_flags
+from batch.indicators.recent import compute_recent
 from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
 
@@ -82,8 +83,9 @@ def compute_and_write(stocks) -> dict:
             continue
         try:
             ind = compute_indicators(ohlcv)
-            flags, events = compute_flags(ind)
-            entries.append(writer.stock_entry(row.code, row.name, ind, flags))
+            _flags, events = compute_flags(ind)  # events는 차트 마킹·최근 발생 계산에 재사용
+            sig = compute_recent(ind, events)
+            entries.append(writer.stock_entry(row.code, row.name, ind, sig))
 
             tf: dict[str, dict] = {}
             for key, freq, bars in tf_specs:

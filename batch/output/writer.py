@@ -18,9 +18,9 @@ def _round(v, nd=2):
 
 
 def stock_entry(
-    code: str, name: str, ind: pd.DataFrame, flags: dict[str, bool]
+    code: str, name: str, ind: pd.DataFrame, sig: dict[str, int]
 ) -> dict:
-    """latest.json의 stocks[] 한 건."""
+    """latest.json의 stocks[] 한 건. sig = {시그널: 마지막 발생 N봉 전(0=오늘)}"""
     last = ind.iloc[-1]
     prev_close = float(ind["close"].iloc[-2]) if len(ind) >= 2 else None
     change_pct = (
@@ -31,7 +31,7 @@ def stock_entry(
         "name": name,
         "close": int(last["close"]),
         "change_pct": change_pct,
-        "flags": flags,
+        "sig": sig,
         "rsi": _round(last["rsi"], 1),
     }
 
