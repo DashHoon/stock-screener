@@ -8,6 +8,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/stats`, changeFrequency: "weekly", priority: 0.8 },
     ...PRESETS.map((p) => ({
       url: `${SITE_URL}/screen/${p.slug}`,
       changeFrequency: "daily" as const,

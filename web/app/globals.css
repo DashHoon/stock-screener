@@ -440,6 +440,51 @@ a {
   color: var(--accent);
 }
 
+/* stats */
+.stats-baseline {
+  margin: 16px 0 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13.5px;
+}
+.baseline-item {
+  margin-left: 12px;
+  color: var(--muted);
+}
+.strategy-card {
+  margin: 28px 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.strategy-card h2 {
+  margin: 0 0 6px;
+}
+.strategy-desc {
+  font-size: 13.5px;
+  color: var(--fg);
+}
+.strategy-desc .muted {
+  color: var(--muted);
+}
+.stats-table {
+  font-size: 13.5px;
+}
+.stats-disclaimer {
+  margin-top: 36px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.stats-disclaimer h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
 /* guide */
 .prose h1 {
   font-size: 24px;

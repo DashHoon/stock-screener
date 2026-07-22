@@ -1,0 +1,90 @@
+"""공개할 전략 정의 (큐레이션).
+
+새 전략을 추가하려면 여기에 항목을 추가하고 배치를 다시 돌리면 된다.
+형식은 engine.py 상단 주석 참고. 이벤트 목록은 events.py의 build_events 키.
+지표 조건(when)에 쓸 수 있는 컬럼: rsi, macd, macd_signal, macd_hist,
+pct_b, bb_width, close 등 indicators.core.compute_indicators가 만드는 모든 컬럼.
+"""
+
+STRATEGIES: list[dict] = [
+    {
+        "id": "div-bull",
+        "name": "상승 다이버전스 (단독)",
+        "trigger": "div_reg_bull",
+        "confirm": None,
+        "desc": "가격 저점은 낮아지고 RSI 저점은 높아진 반전 신호. 확정일 종가 진입.",
+    },
+    {
+        "id": "div-bull-golden-rsi40",
+        "name": "상승 다이버전스 → 10일 내 골든크로스 + RSI≥40",
+        "trigger": "div_reg_bull",
+        "confirm": {
+            "event": "macd_golden",
+            "within_days": 10,
+            "when": [["rsi", ">=", 40]],
+        },
+        "desc": "다이버전스 발생 후 MACD 골든크로스로 반전을 확인하고, 확인 시점 RSI가 40 이상(반등 동력)일 때만 진입.",
+    },
+    {
+        "id": "golden",
+        "name": "MACD 골든크로스 (단독)",
+        "trigger": "macd_golden",
+        "confirm": None,
+        "desc": "MACD선이 시그널선을 상향 돌파한 날 진입.",
+    },
+    {
+        "id": "golden-below-zero",
+        "name": "저점 골든크로스 (MACD<0에서 발생)",
+        "trigger": "macd_golden",
+        "when": [["macd", "<", 0]],
+        "confirm": None,
+        "desc": "0선 아래(하락 후 저점권)에서 나온 골든크로스만 선별.",
+    },
+    {
+        "id": "zero-up",
+        "name": "MACD 0선 상향 돌파",
+        "trigger": "macd_zero_up",
+        "confirm": None,
+        "desc": "중기 추세가 상승으로 전환되는 구간 진입.",
+    },
+    {
+        "id": "oversold-exit",
+        "name": "과매도 탈출 (RSI 30 상향 재돌파)",
+        "trigger": "rsi_cross_up_30",
+        "confirm": None,
+        "desc": "RSI가 30 아래에서 위로 올라온 날 진입 (과매도 반등 초입).",
+    },
+    {
+        "id": "bb-lower-rsi-recover",
+        "name": "볼린저 하단 터치 → 5일 내 RSI 30 회복",
+        "trigger": "bb_lower_touch",
+        "confirm": {
+            "event": "rsi_cross_up_30",
+            "within_days": 5,
+            "when": [],
+        },
+        "desc": "하단 터치(과매도) 후 며칠 안에 RSI가 회복되는 흐름을 확인하고 진입.",
+    },
+    {
+        "id": "squeeze-golden",
+        "name": "볼린저 스퀴즈 상태에서 골든크로스",
+        "trigger": "macd_golden",
+        "when": [["bb_width", "<", 0.1]],
+        "confirm": None,
+        "desc": "밴드폭이 좁은(변동성 축소) 상태에서 나온 골든크로스 — 방향 분출 초입 후보.",
+    },
+    {
+        "id": "div-bear",
+        "name": "하락 다이버전스 (단독) — 경고 신호 검증",
+        "trigger": "div_reg_bear",
+        "confirm": None,
+        "desc": "상승 추세 약화 경고가 실제로 이후 수익률 저하로 이어지는지 확인용.",
+    },
+    {
+        "id": "dead-cross",
+        "name": "MACD 데드크로스 (단독) — 대조군",
+        "trigger": "macd_dead",
+        "confirm": None,
+        "desc": "매도 신호 이후의 평균 흐름. 매수 전략들과 비교하는 기준선 역할.",
+    },
+]

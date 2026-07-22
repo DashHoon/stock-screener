@@ -60,6 +60,8 @@ jobs:
           else
             uv run python -m batch.run
           fi
+          # 백테스트 통계 (~30초). 산출물이 data 브랜치에 매일 포함되어야 하므로 매일 생성
+          uv run python -m batch.backtest.run
 
       # 이후 단계가 실패해도 백필 결과는 보존한다 (기본 cache 액션은 잡 실패 시 저장 안 함)
       - name: Save OHLCV cache
