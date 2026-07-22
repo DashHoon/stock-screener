@@ -45,6 +45,15 @@ export const FLAG_GROUPS: FlagGroup[] = [
       { key: "bb_squeeze", label: "스퀴즈 (밴드폭 최저)", short: "스퀴즈", bullish: null },
     ],
   },
+  {
+    name: "차트 패턴",
+    flags: [
+      { key: "pat_double_bottom", label: "쌍바닥 돌파 (완성)", short: "쌍바닥", bullish: true },
+      { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: null },
+      { key: "pat_double_top", label: "더블탑 붕괴 (완성)", short: "더블탑", bullish: false },
+      { key: "pat_double_top_form", label: "더블탑 형성 중", short: "더블탑形", bullish: null },
+    ],
+  },
 ];
 
 export const ALL_FLAGS: FlagMeta[] = FLAG_GROUPS.flatMap((g) => g.flags);

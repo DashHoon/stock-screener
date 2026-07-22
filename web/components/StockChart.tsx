@@ -62,6 +62,7 @@ interface Settings {
   macdCross: boolean;
   ma: boolean;
   bb: boolean;
+  pattern: boolean; // 차트 패턴 (쌍바닥/더블탑) 마킹
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -70,6 +71,7 @@ const DEFAULT_SETTINGS: Settings = {
   macdCross: true,
   ma: true,
   bb: true,
+  pattern: true,
 };
 
 function loadSettings(): Settings {
@@ -273,6 +275,52 @@ export default function StockChart({ data }: { data: ChartData }) {
       }
     }
 
+    // 차트 패턴 마킹 (쌍바닥/더블탑): 지그재그 3점 + 넥라인
+    if (settings.pattern && current.patterns?.length) {
+      const lastDate = current.dates[current.dates.length - 1];
+      for (const pat of current.patterns) {
+        const bottom = pat.kind === "pat_double_bottom";
+        const c = bottom ? color.up : color.down;
+        const zig = chart.addSeries(LineSeries, {
+          color: c, lineWidth: 2, lineStyle: 0,
+          priceLineVisible: false, lastValueVisible: false,
+          pointMarkersVisible: true, pointMarkersRadius: 3,
+        });
+        zig.setData(pat.points.map(([d, v]) => ({ time: ts(d), value: v })));
+
+        const neckEnd = pat.completed_date ?? lastDate;
+        const neck = chart.addSeries(LineSeries, {
+          color: c, lineWidth: 1, lineStyle: 2, // 점선 넥라인
+          priceLineVisible: false, lastValueVisible: false,
+        });
+        neck.setData([
+          { time: ts(pat.points[0][0]), value: pat.neckline },
+          { time: ts(neckEnd), value: pat.neckline },
+        ]);
+        if (pat.completed_date) {
+          createSeriesMarkers(neck, [
+            {
+              time: ts(pat.completed_date),
+              position: bottom ? "belowBar" : "aboveBar",
+              color: c,
+              shape: bottom ? "arrowUp" : "arrowDown",
+              text: bottom ? "쌍바닥 돌파" : "더블탑 붕괴",
+            },
+          ]);
+        } else if (pat.forming) {
+          createSeriesMarkers(neck, [
+            {
+              time: ts(pat.points[2][0]),
+              position: bottom ? "belowBar" : "aboveBar",
+              color: color.muted,
+              shape: "circle",
+              text: bottom ? "쌍바닥 형성중" : "더블탑 형성중",
+            },
+          ]);
+        }
+      }
+    }
+
     if (settings.div) {
       const markers: SeriesMarker<Time>[] = current.divergences.map((dv) => {
         const bull = dv.kind.endsWith("bull");
@@ -428,6 +476,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               ["macdCross", "MACD 크로스"],
               ["ma", "이평선"],
               ["bb", "볼린저"],
+              ["pattern", "패턴"],
             ] as [keyof Settings, string][]
           ).map(([key, label]) => (
             <label key={key} className={`toolbar-toggle${settings[key] ? " on" : ""}`}>

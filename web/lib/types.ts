@@ -10,7 +10,11 @@ export type FlagKey =
   | "macd_zero_up"
   | "bb_upper_touch"
   | "bb_lower_touch"
-  | "bb_squeeze";
+  | "bb_squeeze"
+  | "pat_double_bottom"
+  | "pat_double_bottom_form"
+  | "pat_double_top"
+  | "pat_double_top_form";
 
 export interface StockSignal {
   code: string;
@@ -37,8 +41,17 @@ export interface DivergenceMark {
   rsi_to: number;
 }
 
+export interface PatternMark {
+  kind: "pat_double_bottom" | "pat_double_top";
+  points: [string, number][]; // [date, price] — 바닥1/넥라인 기준점/바닥2
+  neckline: number;
+  completed_date: string | null;
+  forming: boolean;
+}
+
 export interface TimeframeData {
   dates: string[];
+  patterns?: PatternMark[];
   open: number[];
   high: number[];
   low: number[];

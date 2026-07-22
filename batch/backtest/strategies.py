@@ -74,6 +74,20 @@ STRATEGIES: list[dict] = [
         "desc": "밴드폭이 좁은(변동성 축소) 상태에서 나온 골든크로스 — 방향 분출 초입 후보.",
     },
     {
+        "id": "double-bottom",
+        "name": "쌍바닥 돌파 (넥라인 상향 돌파일 진입)",
+        "trigger": "pat_double_bottom",
+        "confirm": None,
+        "desc": "두 바닥이 ±3% 안에서 형성되고 넥라인(사이 반등 고점)을 종가로 돌파한 날 진입.",
+    },
+    {
+        "id": "double-top",
+        "name": "더블탑 붕괴 (넥라인 하향 돌파) — 경고 신호 검증",
+        "trigger": "pat_double_top",
+        "confirm": None,
+        "desc": "쌍봉 후 넥라인 붕괴가 실제 하락으로 이어지는지 확인용.",
+    },
+    {
         "id": "div-bear",
         "name": "하락 다이버전스 (단독) — 경고 신호 검증",
         "trigger": "div_reg_bear",

@@ -54,6 +54,15 @@ DIV_RSI_BEAR_ZONE = 60.0
 # 30% 미만의 작은 조정(소규모 증자 등)은 여기서 못 잡고 주 1회 전체 재백필이 보정한다.
 REBUILD_JUMP_PCT = 25.0
 
+# --- 차트 패턴 (쌍바닥/더블탑) ---
+PAT_PIVOT_LEFT = 5          # 가격 피벗 좌우 lookback (RSI 피벗보다 넓게 — 주요 스윙만)
+PAT_PIVOT_RIGHT = 5
+PAT_TOL_PCT = 3.0           # 두 바닥(꼭대기)의 가격 유사 허용 오차 %
+PAT_MIN_GAP = 10            # 두 바닥 사이 최소 봉 수
+PAT_MAX_GAP = 60            # 두 바닥 사이 최대 봉 수
+PAT_MIN_DEPTH_PCT = 5.0     # 넥라인이 바닥 대비 최소 이만큼 높아야 (잡음 제거)
+PAT_BREAKOUT_WINDOW = 40    # 두 번째 바닥 확정 후 돌파를 기다리는 최대 봉 수
+
 # --- 스크리너 기간 필터 ---
 RECENT_MAX_BARS = 63        # '최근 발생' 추적 상한 (~3개월). 이보다 오래되면 생략
 

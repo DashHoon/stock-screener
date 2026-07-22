@@ -52,4 +52,14 @@ def build_events(ind: pd.DataFrame) -> dict[str, list[int]]:
         events[kind] = sorted(
             e.confirmed_at for e in divs if e.kind == kind and e.confirmed_at < n
         )
+
+    # 차트 패턴 완성(돌파)일 이벤트
+    from batch.patterns.double import detect_double_patterns
+
+    pats = detect_double_patterns(ind)
+    for kind in ("pat_double_bottom", "pat_double_top"):
+        events[kind] = sorted(
+            p.completed_at for p in pats
+            if p.kind == kind and p.completed_at is not None and p.completed_at < n
+        )
     return events

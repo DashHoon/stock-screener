@@ -27,6 +27,7 @@ from batch.indicators.flags import compute_flags
 from batch.indicators.recent import compute_recent
 from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
+from batch.patterns.double import detect_double_patterns
 
 log = logging.getLogger("batch")
 
@@ -85,6 +86,18 @@ def compute_and_write(stocks) -> dict:
             ind = compute_indicators(ohlcv)
             _flags, events = compute_flags(ind)  # events는 차트 마킹·최근 발생 계산에 재사용
             sig = compute_recent(ind, events)
+
+            # 차트 패턴 (일봉): 완성=돌파일 기준, 형성 중=오늘 상태
+            patterns = detect_double_patterns(ohlcv)
+            n_bars = len(ind)
+            for p in patterns:
+                if p.completed_at is not None:
+                    ago = n_bars - 1 - p.completed_at
+                    if ago <= config.RECENT_MAX_BARS:
+                        sig[p.kind] = min(sig.get(p.kind, ago), ago)
+                elif p.forming:
+                    sig[p.kind + "_form"] = 0
+
             entries.append(writer.stock_entry(row.code, row.name, ind, sig))
 
             tf: dict[str, dict] = {}
@@ -101,7 +114,10 @@ def compute_and_write(stocks) -> dict:
                         tf_ind["low"].astype(float),
                         tf_ind["rsi"],
                     )
-                tf[key] = writer.timeframe_payload(tf_ind, tf_events, bars)
+                tf[key] = writer.timeframe_payload(
+                    tf_ind, tf_events, bars,
+                    patterns=patterns if key == "d" else None,
+                )
             writer.write_chart(row.code, row.name, tf)
             latest_date = max(latest_date, ind["date"].iloc[-1])
         except Exception:
