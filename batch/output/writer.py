@@ -37,12 +37,13 @@ def stock_entry(
         "cap": int(marcap),
         "sig": sig,
         "rsi": _round(last["rsi"], 1),
+        "m": [int(x) for x in ind["close"].iloc[-20:]],  # 최근 20봉 스파크라인
     }
 
 
-def write_latest(date: str, stocks: list[dict]) -> None:
+def write_latest(date: str, stocks: list[dict], indices: list[dict] | None = None) -> None:
     config.SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {"date": date, "stocks": stocks}
+    payload = {"date": date, "indices": indices or [], "stocks": stocks}
     (config.SIGNALS_DIR / "latest.json").write_text(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",

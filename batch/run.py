@@ -144,8 +144,16 @@ def compute_and_write(stocks) -> dict:
             log.exception("%s(%s) 계산 실패", row.name, row.code)
             failed += 1
 
+    # 코스피/코스닥 지수 (초기 화면용)
+    from batch.collector.indices import fetch_indices
+    try:
+        indices = fetch_indices()
+    except Exception:
+        log.exception("지수 수집 실패")
+        indices = []
+
     # 최신 거래일 데이터가 없는(거래정지 등) 종목은 스크리너에서 제외하지 않고 그대로 둔다.
-    writer.write_latest(latest_date, entries)
+    writer.write_latest(latest_date, entries, indices)
     return {
         "date": latest_date,
         "written": len(entries),

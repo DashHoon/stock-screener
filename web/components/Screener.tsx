@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import BacktestPanel from "@/components/BacktestPanel";
+import Sparkline from "@/components/Sparkline";
 
 type SortKey = "name" | "close" | "change_pct" | "rsi" | "cap";
 
@@ -86,8 +87,17 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
     if (target !== current) router.replace(target, { scroll: false });
   }
 
+  // 지표 조건이 하나도 없으면 '초기 화면' — 시총 상위 10만 보여준다
+  const noFilter = selected.size === 0;
+
   const rows = useMemo(() => {
     if (!data) return [];
+    if (noFilter) {
+      return [...data.stocks]
+        .filter((s) => (s.cap ?? -1) >= minCap)
+        .sort((a, b) => (b.cap ?? -1) - (a.cap ?? -1))
+        .slice(0, 10);
+    }
     const keys = [...selected];
     const filtered = data.stocks.filter(
       (s) =>
@@ -101,7 +111,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       const bv = b[sortKey] ?? -Infinity;
       return dir * (Number(av) - Number(bv));
     });
-  }, [data, selected, windowBars, minCap, sortKey, sortDesc]);
+  }, [data, noFilter, selected, windowBars, minCap, sortKey, sortDesc]);
 
   function toggle(key: FlagKey) {
     setSelected((prev) => {
@@ -136,6 +146,28 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
 
   return (
     <div>
+      {noFilter && data?.indices && data.indices.length > 0 && (
+        <div className="index-cards">
+          {data.indices.map((ix) => {
+            const up = (ix.change_pct ?? 0) > 0;
+            const down = (ix.change_pct ?? 0) < 0;
+            return (
+              <div className="index-card" key={ix.name}>
+                <div className="index-info">
+                  <span className="index-name">{ix.name}</span>
+                  <span className="index-close">{ix.close.toLocaleString()}</span>
+                  <span className={up ? "pct-up" : down ? "pct-down" : ""}>
+                    {ix.change_pct == null
+                      ? ""
+                      : `${ix.change_pct > 0 ? "+" : ""}${ix.change_pct.toFixed(2)}%`}
+                  </span>
+                </div>
+                <Sparkline data={ix.spark} width={96} height={32} />
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="filter-panel">
         <div className="filter-group">
           <div className="filter-group-name">발생 시점 (선택한 모든 조건이 이 기간 안에 발생)</div>
@@ -197,11 +229,18 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
 
       <div className="result-meta">
         <span className="count">
-          {data ? `${rows.length.toLocaleString()}종목` : error ? "데이터 로드 실패" : "불러오는 중…"}
+          {!data
+            ? error
+              ? "데이터 로드 실패"
+              : "불러오는 중…"
+            : noFilter
+              ? "시가총액 상위 10"
+              : `${rows.length.toLocaleString()}종목`}
         </span>
         <span className="hint">
-          선택한 조건이 모두 {WINDOWS.find((w) => w.bars === windowBars)?.label}{" "}
-          안에 발생한(AND) 종목입니다. 전일 기준 데이터.
+          {noFilter
+            ? "위에서 지표를 선택하면 조건에 맞는 종목이 표시됩니다. 전일 기준 데이터."
+            : `선택한 조건이 모두 ${WINDOWS.find((w) => w.bars === windowBars)?.label} 안에 발생한(AND) 종목입니다. 전일 기준 데이터.`}
         </span>
       </div>
 
@@ -222,6 +261,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             <th className="num" onClick={() => sortBy("rsi")}>
               RSI{arrow("rsi")}
             </th>
+            <th className="spark-col">20일</th>
             <th>시그널</th>
           </tr>
         </thead>
@@ -248,6 +288,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
                   : `${s.change_pct > 0 ? "+" : ""}${s.change_pct.toFixed(2)}%`}
               </td>
               <td className="num">{s.rsi ?? "-"}</td>
+              <td className="spark-col"><Sparkline data={s.m} /></td>
               <td>
                 {badgesWithin(s, windowBars).map(({ meta, ago }) => (
                   <span
