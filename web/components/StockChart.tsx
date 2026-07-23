@@ -8,6 +8,7 @@ import {
   LineSeries,
   createChart,
   createSeriesMarkers,
+  type LogicalRange,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -162,6 +163,10 @@ function attachPaneLabels(
 export default function StockChart({ data }: { data: ChartData }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  // 토글/높이 변경으로 차트를 재생성할 때 확대 범위를 유지하기 위한 보관용.
+  // 종목·타임프레임이 그대로일 때만 복원한다(바뀌면 시간축이 달라 무의미).
+  const savedRangeRef = useRef<LogicalRange | null>(null);
+  const prevViewRef = useRef<string | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tfKey, setTfKey] = useState<TimeframeKey>("d");
   const [ready, setReady] = useState(false);
@@ -438,6 +443,12 @@ export default function StockChart({ data }: { data: ChartData }) {
       panes[3].setStretchFactor(1);
     }
 
+    // 같은 종목·타임프레임에서 토글/높이만 바뀐 재생성이면 확대 범위를 복원한다.
+    // 종목이나 일/주/월이 바뀌면 시간축이 달라지므로 전체 맞춤(fitContent).
+    const viewKey = `${data.code}|${tfKey}`;
+    const sameView = prevViewRef.current === viewKey;
+    prevViewRef.current = viewKey;
+
     // 폭 0(숨김 탭 등)으로 만들어진 차트는 폭이 생기는 순간 다시 맞춘다
     let fitted = false;
     const resize = () => {
@@ -445,7 +456,11 @@ export default function StockChart({ data }: { data: ChartData }) {
       chart.applyOptions({ width: w });
       if (w > 0 && !fitted) {
         fitted = true;
-        chart.timeScale().fitContent();
+        if (sameView && savedRangeRef.current) {
+          chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
+        } else {
+          chart.timeScale().fitContent();
+        }
         const ps = chart.panes();
         if (ps.length >= 4) {
           attachPaneLabels(
@@ -461,6 +476,12 @@ export default function StockChart({ data }: { data: ChartData }) {
     observer.observe(el);
 
     return () => {
+      // 재생성 직전의 확대 범위를 저장 (다음 effect에서 복원 여부 판단)
+      try {
+        savedRangeRef.current = chart.timeScale().getVisibleLogicalRange();
+      } catch {
+        /* 이미 제거된 경우 */
+      }
       observer.disconnect();
       chart.remove();
       chartRef.current = null;
