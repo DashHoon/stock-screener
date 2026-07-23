@@ -42,6 +42,7 @@ export default async function StockPage({
   const up = close >= prev;
 
   const recentDivs = daily.divergences.slice(-3).reverse();
+  const isIndex = /^[A-Za-z]/.test(data.code); // 지수(KS11/KQ11)는 코드가 문자로 시작
 
   return (
     <>
@@ -49,7 +50,10 @@ export default async function StockPage({
         <h1>
           {data.name} <span className="code">{data.code}</span>
         </h1>
-        <span className="price">{close.toLocaleString()}원</span>
+        <span className="price">
+          {close.toLocaleString()}
+          {isIndex ? "" : "원"}
+        </span>
         {changePct && (
           <span className={up ? "pct-up" : "pct-down"}>
             {up ? "+" : ""}
