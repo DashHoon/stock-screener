@@ -144,13 +144,36 @@ def compute_and_write(stocks) -> dict:
             log.exception("%s(%s) 계산 실패", row.name, row.code)
             failed += 1
 
-    # 코스피/코스닥 지수 (초기 화면용)
-    from batch.collector.indices import fetch_indices
+    # 코스피/코스닥 지수: 초기 화면 카드 + 상세 차트(종목 차트 파이프라인 재사용)
+    from batch.collector.indices import INDICES, fetch_index_ohlcv, fetch_indices
     try:
         indices = fetch_indices()
     except Exception:
         log.exception("지수 수집 실패")
         indices = []
+    for sym, name in INDICES:
+        try:
+            iohlcv = fetch_index_ohlcv(sym)
+            if iohlcv is None or len(iohlcv) < config.MIN_ROWS_FOR_INDICATORS:
+                continue
+            i_ind = compute_indicators(iohlcv)
+            _f, i_events = compute_flags(i_ind)
+            i_pats = detect_all_patterns(iohlcv)
+            i_tf: dict[str, dict] = {}
+            for key, freq, bars in tf_specs:
+                if freq is None:
+                    ti, te, tp = i_ind, i_events, i_pats
+                else:
+                    rs = resample_ohlcv(iohlcv, freq)
+                    if len(rs) < 30:
+                        continue
+                    ti = compute_indicators(rs)
+                    te = detect_divergences(ti["high"].astype(float), ti["low"].astype(float), ti["rsi"])
+                    tp = None
+                i_tf[key] = writer.timeframe_payload(ti, te, bars, patterns=tp if freq is None else None)
+            writer.write_chart(sym, name, i_tf)
+        except Exception:
+            log.exception("지수 %s 차트 생성 실패", sym)
 
     # 최신 거래일 데이터가 없는(거래정지 등) 종목은 스크리너에서 제외하지 않고 그대로 둔다.
     writer.write_latest(latest_date, entries, indices)

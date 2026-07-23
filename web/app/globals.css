@@ -506,6 +506,10 @@ a {
   border-radius: 10px;
   background: var(--surface);
   flex: 1 1 220px;
+  cursor: pointer;
+}
+.index-card:hover {
+  border-color: var(--accent);
 }
 .index-info {
   display: flex;

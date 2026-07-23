@@ -152,9 +152,9 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             const up = (ix.change_pct ?? 0) > 0;
             const down = (ix.change_pct ?? 0) < 0;
             return (
-              <div className="index-card" key={ix.name}>
+              <Link className="index-card" key={ix.name} href={`/stock/${ix.code}`}>
                 <div className="index-info">
-                  <span className="index-name">{ix.name}</span>
+                  <span className="index-name">{ix.name} ›</span>
                   <span className="index-close">{ix.close.toLocaleString()}</span>
                   <span className={up ? "pct-up" : down ? "pct-down" : ""}>
                     {ix.change_pct == null
@@ -163,7 +163,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
                   </span>
                 </div>
                 <Sparkline data={ix.spark} width={96} height={32} />
-              </div>
+              </Link>
             );
           })}
         </div>

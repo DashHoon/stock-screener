@@ -73,6 +73,7 @@ export interface StockSignal {
 }
 
 export interface MarketIndex {
+  code: string;
   name: string;
   close: number;
   change_pct: number | null;
