@@ -19,8 +19,9 @@ MARKETS = {"STK": "KOSPI", "KSQ": "KOSDAQ"}
 def fetch_stock_master() -> pd.DataFrame:
     """전 종목 마스터를 수집해 필터링한 DataFrame을 돌려준다.
 
-    columns: code, name, market, close, change_pct
+    columns: code, name, market, close, change_pct, marcap(억원)
     제외: KONEX, 스팩, 우선주(종목코드 끝자리 != '0')
+    시가총액 내림차순 정렬 (백테스트 large 유니버스가 순서에 의존).
     """
     import FinanceDataReader as fdr
 
@@ -29,6 +30,8 @@ def fetch_stock_master() -> pd.DataFrame:
     df = df[~df["Name"].str.contains("스팩", na=False)]
     df = df[df["Code"].str.endswith("0")]  # 우선주 제외 (5·7·9 등으로 끝남)
 
+    # Marcap(원) → 억원. 결측·0은 -1로 두어 필터에서 '알 수 없음'으로 취급
+    marcap_won = pd.to_numeric(df.get("Marcap"), errors="coerce").fillna(0)
     out = pd.DataFrame(
         {
             "code": df["Code"],
@@ -36,8 +39,10 @@ def fetch_stock_master() -> pd.DataFrame:
             "market": df["MarketId"].map(MARKETS),
             "close": df["Close"].astype("int64"),
             "change_pct": df["ChagesRatio"].astype(float).round(2),
+            "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
         }
-    ).reset_index(drop=True)
+    )
+    out = out.sort_values("marcap", ascending=False).reset_index(drop=True)
     log.info("종목 마스터 %d개 (원본 %d개)", len(out), len(raw))
     return out
 

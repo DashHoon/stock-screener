@@ -113,7 +113,12 @@ def compute_and_write(stocks) -> dict:
                     elif p.forming:
                         sig[p.kind + "_form"] = 0
 
-            entries.append(writer.stock_entry(row.code, row.name, ind, sig))
+            entries.append(
+                writer.stock_entry(
+                    row.code, row.name, ind, sig,
+                    marcap=int(getattr(row, "marcap", -1)),
+                )
+            )
 
             tf: dict[str, dict] = {}
             for key, freq, bars in tf_specs:

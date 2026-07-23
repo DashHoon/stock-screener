@@ -515,9 +515,17 @@ a {
   padding-left: 20px;
 }
 
+.stock-table td.cap {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 모바일: 시총(3)·RSI(5) 열 숨김 → 종목/종가/등락률/시그널만 */
 @media (max-width: 640px) {
-  .stock-table th:nth-child(4),
-  .stock-table td:nth-child(4) {
+  .stock-table th:nth-child(3),
+  .stock-table td:nth-child(3),
+  .stock-table th:nth-child(5),
+  .stock-table td:nth-child(5) {
     display: none;
   }
 }

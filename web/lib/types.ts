@@ -54,6 +54,8 @@ export interface StockSignal {
   name: string;
   close: number;
   change_pct: number | null;
+  /** 시가총액 (억원, -1=알 수 없음) */
+  cap: number;
   /** 시그널별 마지막 발생이 몇 봉 전인지 (0=오늘). 63봉(~3개월) 초과는 생략 */
   sig: Partial<Record<FlagKey, number>>;
   rsi: number | null;
