@@ -10,6 +10,7 @@ import pandas as pd
 
 from batch import config
 from batch.backtest.events import _cross_up
+from batch.indicators.candles import detect_candles
 from batch.indicators.divergence import Divergence
 
 
@@ -55,6 +56,10 @@ def compute_recent(
         candidates[kind] = _last_index(
             [e.confirmed_at for e in div_events if e.kind == kind], n
         )
+
+    # 단기 캔들 패턴 (장악형 등)
+    for kind, idxs in detect_candles(ind).items():
+        candidates[kind] = _last_index(idxs, n)
 
     return {
         k: v for k, v in candidates.items() if v is not None and v <= max_bars

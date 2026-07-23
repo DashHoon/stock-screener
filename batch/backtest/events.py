@@ -53,6 +53,11 @@ def build_events(ind: pd.DataFrame) -> dict[str, list[int]]:
             e.confirmed_at for e in divs if e.kind == kind and e.confirmed_at < n
         )
 
+    # 단기 캔들 패턴 이벤트
+    from batch.indicators.candles import detect_candles
+
+    events.update(detect_candles(ind))
+
     # 차트 패턴 완성(돌파)일 이벤트
     from batch.patterns import PATTERN_KINDS, detect_all_patterns
 

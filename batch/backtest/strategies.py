@@ -47,6 +47,20 @@ STRATEGIES: list[dict] = [
         "desc": "대형주 쌍바닥 돌파를 거래량·추세로 확인.",
     },
     {
+        "id": "engulf-bull",
+        "name": "상승 장악형 (하락 후)",
+        "trigger": "cdl_engulf_bull",
+        "confirm": None,
+        "desc": "하락 흐름에서 양봉 몸통이 전봉 음봉을 완전히 감싼 날 진입. 대표적 단기 반전 캔들.",
+    },
+    {
+        "id": "morning-star",
+        "name": "샛별형 (3봉 반전)",
+        "trigger": "cdl_morning",
+        "confirm": None,
+        "desc": "큰 음봉 → 작은 몸통 → 큰 양봉이 첫 봉 중간을 회복한 3봉 반전 완성일 진입.",
+    },
+    {
         "id": "flag-bull-contrarian",
         "name": "[발견] 상승 플래그 — 하락추세 중 (역발상)",
         "trigger": "pat_flag_bull",

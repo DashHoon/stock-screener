@@ -75,6 +75,20 @@ export const FLAG_GROUPS: FlagGroup[] = [
     ],
   },
   {
+    name: "캔들 패턴 (단기)",
+    flags: [
+      { key: "cdl_engulf_bull", label: "상승 장악형", short: "상승장악", bullish: true },
+      { key: "cdl_hammer", label: "망치형 (하락 후)", short: "망치", bullish: true },
+      { key: "cdl_pierce", label: "관통형", short: "관통", bullish: true },
+      { key: "cdl_morning", label: "샛별형 (3봉)", short: "샛별", bullish: true },
+      { key: "cdl_engulf_bear", label: "하락 장악형", short: "하락장악", bullish: false },
+      { key: "cdl_shooting", label: "유성형 (상승 후)", short: "유성", bullish: false },
+      { key: "cdl_darkcloud", label: "흑운형", short: "흑운", bullish: false },
+      { key: "cdl_evening", label: "저녁별형 (3봉)", short: "저녁별", bullish: false },
+      { key: "cdl_doji", label: "도지 (변동폭 큰 날)", short: "도지", bullish: null },
+    ],
+  },
+  {
     name: "패턴 형성 중",
     flags: [
       { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: null },

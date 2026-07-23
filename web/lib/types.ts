@@ -47,7 +47,16 @@ export type FlagKey =
   | "pat_broadening"
   | "pat_broadening_form"
   | "pat_diamond"
-  | "pat_diamond_form";
+  | "pat_diamond_form"
+  | "cdl_engulf_bull"
+  | "cdl_engulf_bear"
+  | "cdl_hammer"
+  | "cdl_shooting"
+  | "cdl_doji"
+  | "cdl_pierce"
+  | "cdl_darkcloud"
+  | "cdl_morning"
+  | "cdl_evening";
 
 export interface StockSignal {
   code: string;
