@@ -16,7 +16,38 @@ export type FlagKey =
   | "pat_double_top"
   | "pat_double_top_form"
   | "pat_cup_handle"
-  | "pat_cup_handle_form";
+  | "pat_cup_handle_form"
+  | "pat_hs_top"
+  | "pat_hs_top_form"
+  | "pat_hs_inv"
+  | "pat_hs_inv_form"
+  | "pat_triple_bottom"
+  | "pat_triple_bottom_form"
+  | "pat_triple_top"
+  | "pat_triple_top_form"
+  | "pat_round_bottom"
+  | "pat_round_bottom_form"
+  | "pat_round_top"
+  | "pat_round_top_form"
+  | "pat_tri_asc"
+  | "pat_tri_asc_form"
+  | "pat_tri_desc"
+  | "pat_tri_desc_form"
+  | "pat_tri_sym_up"
+  | "pat_tri_sym_down"
+  | "pat_tri_sym_form"
+  | "pat_wedge_rise"
+  | "pat_wedge_rise_form"
+  | "pat_wedge_fall"
+  | "pat_wedge_fall_form"
+  | "pat_flag_bull"
+  | "pat_flag_bull_form"
+  | "pat_flag_bear"
+  | "pat_flag_bear_form"
+  | "pat_broadening"
+  | "pat_broadening_form"
+  | "pat_diamond"
+  | "pat_diamond_form";
 
 export interface StockSignal {
   code: string;
@@ -44,8 +75,9 @@ export interface DivergenceMark {
 }
 
 export interface PatternMark {
-  kind: "pat_double_bottom" | "pat_double_top" | "pat_cup_handle";
-  points: [string, number][]; // [date, price] 꺾은선 좌표
+  kind: string; // pat_* (완성 키 또는 형성 중이면 기본 키)
+  points: [string, number][]; // [date, price] 꺾은선 좌표 (시간 오름차순)
+  points2?: [string, number][]; // 보조선 (삼각형/쐐기의 아래 추세선 등)
   neckline: number;
   completed_date: string | null;
   forming: boolean;

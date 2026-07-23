@@ -281,10 +281,32 @@ export default function StockChart({ data }: { data: ChartData }) {
         pat_double_bottom: ["쌍바닥 돌파", "쌍바닥 형성중"],
         pat_double_top: ["더블탑 붕괴", "더블탑 형성중"],
         pat_cup_handle: ["컵앤핸들 돌파", "컵앤핸들 형성중"],
+        pat_hs_top: ["헤드앤숄더 붕괴", "H&S 형성중"],
+        pat_hs_inv: ["역헤드앤숄더 돌파", "역H&S 형성중"],
+        pat_triple_bottom: ["3중바닥 돌파", "3중바닥 형성중"],
+        pat_triple_top: ["트리플탑 붕괴", "트리플탑 형성중"],
+        pat_round_bottom: ["라운드바텀 돌파", "라운드바텀 형성중"],
+        pat_round_top: ["라운드탑 이탈", "라운드탑 형성중"],
+        pat_tri_asc: ["상승삼각형 돌파", "상승삼각형 형성중"],
+        pat_tri_desc: ["하락삼각형 이탈", "하락삼각형 형성중"],
+        pat_tri_sym: ["삼각수렴", "삼각수렴 형성중"],
+        pat_tri_sym_up: ["삼각수렴 상향 돌파", "삼각수렴 형성중"],
+        pat_tri_sym_down: ["삼각수렴 하향 이탈", "삼각수렴 형성중"],
+        pat_wedge_rise: ["상승쐐기 이탈", "상승쐐기 형성중"],
+        pat_wedge_fall: ["하락쐐기 돌파", "하락쐐기 형성중"],
+        pat_flag_bull: ["상승플래그 돌파", "상승플래그 형성중"],
+        pat_flag_bear: ["하락플래그 이탈", "하락플래그 형성중"],
+        pat_broadening: ["브로드닝 이탈", "브로드닝 형성중"],
+        pat_diamond: ["다이아몬드 이탈", "다이아몬드 형성중"],
       };
+      const BULL_KINDS = new Set([
+        "pat_double_bottom", "pat_cup_handle", "pat_hs_inv", "pat_triple_bottom",
+        "pat_round_bottom", "pat_wedge_fall", "pat_tri_asc", "pat_tri_sym_up",
+        "pat_flag_bull",
+      ]);
       const lastDate = current.dates[current.dates.length - 1];
       for (const pat of current.patterns) {
-        const bottom = pat.kind !== "pat_double_top"; // 상승형 패턴 여부
+        const bottom = BULL_KINDS.has(pat.kind) || pat.kind === "pat_tri_sym";
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
           color: c, lineWidth: 2, lineStyle: 0,
@@ -292,6 +314,13 @@ export default function StockChart({ data }: { data: ChartData }) {
           pointMarkersVisible: true, pointMarkersRadius: 3,
         });
         zig.setData(pat.points.map(([d, v]) => ({ time: ts(d), value: v })));
+        if (pat.points2?.length) {
+          chart.addSeries(LineSeries, {
+            color: c, lineWidth: 2, lineStyle: 0,
+            priceLineVisible: false, lastValueVisible: false,
+            pointMarkersVisible: true, pointMarkersRadius: 3,
+          }).setData(pat.points2.map(([d, v]) => ({ time: ts(d), value: v })));
+        }
 
         const neckEnd = pat.completed_date ?? lastDate;
         const neck = chart.addSeries(LineSeries, {

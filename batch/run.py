@@ -96,8 +96,15 @@ def compute_and_write(stocks) -> dict:
 
             # 차트 패턴 (일봉): 완성=돌파일 기준, 형성 중=오늘 상태
             patterns = detect_all_patterns(ohlcv)
+            n_bars = len(ind)
+            # 차트 마킹은 최근(3개월 내 완성 또는 형성 중)만 — 과거 패턴 전부 그리면 뒤덮임
+            chart_patterns = [
+                p for p in patterns
+                if p.forming
+                or (p.completed_at is not None
+                    and n_bars - 1 - p.completed_at <= config.RECENT_MAX_BARS)
+            ]
             if not is_stale:
-                n_bars = len(ind)
                 for p in patterns:
                     if p.completed_at is not None:
                         ago = n_bars - 1 - p.completed_at
@@ -124,7 +131,7 @@ def compute_and_write(stocks) -> dict:
                     )
                 tf[key] = writer.timeframe_payload(
                     tf_ind, tf_events, bars,
-                    patterns=patterns if key == "d" else None,
+                    patterns=chart_patterns if key == "d" else None,
                 )
             writer.write_chart(row.code, row.name, tf)
             latest_date = max(latest_date, ind["date"].iloc[-1])

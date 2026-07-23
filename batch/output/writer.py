@@ -82,21 +82,27 @@ def timeframe_payload(
     pats = []
     for p in patterns or []:
         pts = [(i - offset, price) for i, price in p.points]
-        if pts[0][0] < 0:
+        if not pts or pts[0][0] < 0:
             continue  # 차트 범위 밖에서 시작한 패턴 제외
-        pats.append(
-            {
-                "kind": p.kind,
-                "points": [[dates[i], round(float(v), 2)] for i, v in pts],
-                "neckline": p.neckline,
-                "completed_date": (
-                    dates[p.completed_at - offset]
-                    if p.completed_at is not None and p.completed_at - offset < len(dates)
-                    else None
-                ),
-                "forming": p.forming,
-            }
-        )
+        entry = {
+            "kind": p.kind,
+            "points": [[dates[i], round(float(v), 2)] for i, v in pts],
+            "neckline": p.neckline,
+            "completed_date": (
+                dates[p.completed_at - offset]
+                if p.completed_at is not None and p.completed_at - offset < len(dates)
+                else None
+            ),
+            "forming": p.forming,
+        }
+        pts2 = [
+            (i - offset, price)
+            for i, price in getattr(p, "points2", []) or []
+            if i - offset >= 0
+        ]
+        if pts2:
+            entry["points2"] = [[dates[i], round(float(v), 2)] for i, v in pts2]
+        pats.append(entry)
 
     return {
         "dates": dates,
