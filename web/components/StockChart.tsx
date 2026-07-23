@@ -275,11 +275,16 @@ export default function StockChart({ data }: { data: ChartData }) {
       }
     }
 
-    // 차트 패턴 마킹 (쌍바닥/더블탑): 지그재그 3점 + 넥라인
+    // 차트 패턴 마킹 (쌍바닥/더블탑/컵앤핸들): 꺾은선 + 넥라인
     if (settings.pattern && current.patterns?.length) {
+      const PATTERN_LABEL: Record<string, [string, string]> = {
+        pat_double_bottom: ["쌍바닥 돌파", "쌍바닥 형성중"],
+        pat_double_top: ["더블탑 붕괴", "더블탑 형성중"],
+        pat_cup_handle: ["컵앤핸들 돌파", "컵앤핸들 형성중"],
+      };
       const lastDate = current.dates[current.dates.length - 1];
       for (const pat of current.patterns) {
-        const bottom = pat.kind === "pat_double_bottom";
+        const bottom = pat.kind !== "pat_double_top"; // 상승형 패턴 여부
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
           color: c, lineWidth: 2, lineStyle: 0,
@@ -304,17 +309,17 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: c,
               shape: bottom ? "arrowUp" : "arrowDown",
-              text: bottom ? "쌍바닥 돌파" : "더블탑 붕괴",
+              text: PATTERN_LABEL[pat.kind]?.[0] ?? pat.kind,
             },
           ]);
         } else if (pat.forming) {
           createSeriesMarkers(neck, [
             {
-              time: ts(pat.points[2][0]),
+              time: ts(pat.points[pat.points.length - 1][0]),
               position: bottom ? "belowBar" : "aboveBar",
               color: color.muted,
               shape: "circle",
-              text: bottom ? "쌍바닥 형성중" : "더블탑 형성중",
+              text: PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind,
             },
           ]);
         }

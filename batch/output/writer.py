@@ -7,7 +7,6 @@ import pandas as pd
 
 from batch import config
 from batch.indicators.divergence import Divergence
-from batch.patterns.double import DoublePattern
 
 
 def _round(v, nd=2):
@@ -50,7 +49,7 @@ def timeframe_payload(
     ind: pd.DataFrame,
     events: list[Divergence],
     bars: int,
-    patterns: list[DoublePattern] | None = None,
+    patterns: list | None = None,  # 공통 인터페이스: kind/points/neckline/completed_at/forming
 ) -> dict:
     """한 타임프레임 분량의 차트 데이터. 최근 `bars`개 봉 + 다이버전스 마킹.
 
@@ -82,19 +81,13 @@ def timeframe_payload(
 
     pats = []
     for p in patterns or []:
-        i1, ip, i2 = p.i1 - offset, p.ip - offset, p.i2 - offset
-        if i1 < 0:
+        pts = [(i - offset, price) for i, price in p.points]
+        if pts[0][0] < 0:
             continue  # 차트 범위 밖에서 시작한 패턴 제외
-        bottom = p.kind == "pat_double_bottom"
-        v = tail["low"] if bottom else tail["high"]
         pats.append(
             {
                 "kind": p.kind,
-                "points": [
-                    [dates[i1], float(v.iloc[i1])],
-                    [dates[ip], p.neckline],
-                    [dates[i2], float(v.iloc[i2])],
-                ],
+                "points": [[dates[i], round(float(v), 2)] for i, v in pts],
                 "neckline": p.neckline,
                 "completed_date": (
                     dates[p.completed_at - offset]

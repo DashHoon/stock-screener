@@ -48,6 +48,8 @@ export const FLAG_GROUPS: FlagGroup[] = [
   {
     name: "차트 패턴",
     flags: [
+      { key: "pat_cup_handle", label: "컵앤핸들 돌파 (완성)", short: "컵핸들", bullish: true },
+      { key: "pat_cup_handle_form", label: "컵앤핸들 형성 중", short: "컵핸들形", bullish: null },
       { key: "pat_double_bottom", label: "쌍바닥 돌파 (완성)", short: "쌍바닥", bullish: true },
       { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: null },
       { key: "pat_double_top", label: "더블탑 붕괴 (완성)", short: "더블탑", bullish: false },

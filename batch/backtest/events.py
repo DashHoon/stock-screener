@@ -54,10 +54,10 @@ def build_events(ind: pd.DataFrame) -> dict[str, list[int]]:
         )
 
     # 차트 패턴 완성(돌파)일 이벤트
-    from batch.patterns.double import detect_double_patterns
+    from batch.patterns import PATTERN_KINDS, detect_all_patterns
 
-    pats = detect_double_patterns(ind)
-    for kind in ("pat_double_bottom", "pat_double_top"):
+    pats = detect_all_patterns(ind)
+    for kind in PATTERN_KINDS:
         events[kind] = sorted(
             p.completed_at for p in pats
             if p.kind == kind and p.completed_at is not None and p.completed_at < n

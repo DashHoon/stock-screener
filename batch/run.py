@@ -27,7 +27,7 @@ from batch.indicators.flags import compute_flags
 from batch.indicators.recent import compute_recent
 from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
-from batch.patterns.double import detect_double_patterns
+from batch.patterns import detect_all_patterns
 
 log = logging.getLogger("batch")
 
@@ -68,8 +68,12 @@ def collect(codes: list[str]) -> None:
 def compute_and_write(stocks) -> dict:
     """캐시의 전 종목을 계산해 JSON 산출. 통계 dict를 돌려준다."""
     entries: list[dict] = []
-    skipped = failed = 0
+    skipped = failed = stale = 0
     latest_date = ""
+    # 거래정지 판별 기준: 마지막 데이터가 오늘로부터 12일(달력) 이상 뒤처진 종목.
+    # 이런 종목의 시그널 경과일은 자기 마지막 봉 기준이라 '최근 발생'처럼 보이는
+    # 착시가 생기므로 시그널을 비운다 (차트 페이지는 유지).
+    stale_cutoff = (dt.date.today() - dt.timedelta(days=12)).isoformat()
 
     tf_specs = [  # (키, 리샘플 주기, 담을 봉 수)
         ("d", None, config.CHART_DAILY_BARS),
@@ -85,18 +89,22 @@ def compute_and_write(stocks) -> dict:
         try:
             ind = compute_indicators(ohlcv)
             _flags, events = compute_flags(ind)  # events는 차트 마킹·최근 발생 계산에 재사용
-            sig = compute_recent(ind, events)
+            is_stale = ohlcv["date"].iloc[-1] < stale_cutoff  # 거래정지 등
+            sig = {} if is_stale else compute_recent(ind, events)
+            if is_stale:
+                stale += 1
 
             # 차트 패턴 (일봉): 완성=돌파일 기준, 형성 중=오늘 상태
-            patterns = detect_double_patterns(ohlcv)
-            n_bars = len(ind)
-            for p in patterns:
-                if p.completed_at is not None:
-                    ago = n_bars - 1 - p.completed_at
-                    if ago <= config.RECENT_MAX_BARS:
-                        sig[p.kind] = min(sig.get(p.kind, ago), ago)
-                elif p.forming:
-                    sig[p.kind + "_form"] = 0
+            patterns = detect_all_patterns(ohlcv)
+            if not is_stale:
+                n_bars = len(ind)
+                for p in patterns:
+                    if p.completed_at is not None:
+                        ago = n_bars - 1 - p.completed_at
+                        if ago <= config.RECENT_MAX_BARS:
+                            sig[p.kind] = min(sig.get(p.kind, ago), ago)
+                    elif p.forming:
+                        sig[p.kind + "_form"] = 0
 
             entries.append(writer.stock_entry(row.code, row.name, ind, sig))
 
@@ -130,6 +138,7 @@ def compute_and_write(stocks) -> dict:
         "date": latest_date,
         "written": len(entries),
         "skipped_short": skipped,
+        "stale_no_sig": stale,
         "failed": failed,
     }
 

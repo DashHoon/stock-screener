@@ -81,6 +81,13 @@ STRATEGIES: list[dict] = [
         "desc": "두 바닥이 ±3% 안에서 형성되고 넥라인(사이 반등 고점)을 종가로 돌파한 날 진입.",
     },
     {
+        "id": "cup-handle",
+        "name": "컵앤핸들 돌파 (우림 상향 돌파일 진입)",
+        "trigger": "pat_cup_handle",
+        "confirm": None,
+        "desc": "U자 컵(깊이 10~50%, 둥근 바닥 검증)과 얕은 핸들 후 우측 림을 종가로 돌파한 날 진입.",
+    },
+    {
         "id": "double-top",
         "name": "더블탑 붕괴 (넥라인 하향 돌파) — 경고 신호 검증",
         "trigger": "pat_double_top",

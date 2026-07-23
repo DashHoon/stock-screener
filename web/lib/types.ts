@@ -14,7 +14,9 @@ export type FlagKey =
   | "pat_double_bottom"
   | "pat_double_bottom_form"
   | "pat_double_top"
-  | "pat_double_top_form";
+  | "pat_double_top_form"
+  | "pat_cup_handle"
+  | "pat_cup_handle_form";
 
 export interface StockSignal {
   code: string;
@@ -42,8 +44,8 @@ export interface DivergenceMark {
 }
 
 export interface PatternMark {
-  kind: "pat_double_bottom" | "pat_double_top";
-  points: [string, number][]; // [date, price] — 바닥1/넥라인 기준점/바닥2
+  kind: "pat_double_bottom" | "pat_double_top" | "pat_cup_handle";
+  points: [string, number][]; // [date, price] 꺾은선 좌표
   neckline: number;
   completed_date: string | null;
   forming: boolean;

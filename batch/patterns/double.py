@@ -33,6 +33,7 @@ class DoublePattern:
     confirmed_at: int    # i2 피벗 확정일 (i2 + PAT_PIVOT_RIGHT)
     completed_at: int | None  # 넥라인 돌파일 (None = 미완성)
     forming: bool        # 오늘 기준 '형성 중' 상태인가
+    points: list         # [(idx, price), ...] 차트 마킹용 꺾은선 좌표
 
 
 def _detect_one_side(
@@ -118,6 +119,11 @@ def _detect_one_side(
                 confirmed_at=int(confirmed_at),
                 completed_at=completed_at,
                 forming=forming,
+                points=[
+                    (int(a), float(ext[a])),
+                    (int(ip), neckline),
+                    (int(b), float(ext[b])),
+                ],
             )
         )
     return out
