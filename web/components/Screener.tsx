@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
+import BacktestPanel from "@/components/BacktestPanel";
 
 type SortKey = "name" | "close" | "change_pct" | "rsi" | "cap";
 
@@ -187,6 +188,12 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
           </div>
         ))}
       </div>
+
+      <BacktestPanel
+        selected={[...selected]}
+        windowBars={windowBars}
+        minCap={minCap}
+      />
 
       <div className="result-meta">
         <span className="count">

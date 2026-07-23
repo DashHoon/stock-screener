@@ -12,8 +12,9 @@ cd "$(dirname "$0")/.."
 echo "[1/4] 최신 시세 수집 + 전체 재산출"
 .venv/bin/python -m batch.run
 
-echo "[2/4] 백테스트 통계"
+echo "[2/4] 백테스트 통계 + 클라이언트 데이터셋"
 .venv/bin/python -m batch.backtest.run
+.venv/bin/python -m batch.backtest.dataset
 
 echo "[3/4] data 브랜치 구성"
 WT=$(mktemp -d)/data-wt
