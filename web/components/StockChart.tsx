@@ -22,6 +22,36 @@ const DIV_LABEL: Record<string, string> = {
   div_hid_bear: "히든 하락",
 };
 
+// 패턴 kind별 [완성 라벨, 형성중 라벨, 차트칩 짧은라벨]
+const PATTERN_LABEL: Record<string, [string, string, string]> = {
+  pat_double_bottom: ["쌍바닥 돌파", "쌍바닥 형성중", "쌍바닥"],
+  pat_double_top: ["더블탑 붕괴", "더블탑 형성중", "더블탑"],
+  pat_cup_handle: ["컵앤핸들 돌파", "컵앤핸들 형성중", "컵핸들"],
+  pat_hs_top: ["헤드앤숄더 붕괴", "H&S 형성중", "H&S"],
+  pat_hs_inv: ["역헤드앤숄더 돌파", "역H&S 형성중", "역H&S"],
+  pat_triple_bottom: ["3중바닥 돌파", "3중바닥 형성중", "3중바닥"],
+  pat_triple_top: ["트리플탑 붕괴", "트리플탑 형성중", "트리플탑"],
+  pat_round_bottom: ["라운드바텀 돌파", "라운드바텀 형성중", "라운드바텀"],
+  pat_round_top: ["라운드탑 이탈", "라운드탑 형성중", "라운드탑"],
+  pat_tri_asc: ["상승삼각형 돌파", "상승삼각형 형성중", "상승삼각"],
+  pat_tri_desc: ["하락삼각형 이탈", "하락삼각형 형성중", "하락삼각"],
+  pat_tri_sym: ["삼각수렴", "삼각수렴 형성중", "삼각수렴"],
+  pat_tri_sym_up: ["삼각수렴 상향 돌파", "삼각수렴 형성중", "수렴↑"],
+  pat_tri_sym_down: ["삼각수렴 하향 이탈", "삼각수렴 형성중", "수렴↓"],
+  pat_wedge_rise: ["상승쐐기 이탈", "상승쐐기 형성중", "상승쐐기"],
+  pat_wedge_fall: ["하락쐐기 돌파", "하락쐐기 형성중", "하락쐐기"],
+  pat_flag_bull: ["상승플래그 돌파", "상승플래그 형성중", "상승플래그"],
+  pat_flag_bear: ["하락플래그 이탈", "하락플래그 형성중", "하락플래그"],
+  pat_broadening: ["브로드닝 이탈", "브로드닝 형성중", "브로드닝"],
+  pat_diamond: ["다이아몬드 이탈", "다이아몬드 형성중", "다이아몬드"],
+};
+
+const BULL_KINDS = new Set([
+  "pat_double_bottom", "pat_cup_handle", "pat_hs_inv", "pat_triple_bottom",
+  "pat_round_bottom", "pat_wedge_fall", "pat_tri_asc", "pat_tri_sym_up",
+  "pat_tri_sym", "pat_flag_bull",
+]);
+
 // 이동평균선 기간·색 (봉 개수 기준 — 주봉이면 N주, 월봉이면 N개월 평균)
 const MA_DEFS = [
   { period: 5, color: "#f59e0b" },
@@ -169,10 +199,13 @@ export default function StockChart({ data }: { data: ChartData }) {
   const prevViewRef = useRef<string | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tfKey, setTfKey] = useState<TimeframeKey>("d");
+  const [hiddenPat, setHiddenPat] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
+  // 현재 차트에 실제로 그려진 패턴 종류들 (겹침 정리용 개별 토글 대상)
+  const patternKinds = [...new Set((current.patterns ?? []).map((p) => p.kind))];
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -280,38 +313,12 @@ export default function StockChart({ data }: { data: ChartData }) {
       }
     }
 
-    // 차트 패턴 마킹 (쌍바닥/더블탑/컵앤핸들): 꺾은선 + 넥라인
+    // 차트 패턴 마킹 (꺾은선 + 넥라인). 종류별로 숨긴 것은 건너뛴다.
     if (settings.pattern && current.patterns?.length) {
-      const PATTERN_LABEL: Record<string, [string, string]> = {
-        pat_double_bottom: ["쌍바닥 돌파", "쌍바닥 형성중"],
-        pat_double_top: ["더블탑 붕괴", "더블탑 형성중"],
-        pat_cup_handle: ["컵앤핸들 돌파", "컵앤핸들 형성중"],
-        pat_hs_top: ["헤드앤숄더 붕괴", "H&S 형성중"],
-        pat_hs_inv: ["역헤드앤숄더 돌파", "역H&S 형성중"],
-        pat_triple_bottom: ["3중바닥 돌파", "3중바닥 형성중"],
-        pat_triple_top: ["트리플탑 붕괴", "트리플탑 형성중"],
-        pat_round_bottom: ["라운드바텀 돌파", "라운드바텀 형성중"],
-        pat_round_top: ["라운드탑 이탈", "라운드탑 형성중"],
-        pat_tri_asc: ["상승삼각형 돌파", "상승삼각형 형성중"],
-        pat_tri_desc: ["하락삼각형 이탈", "하락삼각형 형성중"],
-        pat_tri_sym: ["삼각수렴", "삼각수렴 형성중"],
-        pat_tri_sym_up: ["삼각수렴 상향 돌파", "삼각수렴 형성중"],
-        pat_tri_sym_down: ["삼각수렴 하향 이탈", "삼각수렴 형성중"],
-        pat_wedge_rise: ["상승쐐기 이탈", "상승쐐기 형성중"],
-        pat_wedge_fall: ["하락쐐기 돌파", "하락쐐기 형성중"],
-        pat_flag_bull: ["상승플래그 돌파", "상승플래그 형성중"],
-        pat_flag_bear: ["하락플래그 이탈", "하락플래그 형성중"],
-        pat_broadening: ["브로드닝 이탈", "브로드닝 형성중"],
-        pat_diamond: ["다이아몬드 이탈", "다이아몬드 형성중"],
-      };
-      const BULL_KINDS = new Set([
-        "pat_double_bottom", "pat_cup_handle", "pat_hs_inv", "pat_triple_bottom",
-        "pat_round_bottom", "pat_wedge_fall", "pat_tri_asc", "pat_tri_sym_up",
-        "pat_flag_bull",
-      ]);
       const lastDate = current.dates[current.dates.length - 1];
       for (const pat of current.patterns) {
-        const bottom = BULL_KINDS.has(pat.kind) || pat.kind === "pat_tri_sym";
+        if (hiddenPat.has(pat.kind)) continue;
+        const bottom = BULL_KINDS.has(pat.kind);
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
           color: c, lineWidth: 2, lineStyle: 0,
@@ -487,7 +494,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey]);
+  }, [data, settings, ready, tfKey, hiddenPat]);
 
   return (
     <div>
@@ -554,6 +561,32 @@ export default function StockChart({ data }: { data: ChartData }) {
           </div>
         )}
       </div>
+      {settings.pattern && patternKinds.length > 0 && (
+        <div className="pattern-chips">
+          <span className="pattern-chips-label">패턴 표시:</span>
+          {patternKinds.map((kind) => {
+            const shown = !hiddenPat.has(kind);
+            const bull = BULL_KINDS.has(kind);
+            return (
+              <button
+                key={kind}
+                type="button"
+                className={`pattern-chip${shown ? ` on ${bull ? "bull" : "bear"}` : ""}`}
+                onClick={() =>
+                  setHiddenPat((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(kind)) next.delete(kind);
+                    else next.add(kind);
+                    return next;
+                  })
+                }
+              >
+                {PATTERN_LABEL[kind]?.[2] ?? kind}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div ref={ref} className="chart-wrap" />
     </div>
   );

@@ -400,6 +400,44 @@ a {
   font-size: 12px;
 }
 
+/* 패턴 개별 표시 토글 (겹침 정리) */
+.pattern-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.pattern-chips-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.pattern-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.pattern-chip.on {
+  opacity: 1;
+  text-decoration: none;
+  color: var(--fg);
+}
+.pattern-chip.on.bull {
+  border-color: var(--up);
+  color: var(--up);
+}
+.pattern-chip.on.bear {
+  border-color: var(--down);
+  color: var(--down);
+}
+
 /* 패널 좌상단 라벨 */
 .pane-label {
   position: absolute;
