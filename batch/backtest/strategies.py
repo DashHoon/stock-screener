@@ -7,6 +7,53 @@ pct_b, bb_width, close 등 indicators.core.compute_indicators가 만드는 모�
 """
 
 STRATEGIES: list[dict] = [
+    # --- 품질 필터 실험(2026-07-23)에서 유효성이 확인된 조합 ---
+    # 발견: 패턴 돌파 + 품질 필터는 '대형주(시총 상위 300)'에서 유효하고,
+    # 전 종목(소형주 포함)에서는 무효/역효과. universe: large300 = 대형주 한정.
+    {
+        "id": "flag-bull-large-q",
+        "name": "[대형주] 상승 플래그 + 거래량 1.5배 + 추세 위",
+        "trigger": "pat_flag_bull",
+        "when": [["vol_ratio20", ">=", 1.5], ["ma120_gap", ">=", 0]],
+        "confirm": None,
+        "universe": "large300",
+        "desc": "시총 상위 300 종목에서 급등 깃대 후 조정 돌파를 거래량·추세로 확인. 실험에서 가장 강한 조합.",
+    },
+    {
+        "id": "cup-handle-large-q",
+        "name": "[대형주] 컵앤핸들 + 거래량 1.5배",
+        "trigger": "pat_cup_handle",
+        "when": [["vol_ratio20", ">=", 1.5]],
+        "confirm": None,
+        "universe": "large300",
+        "desc": "대형주 컵앤핸들 돌파를 거래량으로 확인. 무필터 대비 개선이 뚜렷했던 조합.",
+    },
+    {
+        "id": "hs-inv-large-q",
+        "name": "[대형주] 역헤드앤숄더 + 추세 위",
+        "trigger": "pat_hs_inv",
+        "when": [["ma120_gap", ">=", 0]],
+        "confirm": None,
+        "universe": "large300",
+        "desc": "대형주에서 120일선 위(장기 추세 순방향)일 때의 역H&S 돌파만 선별.",
+    },
+    {
+        "id": "double-bottom-large-q",
+        "name": "[대형주] 쌍바닥 + 거래량 1.5배 + 추세 위",
+        "trigger": "pat_double_bottom",
+        "when": [["vol_ratio20", ">=", 1.5], ["ma120_gap", ">=", 0]],
+        "confirm": None,
+        "universe": "large300",
+        "desc": "대형주 쌍바닥 돌파를 거래량·추세로 확인.",
+    },
+    {
+        "id": "flag-bull-contrarian",
+        "name": "[발견] 상승 플래그 — 하락추세 중 (역발상)",
+        "trigger": "pat_flag_bull",
+        "when": [["ma120_gap", "<", 0]],
+        "confirm": None,
+        "desc": "실험 중 발견된 역발상 조합: 장기 추세 아래에서 나온 급등-조정-재돌파. 하락장 반등 국면 특성일 수 있어 해석에 주의.",
+    },
     {
         "id": "div-bull",
         "name": "상승 다이버전스 (단독)",

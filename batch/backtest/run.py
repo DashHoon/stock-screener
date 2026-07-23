@@ -43,11 +43,12 @@ def run(limit: int = 0) -> dict:
     first_date, last_date = "9999-12-31", ""
     universe = 0
 
-    for row in stocks.itertuples():
+    for rank, row in enumerate(stocks.itertuples()):
         ohlcv = backfill.load_cached(row.code)
         if ohlcv is None or len(ohlcv) < config.MIN_ROWS_FOR_INDICATORS:
             continue
         universe += 1
+        is_large = rank < 300  # 종목 마스터는 시가총액 내림차순 → 상위 300 = 대형주
         ind = compute_indicators(ohlcv)
         events = build_events(ind)
         first_date = min(first_date, ind["date"].iloc[0])
@@ -63,6 +64,8 @@ def run(limit: int = 0) -> dict:
                 baseline[h].append((close[i + h] / close[i] - 1) * 100)
 
         for s in STRATEGIES:
+            if s.get("universe") == "large300" and not is_large:
+                continue
             entries = find_entries(ind, events, s)
             if entries:
                 strat_stocks[s["id"]] += 1

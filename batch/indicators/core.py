@@ -76,4 +76,10 @@ def compute_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     close = df["close"].astype(float)
     df["rsi"] = rsi(close)
     df = pd.concat([df, macd(close), bollinger(close)], axis=1)
+    # 백테스트 품질 필터용 파생 컬럼
+    vol = df["volume"].astype(float)
+    vol_ma20 = vol.rolling(20).mean()
+    df["vol_ratio20"] = (vol / vol_ma20).where(vol_ma20 > 0)  # 20일 평균 대비 거래량 배수
+    ma120 = close.rolling(120).mean()
+    df["ma120_gap"] = (close / ma120 - 1) * 100  # 120일선 대비 이격 % (양수=추세 위)
     return df
