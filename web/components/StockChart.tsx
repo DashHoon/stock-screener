@@ -60,6 +60,9 @@ const MA_DEFS = [
   { period: 120, color: "#64748b" },
 ];
 
+// 일봉 첫 진입 시 보여줄 봉 수 (최근 100거래일)
+const INITIAL_DAILY_BARS = 100;
+
 const HEIGHTS = { md: 520, lg: 720, xl: 920 } as const;
 type HeightKey = keyof typeof HEIGHTS;
 
@@ -465,6 +468,12 @@ export default function StockChart({ data }: { data: ChartData }) {
         fitted = true;
         if (sameView && savedRangeRef.current) {
           chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
+        } else if (tfKey === "d" && current.dates.length > INITIAL_DAILY_BARS) {
+          // 일봉 첫 진입: 최근 100봉만 (전체는 너무 촘촘해 보기 불편)
+          const n = current.dates.length;
+          chart
+            .timeScale()
+            .setVisibleLogicalRange({ from: n - INITIAL_DAILY_BARS, to: n - 1 });
         } else {
           chart.timeScale().fitContent();
         }
