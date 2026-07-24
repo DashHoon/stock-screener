@@ -207,12 +207,21 @@ const INDICATOR_INFO: Record<string, { title: string; desc: string }> = {
     title: "볼린저밴드 (Bollinger Band, 20·2)",
     desc: "20일 이동평균선(가운데)을 중심으로 표준편차의 2배만큼 위·아래에 그린 띠입니다. 가격의 약 95%가 이 띠 안에서 움직여, 상단 터치는 단기 과열, 하단 터치는 단기 침체로 봅니다. 띠 폭이 좁아지는 '스퀴즈'는 변동성이 줄었다가 곧 크게 움직일 신호이고, 폭이 벌어지면 추세가 강해지는 것으로 해석합니다.",
   },
+  ma: {
+    title: "이동평균선 (MA)",
+    desc: "일정 기간 종가의 평균을 이은 선입니다. MA5(5일)·MA20(20일)·MA60(60일)·MA120(120일)을 함께 봅니다. 주가가 이평선 위에 있으면 상승 추세, 아래면 하락 추세로 보고, 이평선은 지지·저항 역할도 합니다. 단기선이 장기선을 아래→위로 뚫으면 골든크로스(상승), 위→아래로 뚫으면 데드크로스(하락) 신호입니다.",
+  },
+  volume: {
+    title: "거래량 (Volume)",
+    desc: "하루 동안 거래된 주식 수입니다. 가격 움직임에 거래량이 실리면(급등·급락 시 거래량 급증) 그 움직임의 신뢰도가 높다고 봅니다. 거래량 없는 상승은 힘이 약할 수 있고, 바닥에서 거래량이 크게 터지면 추세 전환 신호가 되기도 합니다. 막대의 빨강은 상승 마감일, 파랑은 하락 마감일의 거래량입니다.",
+  },
 };
 
-// 툴바 토글(다이버전스·볼린저) → 설명 키
+// 툴바 토글(다이버전스·볼린저·이평선) → 설명 키
 const TOGGLE_INFO: Partial<Record<keyof Settings, string>> = {
   div: "divergence",
   bb: "bollinger",
+  ma: "ma",
 };
 
 /** 패널 좌상단에 라벨 오버레이 부착. pane DOM은 늦게 생성되므로 잠시 재시도한다. */
@@ -655,7 +664,7 @@ export default function StockChart({ data }: { data: ChartData }) {
           attachPaneLabels(
             [ps[1], ps[2], ps[3]],
             [
-              { text: "거래량" },
+              { text: "거래량", infoKey: "volume" },
               { text: "RSI (14)", infoKey: "rsi" },
               { text: "MACD (12,26,9)", infoKey: "macd" },
             ],
