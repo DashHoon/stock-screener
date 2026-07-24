@@ -16,6 +16,15 @@ import {
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import FlagInfoModal from "@/components/FlagInfoModal";
+import {
+  DRAW_COLOR,
+  loadDrawings,
+  makeDrawPrimitive,
+  saveDrawings,
+  type Drawing,
+  type DrawTool,
+} from "@/components/chartDrawings";
+import { rid } from "@/lib/storage";
 import type { ChartData, FlagKey, TimeframeData, TimeframeKey } from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
@@ -221,6 +230,11 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [hiddenCdl, setHiddenCdl] = useState<Set<string>>(new Set());
   const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // ⓘ 설명 팝오버
   const [ready, setReady] = useState(false);
+  // 차트 그리기 (가로선/추세선/박스) — 종목·타임프레임별 localStorage 저장
+  const [tool, setTool] = useState<DrawTool>("none");
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const toolRef = useRef<DrawTool>("none");
+  const pendingRef = useRef<{ time: number; price: number }[]>([]);
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
@@ -240,6 +254,37 @@ export default function StockChart({ data }: { data: ChartData }) {
       localStorage.setItem("chartSettings", JSON.stringify(next));
       return next;
     });
+  }
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
+  // 종목/타임프레임이 바뀌면 해당 그리기 세트를 불러온다 (미완성 점 초기화)
+  useEffect(() => {
+    setDrawings(loadDrawings(data.code, tfKey));
+    pendingRef.current = [];
+    setTool("none");
+  }, [data.code, tfKey]);
+
+  function addDrawing(d: Drawing) {
+    setDrawings((prev) => {
+      const next = [...prev, d];
+      saveDrawings(data.code, tfKey, next);
+      return next;
+    });
+  }
+  function undoDrawing() {
+    setDrawings((prev) => {
+      const next = prev.slice(0, -1);
+      saveDrawings(data.code, tfKey, next);
+      return next;
+    });
+  }
+  function clearDrawings() {
+    setDrawings([]);
+    saveDrawings(data.code, tfKey, []);
+    pendingRef.current = [];
   }
 
   function setPeriod(days: number | null) {
@@ -425,6 +470,40 @@ export default function StockChart({ data }: { data: ChartData }) {
       createSeriesMarkers(candles, candleMarkers);
     }
 
+    // 사용자 그리기: 가로선은 priceLine, 추세선·박스는 프리미티브로
+    for (const d of drawings) {
+      if (d.type === "hline") {
+        candles.createPriceLine({
+          price: d.price,
+          color: DRAW_COLOR,
+          lineWidth: 1,
+          lineStyle: 0,
+          axisLabelVisible: true,
+          title: "",
+        });
+      } else {
+        candles.attachPrimitive(makeDrawPrimitive(d, DRAW_COLOR));
+      }
+    }
+    // 도구 선택 상태에서 차트 클릭 → 점 수집 (가로선 1점, 추세선·박스 2점)
+    chart.subscribeClick((param) => {
+      const t = toolRef.current;
+      if (t === "none" || !param.point || param.time == null) return;
+      const price = candles.coordinateToPrice(param.point.y);
+      if (price == null) return;
+      const time = param.time as unknown as number;
+      if (t === "hline") {
+        addDrawing({ id: rid(), type: "hline", price });
+        return;
+      }
+      pendingRef.current.push({ time, price });
+      if (pendingRef.current.length >= 2) {
+        const [a, b] = pendingRef.current;
+        addDrawing({ id: rid(), type: t, t1: a.time, p1: a.price, t2: b.time, p2: b.price });
+        pendingRef.current = [];
+      }
+    });
+
     // pane 1: 거래량
     const volume = chart.addSeries(
       HistogramSeries,
@@ -543,7 +622,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl]);
+  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, drawings]);
 
   return (
     <div>
@@ -609,6 +688,51 @@ export default function StockChart({ data }: { data: ChartData }) {
               </span>
             ))}
           </div>
+        )}
+      </div>
+      <div className="draw-toolbar">
+        <span className="toolbar-label">그리기</span>
+        {(
+          [
+            ["hline", "─ 가로선"],
+            ["trend", "╱ 추세선"],
+            ["box", "▭ 박스"],
+          ] as [DrawTool, string][]
+        ).map(([t, label]) => (
+          <button
+            key={t}
+            type="button"
+            className={`draw-tool${tool === t ? " on" : ""}`}
+            onClick={() => {
+              setTool(tool === t ? "none" : t);
+              pendingRef.current = [];
+            }}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="draw-tool"
+          onClick={undoDrawing}
+          disabled={drawings.length === 0}
+        >
+          실행취소
+        </button>
+        <button
+          type="button"
+          className="draw-tool danger"
+          onClick={clearDrawings}
+          disabled={drawings.length === 0}
+        >
+          지우기
+        </button>
+        {tool !== "none" && (
+          <span className="draw-hint">
+            {tool === "hline"
+              ? "차트를 클릭해 가로선을 놓으세요"
+              : "시작·끝 두 점을 클릭하세요"}
+          </span>
         )}
       </div>
       {settings.pattern && patternKinds.length > 0 && (

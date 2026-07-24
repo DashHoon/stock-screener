@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
+import StockActions from "@/components/StockActions";
 import StockChart from "@/components/StockChart";
 import { listChartCodes, loadChart } from "@/lib/data";
 import { FLAG_BY_KEY } from "@/lib/flags";
@@ -61,6 +62,7 @@ export default async function StockPage({
           </span>
         )}
         <span className="notice">전일({daily.dates[last]}) 기준</span>
+        <StockActions code={data.code} name={data.name} />
       </div>
 
       <div className="mobile-top-ad">

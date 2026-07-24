@@ -9,6 +9,13 @@ import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import BacktestPanel from "@/components/BacktestPanel";
 import FlagInfoModal from "@/components/FlagInfoModal";
 import Sparkline from "@/components/Sparkline";
+import {
+  rid,
+  removeScreen,
+  saveScreen,
+  useScreens,
+  type SavedScreen,
+} from "@/lib/storage";
 
 type SortKey = "name" | "close" | "change_pct" | "rsi" | "cap";
 
@@ -99,6 +106,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   });
   const [dir, setDir] = useState<Dir>("all"); // 방향 보기 필터 (URL 비반영)
   const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // 지표설명 팝오버
+  const savedScreens = useScreens(); // 저장한 스크리닝 조건 (localStorage)
   const [sortKey, setSortKey] = useState<SortKey>("change_pct");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -178,6 +186,33 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
     syncUrl(selected, windowBars, minCap, mkt);
   }
 
+  // 현재 필터 조합을 이름 붙여 저장 (localStorage)
+  function saveCurrentScreen() {
+    if (selected.size === 0) return;
+    const def = [...selected].map((k) => FLAG_BY_KEY.get(k)?.short ?? k).join("+");
+    const name = window.prompt("저장할 조건 이름", def)?.trim();
+    if (!name) return;
+    saveScreen({
+      id: rid(),
+      name,
+      flags: [...selected],
+      within: windowBars,
+      cap: minCap,
+      mkt: market,
+    });
+  }
+
+  // 저장한 조건을 현재 화면에 적용 (재마운트 없이 상태·URL 동기화)
+  function applyScreen(s: SavedScreen) {
+    const next = new Set(s.flags.filter((k) => FLAG_BY_KEY.has(k as FlagKey)) as FlagKey[]);
+    setSelected(next);
+    setWindowBars(s.within);
+    setMinCap(s.cap);
+    setMarketState(s.mkt ?? "");
+    syncUrl(next, s.within, s.cap, s.mkt ?? "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function sortBy(key: SortKey) {
     if (sortKey === key) setSortDesc((d) => !d);
     else {
@@ -211,6 +246,26 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
               </Link>
             );
           })}
+        </div>
+      )}
+      {savedScreens.length > 0 && (
+        <div className="saved-screens">
+          <span className="saved-label">저장한 조건:</span>
+          {savedScreens.map((s) => (
+            <span key={s.id} className="saved-chip">
+              <button type="button" className="saved-apply" onClick={() => applyScreen(s)}>
+                {s.name}
+              </button>
+              <button
+                type="button"
+                className="saved-del"
+                aria-label={`${s.name} 삭제`}
+                onClick={() => removeScreen(s.id)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
         </div>
       )}
       <div className="filter-panel">
@@ -336,6 +391,11 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             ? "위에서 지표를 선택하면 조건에 맞는 종목이 표시됩니다. 전일 기준 데이터."
             : `선택한 조건이 모두 ${WINDOWS.find((w) => w.bars === windowBars)?.label} 안에 발생한(AND) 종목입니다. 전일 기준 데이터.`}
         </span>
+        {!noFilter && (
+          <button type="button" className="save-screen-btn" onClick={saveCurrentScreen}>
+            ＋ 조건 저장
+          </button>
+        )}
       </div>
 
       <div className="table-wrap">

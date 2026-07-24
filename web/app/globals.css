@@ -407,6 +407,162 @@ a {
   border-radius: 8px;
 }
 
+/* 관심종목 버튼 (종목 상세 헤더) */
+.watch-btn {
+  margin-left: auto;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.watch-btn.on {
+  border-color: #f59e0b;
+  color: #d97706;
+  background: color-mix(in srgb, #f59e0b 10%, var(--bg));
+}
+
+/* 홈: 관심종목 / 최근 본 종목 */
+.quick-access {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.qa-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qa-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.qa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.qa-chip {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+}
+.qa-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.qa-chip.star {
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--border));
+}
+
+/* 저장한 스크리닝 조건 */
+.saved-screens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 -4px;
+}
+.saved-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.saved-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.saved-apply {
+  padding: 4px 6px 4px 12px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.saved-del {
+  padding: 4px 9px 4px 3px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.saved-del:hover {
+  color: var(--down);
+}
+.save-screen-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.save-screen-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+}
+
+/* 차트 그리기 툴바 */
+.draw-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.draw-tool {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.draw-tool.on {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  font-weight: 600;
+  background: color-mix(in srgb, #7c3aed 10%, var(--bg));
+}
+.draw-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.draw-tool.danger:hover:not(:disabled) {
+  border-color: var(--down);
+  color: var(--down);
+}
+.draw-hint {
+  font-size: 12px;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
 /* stock detail */
 .stock-header {
   display: flex;

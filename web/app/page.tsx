@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import QuickAccess from "@/components/QuickAccess";
 import Screener from "@/components/Screener";
 import { PRESETS } from "@/lib/presets";
 
@@ -15,6 +16,7 @@ export default function Home() {
           </Link>
         ))}
       </nav>
+      <QuickAccess />
       <Suspense>
         <Screener />
       </Suspense>
