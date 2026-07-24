@@ -57,6 +57,7 @@ def timeframe_payload(
     events: list[Divergence],
     bars: int,
     patterns: list | None = None,  # 공통 인터페이스: kind/points/neckline/completed_at/forming
+    candles: dict[str, list[int]] | None = None,  # 캔들 패턴 {kind: [발생 인덱스]}
 ) -> dict:
     """한 타임프레임 분량의 차트 데이터. 최근 `bars`개 봉 + 다이버전스 마킹.
 
@@ -111,7 +112,14 @@ def timeframe_payload(
             entry["points2"] = [[dates[i], round(float(v), 2)] for i, v in pts2]
         pats.append(entry)
 
-    return {
+    # 캔들 패턴: 차트 범위 내 발생일 목록 {kind: [date, ...]}
+    cdl: dict[str, list[str]] = {}
+    for kind, idxs in (candles or {}).items():
+        ds = [dates[i - offset] for i in idxs if i - offset >= 0]
+        if ds:
+            cdl[kind] = ds
+
+    out = {
         "dates": dates,
         "patterns": pats,
         "open": tail["open"].tolist(),
@@ -128,6 +136,9 @@ def timeframe_payload(
         "bb_lower": col("bb_lower"),
         "divergences": divs,
     }
+    if cdl:
+        out["candles"] = cdl
+    return out
 
 
 def write_chart(code: str, name: str, tf: dict[str, dict]) -> None:

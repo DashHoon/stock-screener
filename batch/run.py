@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from batch import config
 from batch.collector import backfill, daily, master
+from batch.indicators.candles import detect_candles
 from batch.indicators.core import compute_indicators
 from batch.indicators.divergence import detect_divergences
 from batch.indicators.flags import compute_flags
@@ -168,6 +169,7 @@ def compute_and_write(stocks) -> dict:
                 tf[key] = writer.timeframe_payload(
                     tf_ind, tf_events, bars,
                     patterns=chart_patterns if key == "d" else None,
+                    candles=detect_candles(ind) if key == "d" else None,
                 )
             writer.write_chart(row.code, row.name, tf)
             latest_date = max(latest_date, ind["date"].iloc[-1])
@@ -201,7 +203,11 @@ def compute_and_write(stocks) -> dict:
                     ti = compute_indicators(rs)
                     te = detect_divergences(ti["high"].astype(float), ti["low"].astype(float), ti["rsi"])
                     tp = None
-                i_tf[key] = writer.timeframe_payload(ti, te, bars, patterns=tp if freq is None else None)
+                i_tf[key] = writer.timeframe_payload(
+                    ti, te, bars,
+                    patterns=tp if freq is None else None,
+                    candles=detect_candles(i_ind) if freq is None else None,
+                )
             writer.write_chart(sym, name, i_tf)
         except Exception:
             log.exception("지수 %s 차트 생성 실패", sym)

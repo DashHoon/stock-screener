@@ -110,6 +110,8 @@ export interface PatternMark {
 export interface TimeframeData {
   dates: string[];
   patterns?: PatternMark[];
+  /** 캔들 패턴 발생일 {cdl_*: [date, ...]} (일봉만) */
+  candles?: Record<string, string[]>;
   open: number[];
   high: number[];
   low: number[];

@@ -13,7 +13,9 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { ChartData, TimeframeData, TimeframeKey } from "@/lib/types";
+import { FLAG_BY_KEY } from "@/lib/flags";
+import type { FlagMeta } from "@/lib/flags";
+import type { ChartData, FlagKey, TimeframeData, TimeframeKey } from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
   div_reg_bull: "상승 다이버전스",
@@ -51,6 +53,16 @@ const BULL_KINDS = new Set([
   "pat_round_bottom", "pat_wedge_fall", "pat_tri_asc", "pat_tri_sym_up",
   "pat_tri_sym", "pat_flag_bull",
 ]);
+
+// 캔들 패턴 표시 순서 (상승 → 하락 → 중립). 라벨·방향·설명은 flags.ts 메타 재사용
+const CDL_ORDER = [
+  "cdl_engulf_bull", "cdl_hammer", "cdl_pierce", "cdl_morning",
+  "cdl_engulf_bear", "cdl_shooting", "cdl_darkcloud", "cdl_evening",
+  "cdl_doji",
+];
+function cdlMeta(kind: string): FlagMeta | undefined {
+  return FLAG_BY_KEY.get(kind as FlagKey);
+}
 
 // 이동평균선 기간·색 (봉 개수 기준 — 주봉이면 N주, 월봉이면 N개월 평균)
 const MA_DEFS = [
@@ -97,6 +109,7 @@ interface Settings {
   ma: boolean;
   bb: boolean;
   pattern: boolean; // 차트 패턴 (쌍바닥/더블탑) 마킹
+  candle: boolean; // 단기 캔들 패턴 (장악형 등) 마킹
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -106,6 +119,7 @@ const DEFAULT_SETTINGS: Settings = {
   ma: true,
   bb: true,
   pattern: true,
+  candle: true,
 };
 
 function loadSettings(): Settings {
@@ -203,12 +217,16 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tfKey, setTfKey] = useState<TimeframeKey>("d");
   const [hiddenPat, setHiddenPat] = useState<Set<string>>(new Set());
+  const [hiddenCdl, setHiddenCdl] = useState<Set<string>>(new Set());
+  const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // ⓘ 설명 팝오버
   const [ready, setReady] = useState(false);
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
   // 현재 차트에 실제로 그려진 패턴 종류들 (겹침 정리용 개별 토글 대상)
   const patternKinds = [...new Set((current.patterns ?? []).map((p) => p.kind))];
+  // 캔들 패턴 종류 (발생 있는 것만, 상승→하락→중립 순)
+  const candleKinds = CDL_ORDER.filter((k) => current.candles?.[k]?.length);
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -370,19 +388,40 @@ export default function StockChart({ data }: { data: ChartData }) {
       }
     }
 
+    // 캔들 시리즈 위 마커: 다이버전스 + 캔들 패턴을 한 배열로 (시간 정렬 필수)
+    const candleMarkers: SeriesMarker<Time>[] = [];
     if (settings.div) {
-      const markers: SeriesMarker<Time>[] = current.divergences.map((dv) => {
+      for (const dv of current.divergences) {
         const bull = dv.kind.endsWith("bull");
-        return {
+        candleMarkers.push({
           time: ts(dv.date_to),
           position: bull ? "belowBar" : "aboveBar",
           color: bull ? color.up : color.down,
           shape: bull ? "arrowUp" : "arrowDown",
           text: DIV_LABEL[dv.kind],
-        };
-      });
-      markers.sort((a, b) => (a.time as number) - (b.time as number));
-      createSeriesMarkers(candles, markers);
+        });
+      }
+    }
+    if (settings.candle && current.candles) {
+      for (const [kind, dates] of Object.entries(current.candles)) {
+        if (hiddenCdl.has(kind)) continue;
+        const meta = cdlMeta(kind);
+        const bull = meta?.bullish;
+        for (const d of dates) {
+          candleMarkers.push({
+            time: ts(d),
+            // 중립(도지)은 위쪽 원형, 상승은 아래 화살표, 하락은 위 화살표
+            position: bull === true ? "belowBar" : "aboveBar",
+            color: bull === true ? color.up : bull === false ? color.down : color.muted,
+            shape: bull === true ? "arrowUp" : bull === false ? "arrowDown" : "circle",
+            text: meta?.short ?? kind,
+          });
+        }
+      }
+    }
+    if (candleMarkers.length) {
+      candleMarkers.sort((a, b) => (a.time as number) - (b.time as number));
+      createSeriesMarkers(candles, candleMarkers);
     }
 
     // pane 1: 거래량
@@ -503,7 +542,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey, hiddenPat]);
+  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl]);
 
   return (
     <div>
@@ -548,6 +587,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               ["ma", "이평선"],
               ["bb", "볼린저"],
               ["pattern", "패턴"],
+              ["candle", "캔들"],
             ] as [keyof Settings, string][]
           ).map(([key, label]) => (
             <label key={key} className={`toolbar-toggle${settings[key] ? " on" : ""}`}>
@@ -623,6 +663,85 @@ export default function StockChart({ data }: { data: ChartData }) {
                 </div>
               );
             })}
+        </div>
+      )}
+      {settings.candle && candleKinds.length > 0 && (
+        <div className="pattern-chips">
+          <button
+            type="button"
+            className="pattern-chips-label as-btn"
+            title={candleKinds.every((k) => !hiddenCdl.has(k)) ? "모두 끄기" : "모두 켜기"}
+            onClick={() =>
+              setHiddenCdl((prev) => {
+                const next = new Set(prev);
+                const allShown = candleKinds.every((k) => !prev.has(k));
+                if (allShown) candleKinds.forEach((k) => next.add(k));
+                else candleKinds.forEach((k) => next.delete(k));
+                return next;
+              })
+            }
+          >
+            🕯 캔들 패턴:
+          </button>
+          {candleKinds.map((kind) => {
+            const meta = cdlMeta(kind);
+            const shown = !hiddenCdl.has(kind);
+            const dirCls =
+              meta?.bullish === true ? " bull" : meta?.bullish === false ? " bear" : "";
+            return (
+              <button
+                key={kind}
+                type="button"
+                className={`pattern-chip${shown ? ` on${dirCls}` : ""}`}
+                onClick={() =>
+                  setHiddenCdl((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(kind)) next.delete(kind);
+                    else next.add(kind);
+                    return next;
+                  })
+                }
+              >
+                {meta?.short ?? kind}
+                <span
+                  role="button"
+                  aria-label={`${meta?.label ?? kind} 설명`}
+                  className="chip-info"
+                  onClick={(e) => {
+                    e.stopPropagation(); // 칩 토글과 분리
+                    if (meta) setInfoFlag(meta);
+                  }}
+                >
+                  ⓘ
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {infoFlag && (
+        <div className="info-overlay" onClick={() => setInfoFlag(null)}>
+          <div className="info-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="info-pop-head">
+              <span
+                className={`badge${
+                  infoFlag.bullish === true ? " bull" : infoFlag.bullish === false ? " bear" : ""
+                }`}
+              >
+                {infoFlag.short}
+              </span>
+              <strong>{infoFlag.label}</strong>
+              <button
+                type="button"
+                className="info-close"
+                aria-label="닫기"
+                onClick={() => setInfoFlag(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p>{infoFlag.desc}</p>
+          </div>
         </div>
       )}
       <div ref={ref} className="chart-wrap" />
