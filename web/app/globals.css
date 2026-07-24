@@ -161,6 +161,74 @@ a {
   font-size: 12px;
   background: var(--surface);
 }
+.ad-slot.ad-banner {
+  min-height: 90px;
+}
+.ad-slot.ad-rect {
+  min-height: 200px;
+}
+.ad-slot.ad-inline {
+  min-height: 60px;
+}
+
+/* 모바일 하단 고정 광고 (앵커) */
+.sticky-ad {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: none; /* 데스크톱에서는 숨김 */
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.sticky-ad-close {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+@media (max-width: 640px) {
+  .sticky-ad {
+    display: flex;
+  }
+  body {
+    padding-bottom: 60px; /* 고정 광고에 콘텐츠가 가리지 않도록 */
+  }
+}
+
+/* 푸터 법적 링크 */
+.footer-disclaimer {
+  line-height: 1.6;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+}
+.footer-links a {
+  color: var(--muted);
+  text-decoration: underline;
+}
+.footer-links a:hover {
+  color: var(--accent);
+}
 
 /* screener */
 .filter-panel {

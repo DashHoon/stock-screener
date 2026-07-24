@@ -17,10 +17,11 @@ export default function Home() {
         ))}
       </nav>
       <QuickAccess />
+      <AdSlot id="home-top" variant="banner" />
       <Suspense>
         <Screener />
       </Suspense>
-      <AdSlot id="home-bottom" />
+      <AdSlot id="home-bottom" variant="banner" />
     </>
   );
 }

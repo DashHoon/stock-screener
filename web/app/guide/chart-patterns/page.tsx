@@ -1,0 +1,113 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import AdSlot from "@/components/AdSlot";
+
+export const metadata: Metadata = {
+  title: "차트 패턴 가이드 — 쌍바닥·헤드앤숄더·삼각수렴·플래그",
+  description:
+    "쌍바닥, 삼중바닥, 헤드앤숄더, 컵앤핸들, 삼각형, 쐐기, 플래그, 다이아몬드 등 주요 차트 패턴의 모양과 매매 의미를 상승·하락으로 나눠 설명합니다.",
+};
+
+export default function ChartPatternsGuide() {
+  return (
+    <div className="prose">
+      <h1>차트 패턴 가이드</h1>
+      <p>
+        차트 패턴은 가격의 흐름이 반복적으로 만드는 그림입니다. 지지·저항선을
+        돌파하거나 이탈하는 순간을 &ldquo;완성&rdquo;으로 보며, 스크리너에서는
+        완성된 패턴과 형성 중인 패턴을 구분해 표시합니다. 종목 차트에서 각 패턴에
+        마우스를 올리면 실제 그림과 넥라인을 볼 수 있습니다.
+      </p>
+
+      <AdSlot id="cp-top" variant="banner" />
+
+      <h2>상승(바닥·지속) 패턴</h2>
+      <ul>
+        <li>
+          <strong>쌍바닥(더블바텀)</strong>: 비슷한 높이의 두 저점(W자) 뒤 목선을
+          위로 돌파. 바닥 반등의 대표 신호입니다.
+        </li>
+        <li>
+          <strong>삼중바닥</strong>: 비슷한 세 저점 뒤 목선 돌파. 쌍바닥보다 바닥
+          확인이 강합니다.
+        </li>
+        <li>
+          <strong>역헤드앤숄더</strong>: 가운데 저점이 가장 낮은 세 골 이후 목선
+          돌파. 하락 추세의 상승 전환을 뜻합니다.
+        </li>
+        <li>
+          <strong>컵앤핸들</strong>: 완만한 U자(컵) 뒤 짧은 눌림(핸들)을 거쳐 상단
+          돌파. 상승 지속형입니다.
+        </li>
+        <li>
+          <strong>라운드 바텀</strong>: 완만한 원형 바닥. 장기 저점의 반등을
+          시사합니다.
+        </li>
+        <li>
+          <strong>상승삼각형·삼각수렴 상향 돌파</strong>: 저점이 높아지며 저항선을
+          위로 뚫는 형태로 상승 지속을 의미합니다.
+        </li>
+        <li>
+          <strong>하락쐐기 상향 돌파</strong>: 수렴하며 내려오던 쐐기의 상단을 위로
+          돌파. 하락 마무리·반등 신호입니다.
+        </li>
+        <li>
+          <strong>상승 플래그/페넌트</strong>: 급등(폴대) 뒤 짧은 눌림(깃발) 후
+          재상승. 강한 상승 추세의 지속을 뜻합니다.
+        </li>
+      </ul>
+
+      <AdSlot id="cp-mid" variant="rect" />
+
+      <h2>하락(천장·이탈) 패턴</h2>
+      <ul>
+        <li>
+          <strong>더블탑</strong>: 비슷한 두 고점(M자) 뒤 목선 하향 이탈. 고점
+          붕괴의 대표 신호입니다.
+        </li>
+        <li>
+          <strong>트리플탑</strong>: 비슷한 세 고점 뒤 목선 이탈. 강한 천장
+          신호입니다.
+        </li>
+        <li>
+          <strong>헤드앤숄더</strong>: 가운데 고점이 가장 높은 세 봉 이후 목선
+          이탈. 상승 추세의 하락 전환입니다.
+        </li>
+        <li>
+          <strong>라운드 탑</strong>: 완만한 원형 천장 뒤 하단 이탈.
+        </li>
+        <li>
+          <strong>하락삼각형·삼각수렴 하향 이탈</strong>: 고점이 낮아지며 지지선을
+          아래로 뚫어 하락 지속을 의미합니다.
+        </li>
+        <li>
+          <strong>상승쐐기 하향 이탈</strong>: 수렴하며 올라가던 쐐기의 하단을 아래로
+          이탈. 상승 마무리·하락 신호입니다.
+        </li>
+        <li>
+          <strong>하락 플래그/페넌트</strong>: 급락(폴대) 뒤 짧은 반등 후 재하락.
+        </li>
+        <li>
+          <strong>브로드닝(확산형)</strong>: 고점·저점이 점점 벌어지며 변동성이
+          커지는 형태로, 하단 이탈 시 하락 신호입니다.
+        </li>
+        <li>
+          <strong>다이아몬드 탑</strong>: 확산 후 다시 수렴하는 마름모형 천장.
+          하단 이탈은 고점 반전 신호입니다.
+        </li>
+      </ul>
+
+      <p className="notice">
+        패턴은 완성 후에도 실패(속임수 돌파)할 수 있으며, 거래량·추세와 함께 봐야
+        신뢰도가 올라갑니다. 본 내용은 정보 제공용이며 투자 조언이 아닙니다.
+      </p>
+
+      <p>
+        ← <Link href="/guide">지표 가이드로 돌아가기</Link> ·{" "}
+        <Link href="/guide/candlestick">캔들 패턴 가이드</Link>
+      </p>
+
+      <AdSlot id="cp-bottom" variant="banner" />
+    </div>
+  );
+}

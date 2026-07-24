@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
+import AdSlot from "@/components/AdSlot";
 import BacktestPanel from "@/components/BacktestPanel";
 import FlagInfoModal from "@/components/FlagInfoModal";
 import Sparkline from "@/components/Sparkline";
@@ -398,6 +399,8 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
         )}
       </div>
 
+      <AdSlot id="screener-results-top" variant="banner" />
+
       <div className="table-wrap">
       <table className="stock-table">
         <thead>
@@ -466,6 +469,8 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
         </tbody>
       </table>
       </div>
+
+      <AdSlot id="screener-results-bottom" variant="banner" />
     </div>
   );
 }

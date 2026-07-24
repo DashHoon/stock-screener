@@ -68,8 +68,11 @@ export default async function StockPage({
       <div className="mobile-top-ad">
         <AdSlot id="stock-mobile-top" />
       </div>
+      <AdSlot id="stock-top" variant="banner" />
 
       <StockChart data={data} />
+
+      <AdSlot id="stock-mid" variant="rect" />
 
       {recentDivs.length > 0 && (
         <p className="notice">
@@ -83,7 +86,7 @@ export default async function StockPage({
         </p>
       )}
 
-      <AdSlot id="stock-bottom" />
+      <AdSlot id="stock-bottom" variant="banner" />
     </>
   );
 }
