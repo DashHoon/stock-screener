@@ -1,4 +1,6 @@
+/* 화이트톤 고정 테마 (시스템 다크 설정과 무관하게 항상 라이트). */
 :root {
+  color-scheme: light;
   --bg: #ffffff;
   --fg: #1a1d24;
   --muted: #6b7280;
@@ -10,21 +12,6 @@
   --bull: #dc2626;
   --bear: #2563eb;
   --neutral: #6b7280;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1117;
-    --fg: #e5e7eb;
-    --muted: #9ca3af;
-    --border: #2a2e3a;
-    --surface: #171a23;
-    --accent: #60a5fa;
-    --up: #f87171;
-    --down: #60a5fa;
-    --bull: #f87171;
-    --bear: #60a5fa;
-  }
 }
 
 * {
