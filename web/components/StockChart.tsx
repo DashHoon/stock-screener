@@ -184,10 +184,28 @@ function macdCrossMarkers(
   return out;
 }
 
+interface PaneLabelSpec {
+  text: string;
+  infoKey?: string; // 있으면 라벨 옆 ⓘ 버튼 표시
+}
+
+// 지표 개념 설명 (패널 ⓘ 클릭 시)
+const INDICATOR_INFO: Record<string, { title: string; desc: string }> = {
+  rsi: {
+    title: "RSI (상대강도지수, 14)",
+    desc: "최근 14일간 오른 폭과 내린 폭을 비교해 0~100으로 나타낸 모멘텀 지표입니다. 70 이상이면 과매수(단기 과열), 30 이하면 과매도(단기 침체)로 봅니다. 가격은 신고점인데 RSI는 낮아지는 식으로 둘이 엇갈리는 '다이버전스'는 추세 반전 신호로 자주 쓰입니다.",
+  },
+  macd: {
+    title: "MACD (이동평균수렴확산, 12·26·9)",
+    desc: "단기(12일)·장기(26일) 지수이동평균의 차이가 MACD선, 그 9일 평균이 시그널선입니다. MACD선이 시그널선을 아래→위로 뚫으면 골든크로스(상승 전환), 위→아래로 뚫으면 데드크로스(하락 전환) 신호입니다. 막대(히스토그램)는 두 선의 간격이고, 0선 위/아래로 중기 추세 방향을 봅니다.",
+  },
+};
+
 /** 패널 좌상단에 라벨 오버레이 부착. pane DOM은 늦게 생성되므로 잠시 재시도한다. */
 function attachPaneLabels(
   panes: { getHTMLElement(): HTMLElement | null }[],
-  texts: string[],
+  specs: PaneLabelSpec[],
+  onInfo?: (key: string) => void,
   tries = 10,
 ) {
   const pending: number[] = [];
@@ -205,13 +223,34 @@ function attachPaneLabels(
     if (el.querySelector(".pane-label")) return;
     const label = document.createElement("div");
     label.className = "pane-label";
-    label.textContent = texts[i];
+    const span = document.createElement("span");
+    span.textContent = specs[i].text;
+    label.appendChild(span);
+    const key = specs[i].infoKey;
+    if (key && onInfo) {
+      const info = document.createElement("button");
+      info.type = "button";
+      info.className = "pane-info";
+      info.textContent = "ⓘ";
+      info.setAttribute("aria-label", `${specs[i].text} 설명`);
+      info.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onInfo(key);
+      });
+      label.appendChild(info);
+    }
     el.style.position = "relative";
     el.appendChild(label);
   });
   if (pending.length && tries > 0) {
     setTimeout(
-      () => attachPaneLabels(pending.map((i) => panes[i]), pending.map((i) => texts[i]), tries - 1),
+      () =>
+        attachPaneLabels(
+          pending.map((i) => panes[i]),
+          pending.map((i) => specs[i]),
+          onInfo,
+          tries - 1,
+        ),
       50,
     );
   }
@@ -229,6 +268,7 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [hiddenPat, setHiddenPat] = useState<Set<string>>(new Set());
   const [hiddenCdl, setHiddenCdl] = useState<Set<string>>(new Set());
   const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // ⓘ 설명 팝오버
+  const [infoInd, setInfoInd] = useState<{ title: string; desc: string } | null>(null); // 지표 설명
   const [ready, setReady] = useState(false);
   // 차트 그리기 (가로선/추세선/박스) — 종목·타임프레임별 localStorage 저장
   const [tool, setTool] = useState<DrawTool>("none");
@@ -600,7 +640,12 @@ export default function StockChart({ data }: { data: ChartData }) {
         if (ps.length >= 4) {
           attachPaneLabels(
             [ps[1], ps[2], ps[3]],
-            ["거래량", "RSI (14)", "MACD (12,26,9)"],
+            [
+              { text: "거래량" },
+              { text: "RSI (14)", infoKey: "rsi" },
+              { text: "MACD (12,26,9)", infoKey: "macd" },
+            ],
+            (key) => setInfoInd(INDICATOR_INFO[key] ?? null),
           );
         }
       }
@@ -845,6 +890,24 @@ export default function StockChart({ data }: { data: ChartData }) {
         </div>
       )}
       {infoFlag && <FlagInfoModal flag={infoFlag} onClose={() => setInfoFlag(null)} />}
+      {infoInd && (
+        <div className="info-overlay" onClick={() => setInfoInd(null)}>
+          <div className="info-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="info-pop-head">
+              <strong>{infoInd.title}</strong>
+              <button
+                type="button"
+                className="info-close"
+                aria-label="닫기"
+                onClick={() => setInfoInd(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p>{infoInd.desc}</p>
+          </div>
+        </div>
+      )}
       <div ref={ref} className="chart-wrap" />
     </div>
   );

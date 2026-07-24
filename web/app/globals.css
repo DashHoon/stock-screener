@@ -712,6 +712,23 @@ a {
   font-weight: 600;
   color: var(--muted);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pane-info {
+  pointer-events: auto; /* 라벨은 클릭 통과, ⓘ만 클릭 가능 */
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pane-info:hover {
+  color: var(--accent);
 }
 
 /* 모바일: 광고를 차트보다 먼저 */
