@@ -1,0 +1,7 @@
+# ads.txt — 광고 판매자 인증 파일
+# 계정 승인 후 아래 형식으로 실제 게시자 ID를 추가한다.
+#
+# 구글 애드센스 (pub-XXXXXXXXXXXXXXXX 를 발급받은 게시자 ID로 교체):
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+#
+# 카카오 애드핏은 ads.txt 등록이 필수는 아님 (안내 시 추가)

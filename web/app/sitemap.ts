@@ -7,8 +7,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const codes = await listChartCodes();
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
-    { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/guide/chart-patterns`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/guide/candlestick`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/stats`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE_URL}/disclaimer`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
     ...PRESETS.map((p) => ({
       url: `${SITE_URL}/screen/${p.slug}`,
       changeFrequency: "daily" as const,

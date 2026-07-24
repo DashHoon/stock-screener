@@ -5,14 +5,22 @@ import AdSlot from "@/components/AdSlot";
 import StickyAd from "@/components/StickyAd";
 import StockSearch from "@/components/StockSearch";
 import { loadLatest } from "@/lib/data";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL), // OG·canonical의 절대 URL 기준 (도메인 교체 시 env만 변경)
   title: {
     default: "주식 시그널 스크리너 — RSI 다이버전스·MACD·볼린저밴드",
     template: "%s | 주식 시그널 스크리너",
   },
   description:
-    "국내주식 전 종목의 RSI 다이버전스, MACD 크로스, 볼린저밴드 시그널을 매일 스크리닝합니다.",
+    "국내주식 전 종목의 RSI 다이버전스, MACD 크로스, 볼린저밴드, 차트 패턴 시그널을 매일 스크리닝합니다. 종목별 10년 차트와 백테스트 통계 제공.",
+  openGraph: {
+    type: "website",
+    siteName: "주식 시그널 스크리너",
+    locale: "ko_KR",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default async function RootLayout({
