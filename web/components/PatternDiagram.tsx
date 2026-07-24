@@ -225,10 +225,11 @@ const DIAGRAMS: Record<string, ReactElement> = {
   ),
   pat_flag_bull: (
     <>
-      <L d="M26 106 L66 30 L96 46 L134 58 L120 40 L158 52 L204 16" />
-      <L d="M92 40 L150 54" c={MUTED} w={1.2} dash="3 3" />
-      <L d="M100 54 L158 68" c={MUTED} w={1.2} dash="3 3" />
-      <TriUp x={188} y={36} />
+      {/* 급등 폴대 → 하향 기울기 깃발(좁은 채널) → 상향 돌파 */}
+      <L d="M25 112 L60 30 L80 46 L96 38 L114 54 L130 46 L205 16" />
+      <L d="M58 29 L138 47" c={MUTED} w={1.2} dash="4 3" />
+      <L d="M78 45 L138 61" c={MUTED} w={1.2} dash="4 3" />
+      <TriUp x={176} y={40} />
     </>
   ),
   // ── 하락 패턴 ──────────────────────────
@@ -297,10 +298,11 @@ const DIAGRAMS: Record<string, ReactElement> = {
   ),
   pat_flag_bear: (
     <>
-      <L d="M26 30 L66 104 L96 88 L134 76 L120 94 L158 82 L204 118" />
-      <L d="M92 82 L150 96" c={MUTED} w={1.2} dash="3 3" />
-      <L d="M100 68 L158 82" c={MUTED} w={1.2} dash="3 3" />
-      <TriDown x={188} y={104} c={DOWN} />
+      {/* 급락 폴대 → 상향 기울기 깃발(좁은 채널) → 하향 이탈 */}
+      <L d="M25 20 L60 100 L80 84 L96 92 L114 76 L130 84 L205 114" />
+      <L d="M58 101 L138 83" c={MUTED} w={1.2} dash="4 3" />
+      <L d="M78 87 L138 69" c={MUTED} w={1.2} dash="4 3" />
+      <TriDown x={176} y={106} c={DOWN} />
     </>
   ),
   pat_broadening: (
