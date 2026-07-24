@@ -199,6 +199,20 @@ const INDICATOR_INFO: Record<string, { title: string; desc: string }> = {
     title: "MACD (이동평균수렴확산, 12·26·9)",
     desc: "단기(12일)·장기(26일) 지수이동평균의 차이가 MACD선, 그 9일 평균이 시그널선입니다. MACD선이 시그널선을 아래→위로 뚫으면 골든크로스(상승 전환), 위→아래로 뚫으면 데드크로스(하락 전환) 신호입니다. 막대(히스토그램)는 두 선의 간격이고, 0선 위/아래로 중기 추세 방향을 봅니다.",
   },
+  divergence: {
+    title: "다이버전스 (Divergence)",
+    desc: "가격과 RSI의 고·저점 방향이 서로 엇갈리는 현상입니다. 가격은 저점을 더 낮췄는데 RSI 저점은 오히려 높아지면(상승 다이버전스) 하락 힘이 약해져 반등 가능성이 커집니다. 반대로 가격 고점은 높은데 RSI 고점이 낮아지면(하락 다이버전스) 상승 동력이 꺼지는 신호입니다. 추세 반전을 미리 포착하는 데 씁니다. 차트에는 발생 구간을 화살표로 표시합니다.",
+  },
+  bollinger: {
+    title: "볼린저밴드 (Bollinger Band, 20·2)",
+    desc: "20일 이동평균선(가운데)을 중심으로 표준편차의 2배만큼 위·아래에 그린 띠입니다. 가격의 약 95%가 이 띠 안에서 움직여, 상단 터치는 단기 과열, 하단 터치는 단기 침체로 봅니다. 띠 폭이 좁아지는 '스퀴즈'는 변동성이 줄었다가 곧 크게 움직일 신호이고, 폭이 벌어지면 추세가 강해지는 것으로 해석합니다.",
+  },
+};
+
+// 툴바 토글(다이버전스·볼린저) → 설명 키
+const TOGGLE_INFO: Partial<Record<keyof Settings, string>> = {
+  div: "divergence",
+  bb: "bollinger",
 };
 
 /** 패널 좌상단에 라벨 오버레이 부착. pane DOM은 늦게 생성되므로 잠시 재시도한다. */
@@ -715,14 +729,26 @@ export default function StockChart({ data }: { data: ChartData }) {
               ["candle", "캔들"],
             ] as [keyof Settings, string][]
           ).map(([key, label]) => (
-            <label key={key} className={`toolbar-toggle${settings[key] ? " on" : ""}`}>
-              <input
-                type="checkbox"
-                checked={settings[key] as boolean}
-                onChange={(e) => update({ [key]: e.target.checked })}
-              />
-              {label}
-            </label>
+            <span key={key} className="toggle-wrap">
+              <label className={`toolbar-toggle${settings[key] ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={settings[key] as boolean}
+                  onChange={(e) => update({ [key]: e.target.checked })}
+                />
+                {label}
+              </label>
+              {TOGGLE_INFO[key] && (
+                <button
+                  type="button"
+                  className="chip-info"
+                  aria-label={`${label} 설명`}
+                  onClick={() => setInfoInd(INDICATOR_INFO[TOGGLE_INFO[key]!] ?? null)}
+                >
+                  ⓘ
+                </button>
+              )}
+            </span>
           ))}
         </div>
         {settings.ma && (

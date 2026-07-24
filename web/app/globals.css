@@ -730,6 +730,12 @@ a {
 .pane-info:hover {
   color: var(--accent);
 }
+/* 툴바 토글(다이버전스·볼린저) 라벨 옆 ⓘ */
+.toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 
 /* 모바일: 광고를 차트보다 먼저 */
 .mobile-top-ad {
