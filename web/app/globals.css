@@ -409,6 +409,16 @@ a {
   line-height: 1.6;
   color: var(--fg);
 }
+.flag-diagram {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  margin: 0 auto 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 
 /* stock detail */
 .stock-header {

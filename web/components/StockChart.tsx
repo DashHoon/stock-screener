@@ -15,6 +15,7 @@ import {
 } from "lightweight-charts";
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
+import FlagInfoModal from "@/components/FlagInfoModal";
 import type { ChartData, FlagKey, TimeframeData, TimeframeKey } from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
@@ -719,31 +720,7 @@ export default function StockChart({ data }: { data: ChartData }) {
           })}
         </div>
       )}
-      {infoFlag && (
-        <div className="info-overlay" onClick={() => setInfoFlag(null)}>
-          <div className="info-pop" onClick={(e) => e.stopPropagation()}>
-            <div className="info-pop-head">
-              <span
-                className={`badge${
-                  infoFlag.bullish === true ? " bull" : infoFlag.bullish === false ? " bear" : ""
-                }`}
-              >
-                {infoFlag.short}
-              </span>
-              <strong>{infoFlag.label}</strong>
-              <button
-                type="button"
-                className="info-close"
-                aria-label="닫기"
-                onClick={() => setInfoFlag(null)}
-              >
-                ×
-              </button>
-            </div>
-            <p>{infoFlag.desc}</p>
-          </div>
-        </div>
-      )}
+      {infoFlag && <FlagInfoModal flag={infoFlag} onClose={() => setInfoFlag(null)} />}
       <div ref={ref} className="chart-wrap" />
     </div>
   );
