@@ -571,29 +571,58 @@ export default function StockChart({ data }: { data: ChartData }) {
         )}
       </div>
       {settings.pattern && patternKinds.length > 0 && (
-        <div className="pattern-chips">
-          <span className="pattern-chips-label">패턴 표시:</span>
-          {patternKinds.map((kind) => {
-            const shown = !hiddenPat.has(kind);
-            const bull = BULL_KINDS.has(kind);
-            return (
-              <button
-                key={kind}
-                type="button"
-                className={`pattern-chip${shown ? ` on ${bull ? "bull" : "bear"}` : ""}`}
-                onClick={() =>
-                  setHiddenPat((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(kind)) next.delete(kind);
-                    else next.add(kind);
-                    return next;
-                  })
-                }
-              >
-                {PATTERN_LABEL[kind]?.[2] ?? kind}
-              </button>
-            );
-          })}
+        <div className="pattern-chips-wrap">
+          {(
+            [
+              ["상승", "📈", patternKinds.filter((k) => BULL_KINDS.has(k))],
+              ["하락", "📉", patternKinds.filter((k) => !BULL_KINDS.has(k))],
+            ] as [string, string, string[]][]
+          )
+            .filter(([, , kinds]) => kinds.length > 0)
+            .map(([name, icon, kinds]) => {
+              const allShown = kinds.every((k) => !hiddenPat.has(k));
+              return (
+                <div className="pattern-chips" key={name}>
+                  <button
+                    type="button"
+                    className="pattern-chips-label as-btn"
+                    title={allShown ? "모두 끄기" : "모두 켜기"}
+                    onClick={() =>
+                      setHiddenPat((prev) => {
+                        const next = new Set(prev);
+                        // 하나라도 켜져 있으면 전부 끄고, 전부 꺼져 있으면 전부 켠다
+                        if (allShown) kinds.forEach((k) => next.add(k));
+                        else kinds.forEach((k) => next.delete(k));
+                        return next;
+                      })
+                    }
+                  >
+                    {icon} {name} 패턴:
+                  </button>
+                  {kinds.map((kind) => {
+                    const shown = !hiddenPat.has(kind);
+                    const bull = BULL_KINDS.has(kind);
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        className={`pattern-chip${shown ? ` on ${bull ? "bull" : "bear"}` : ""}`}
+                        onClick={() =>
+                          setHiddenPat((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(kind)) next.delete(kind);
+                            else next.add(kind);
+                            return next;
+                          })
+                        }
+                      >
+                        {PATTERN_LABEL[kind]?.[2] ?? kind}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
         </div>
       )}
       <div ref={ref} className="chart-wrap" />

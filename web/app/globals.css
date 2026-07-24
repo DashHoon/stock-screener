@@ -316,6 +316,100 @@ a {
   border-radius: 7px;
 }
 
+/* 시그널 칩: 토글 라벨 + 지표설명(ⓘ) 버튼 */
+.chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.chip-info {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  font-family: inherit;
+}
+.chip-info:hover {
+  color: var(--accent);
+}
+/* 상승/하락 칩 옅은 색조로 방향 구분 (선택 시 accent가 우선) */
+.filter-chip.dir-up:not(.on) {
+  background: color-mix(in srgb, var(--bull) 7%, var(--bg));
+}
+.filter-chip.dir-down:not(.on) {
+  background: color-mix(in srgb, var(--bear) 7%, var(--bg));
+}
+
+/* 결과 테이블 시장(코스피/코스닥) 태그 */
+.mkt-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.mkt-tag.kospi {
+  background: color-mix(in srgb, #2b7de9 16%, transparent);
+  color: #2b7de9;
+}
+.mkt-tag.kosdaq {
+  background: color-mix(in srgb, #e6842b 18%, transparent);
+  color: #d9781f;
+}
+
+/* 지표설명 팝오버 */
+.info-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.info-pop {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 420px;
+  width: 100%;
+  padding: 18px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+.info-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.info-pop-head strong {
+  font-size: 15px;
+  flex: 1;
+}
+.info-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  font-family: inherit;
+}
+.info-pop p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg);
+}
+
 /* stock detail */
 .stock-header {
   display: flex;
@@ -401,17 +495,34 @@ a {
 }
 
 /* 패턴 개별 표시 토글 (겹침 정리) */
+.pattern-chips-wrap {
+  margin: 0 0 10px;
+}
 .pattern-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
+}
+.pattern-chips:last-child {
+  margin-bottom: 0;
 }
 .pattern-chips-label {
   font-size: 12px;
   color: var(--muted);
   margin-right: 2px;
+}
+/* 방향별 '모두 켜기/끄기' 라벨 버튼 */
+.pattern-chips-label.as-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
+.pattern-chips-label.as-btn:hover {
+  color: var(--accent);
 }
 .pattern-chip {
   padding: 3px 9px;

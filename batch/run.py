@@ -147,6 +147,7 @@ def compute_and_write(stocks) -> dict:
                 writer.stock_entry(
                     row.code, row.name, ind, sig,
                     marcap=int(getattr(row, "marcap", -1)),
+                    market=str(getattr(row, "market", "")),
                 )
             )
 

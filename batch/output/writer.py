@@ -18,11 +18,12 @@ def _round(v, nd=2):
 
 
 def stock_entry(
-    code: str, name: str, ind: pd.DataFrame, sig: dict[str, int], marcap: int = -1
+    code: str, name: str, ind: pd.DataFrame, sig: dict[str, int],
+    marcap: int = -1, market: str = "",
 ) -> dict:
     """latest.json의 stocks[] 한 건. sig = {시그널: 마지막 발생 N봉 전(0=오늘)}
 
-    marcap: 시가총액(억원, -1=알 수 없음)
+    marcap: 시가총액(억원, -1=알 수 없음). market: 'KOSPI'|'KOSDAQ'
     """
     last = ind.iloc[-1]
     prev_close = float(ind["close"].iloc[-2]) if len(ind) >= 2 else None
@@ -35,6 +36,7 @@ def stock_entry(
         "close": int(last["close"]),
         "change_pct": change_pct,
         "cap": int(marcap),
+        "mkt": market,
         "sig": sig,
         "rsi": _round(last["rsi"], 1),
         "m": [int(x) for x in ind["close"].iloc[-20:]],  # 최근 20봉 스파크라인

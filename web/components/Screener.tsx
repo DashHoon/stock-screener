@@ -4,11 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
+import type { FlagMeta } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import BacktestPanel from "@/components/BacktestPanel";
 import Sparkline from "@/components/Sparkline";
 
 type SortKey = "name" | "close" | "change_pct" | "rsi" | "cap";
+
+// 시장 구분 필터
+const MARKETS = [
+  { label: "전체", val: "" },
+  { label: "코스피", val: "KOSPI" },
+  { label: "코스닥", val: "KOSDAQ" },
+];
+
+// 상승/하락 방향 보기 필터 (체크박스 노출을 방향별로 좁힌다)
+type Dir = "all" | "up" | "down";
+const DIRECTIONS: { label: string; val: Dir }[] = [
+  { label: "전체", val: "all" },
+  { label: "📈 상승", val: "up" },
+  { label: "📉 하락", val: "down" },
+];
+function inDir(bullish: boolean | null, dir: Dir): boolean {
+  if (dir === "all") return true;
+  if (dir === "up") return bullish === true;
+  return bullish === false;
+}
 
 // 기간 필터: 최근 N봉(거래일) 내 발생. 기본 1주
 const WINDOWS = [
@@ -71,6 +92,12 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
     const c = Number(searchParams.get("cap"));
     return CAP_TIERS.some((t) => t.min === c) ? c : 0;
   });
+  const [market, setMarketState] = useState<string>(() => {
+    const m = searchParams.get("mkt") ?? "";
+    return MARKETS.some((x) => x.val === m) ? m : "";
+  });
+  const [dir, setDir] = useState<Dir>("all"); // 방향 보기 필터 (URL 비반영)
+  const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // 지표설명 팝오버
   const [sortKey, setSortKey] = useState<SortKey>("change_pct");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -84,12 +111,13 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   // 필터 상태를 URL에 동기화. 지표를 다 해제해도 기간·시총 파라미터가 있으면
   // /screen에 머문다(홈 '/'으로 보내면 컴포넌트가 재마운트되며 기간·시총이
   // 초기값으로 리셋되는 문제 방지). 전부 기본값일 때만 홈으로.
-  function syncUrl(next: Set<FlagKey>, bars: number, cap: number) {
+  function syncUrl(next: Set<FlagKey>, bars: number, cap: number, mkt: string) {
     const flags = [...next].join(",");
     const parts: string[] = [];
     if (flags) parts.push(`flags=${flags}`);
     if (bars !== DEFAULT_WINDOW) parts.push(`within=${bars}`);
     if (cap > 0) parts.push(`cap=${cap}`);
+    if (mkt) parts.push(`mkt=${mkt}`);
     const target = parts.length ? `/screen?${parts.join("&")}` : "/";
     const current =
       pathname + (searchParams.size ? `?${searchParams.toString()}` : "");
@@ -101,45 +129,52 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
 
   const rows = useMemo(() => {
     if (!data) return [];
+    const mktOk = (s: StockSignal) => !market || s.mkt === market;
     if (noFilter) {
       return [...data.stocks]
-        .filter((s) => (s.cap ?? -1) >= minCap)
+        .filter((s) => mktOk(s) && (s.cap ?? -1) >= minCap)
         .sort((a, b) => (b.cap ?? -1) - (a.cap ?? -1))
         .slice(0, 10);
     }
     const keys = [...selected];
     const filtered = data.stocks.filter(
       (s) =>
+        mktOk(s) &&
         (minCap === 0 || (s.cap ?? -1) >= minCap) &&
         keys.every((k) => (s.sig?.[k] ?? Infinity) <= windowBars),
     );
-    const dir = sortDesc ? -1 : 1;
+    const sdir = sortDesc ? -1 : 1;
     return filtered.sort((a, b) => {
-      if (sortKey === "name") return dir * a.name.localeCompare(b.name, "ko");
+      if (sortKey === "name") return sdir * a.name.localeCompare(b.name, "ko");
       const av = a[sortKey] ?? -Infinity;
       const bv = b[sortKey] ?? -Infinity;
-      return dir * (Number(av) - Number(bv));
+      return sdir * (Number(av) - Number(bv));
     });
-  }, [data, noFilter, selected, windowBars, minCap, sortKey, sortDesc]);
+  }, [data, noFilter, selected, windowBars, minCap, market, sortKey, sortDesc]);
 
   function toggle(key: FlagKey) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      syncUrl(next, windowBars, minCap);
+      syncUrl(next, windowBars, minCap, market);
       return next;
     });
   }
 
   function setWindow(bars: number) {
     setWindowBars(bars);
-    syncUrl(selected, bars, minCap);
+    syncUrl(selected, bars, minCap, market);
   }
 
   function setCap(cap: number) {
     setMinCap(cap);
-    syncUrl(selected, windowBars, cap);
+    syncUrl(selected, windowBars, cap, market);
+  }
+
+  function setMarket(mkt: string) {
+    setMarketState(mkt);
+    syncUrl(selected, windowBars, minCap, mkt);
   }
 
   function sortBy(key: SortKey) {
@@ -209,27 +244,99 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             ))}
           </div>
         </div>
-        {FLAG_GROUPS.map((g) => (
-          <div className="filter-group" key={g.name}>
-            <div className="filter-group-name">{g.name}</div>
-            <div className="filter-options">
-              {g.flags.map((f) => (
-                <label
-                  key={f.key}
-                  className={`filter-chip${selected.has(f.key) ? " on" : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(f.key)}
-                    onChange={() => toggle(f.key)}
-                  />
-                  {f.label}
-                </label>
-              ))}
-            </div>
+        <div className="filter-group">
+          <div className="filter-group-name">시장</div>
+          <div className="filter-options">
+            {MARKETS.map((m) => (
+              <button
+                key={m.val}
+                type="button"
+                className={`filter-chip window-chip${market === m.val ? " on" : ""}`}
+                onClick={() => setMarket(m.val)}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
-        ))}
+        </div>
+        <div className="filter-group">
+          <div className="filter-group-name">시그널 방향 (상승/하락 스크리닝)</div>
+          <div className="filter-options">
+            {DIRECTIONS.map((d) => (
+              <button
+                key={d.val}
+                type="button"
+                className={`filter-chip window-chip${dir === d.val ? " on" : ""}`}
+                onClick={() => setDir(d.val)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {FLAG_GROUPS.map((g) => {
+          const flags = g.flags.filter((f) => inDir(f.bullish, dir));
+          if (flags.length === 0) return null; // 방향 필터로 비면 그룹 숨김
+          return (
+            <div className="filter-group" key={g.name}>
+              <div className="filter-group-name">{g.name}</div>
+              <div className="filter-options">
+                {flags.map((f) => (
+                  <div
+                    key={f.key}
+                    className={`filter-chip${selected.has(f.key) ? " on" : ""}${
+                      f.bullish === true ? " dir-up" : f.bullish === false ? " dir-down" : ""
+                    }`}
+                  >
+                    <label className="chip-main">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(f.key)}
+                        onChange={() => toggle(f.key)}
+                      />
+                      {f.label}
+                    </label>
+                    <button
+                      type="button"
+                      className="chip-info"
+                      aria-label={`${f.label} 설명`}
+                      onClick={() => setInfoFlag(f)}
+                    >
+                      ⓘ
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
+
+      {infoFlag && (
+        <div className="info-overlay" onClick={() => setInfoFlag(null)}>
+          <div className="info-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="info-pop-head">
+              <span
+                className={`badge${
+                  infoFlag.bullish === true ? " bull" : infoFlag.bullish === false ? " bear" : ""
+                }`}
+              >
+                {infoFlag.short}
+              </span>
+              <strong>{infoFlag.label}</strong>
+              <button
+                type="button"
+                className="info-close"
+                aria-label="닫기"
+                onClick={() => setInfoFlag(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p>{infoFlag.desc}</p>
+          </div>
+        </div>
+      )}
 
       <BacktestPanel
         selected={[...selected]}
@@ -281,6 +388,11 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
               <td className="name">
                 <Link href={`/stock/${s.code}`}>{s.name}</Link>
                 <span className="code">{s.code}</span>
+                {s.mkt && (
+                  <span className={`mkt-tag ${s.mkt === "KOSPI" ? "kospi" : "kosdaq"}`}>
+                    {s.mkt === "KOSPI" ? "코스피" : "코스닥"}
+                  </span>
+                )}
               </td>
               <td className="num">{s.close.toLocaleString()}</td>
               <td className="num cap">{fmtCap(s.cap)}</td>
