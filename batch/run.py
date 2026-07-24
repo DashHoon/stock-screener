@@ -48,8 +48,35 @@ def repair_gaps(codes: list[str], target_date: str) -> None:
         backfill.update_all(stale)
 
 
+def market_latest_date() -> str | None:
+    """실제 최신 거래일(코스피 지수 기준). 공공 API가 늦을 때 기준일로 쓴다.
+
+    공공 API는 하루 지연에 더해 갱신이 늦어 전일치가 아직 안 올라올 때가 있다.
+    그 경우에도 지수(fdr)는 최신 거래일을 갖고 있으므로, 이를 기준으로 삼아
+    뒤처진 종목을 fdr로 채운다. 조회 실패 시 None(공공 API 기준 그대로).
+    """
+    try:
+        import FinanceDataReader as fdr
+
+        start = (dt.date.today() - dt.timedelta(days=10)).isoformat()
+        df = fdr.DataReader("KS11", start)
+        if df is None or df.empty:
+            return None
+        today = dt.date.today().isoformat()
+        dates = [str(d)[:10] for d in df.index]
+        past = [d for d in dates if d < today]  # 오늘 미완성 봉 제외
+        return past[-1] if past else None
+    except Exception:
+        log.exception("시장 최신 거래일 조회 실패")
+        return None
+
+
 def collect(codes: list[str]) -> None:
-    """일별 수집. 공공 API 우선, 실패/키 없음이면 fdr 증분 갱신."""
+    """일별 수집. 공공 API 우선, 실패/키 없음이면 fdr 증분 갱신.
+
+    공공 API가 최신 거래일을 아직 안 올렸으면(지수보다 뒤처지면) 그 차이만큼
+    fdr 증분으로 보완한다 — repair_gaps 기준일을 지수 최신일까지 끌어올린다.
+    """
     if daily.api_key():
         # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일)
         for back in range(1, 6):
@@ -57,7 +84,9 @@ def collect(codes: list[str]) -> None:
             day = daily.fetch_day(bas_dt)
             if not day.empty:
                 daily.merge_into_cache(day)
-                repair_gaps(codes, day["date"].max())
+                # 공공 API가 지수보다 뒤처지면 지수 최신일까지 fdr로 채운다
+                target = max(day["date"].max(), market_latest_date() or "")
+                repair_gaps(codes, target)
                 return
         log.warning("공공 API 최근 5일 데이터 없음 — fdr 폴백")
     else:

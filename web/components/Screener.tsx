@@ -12,12 +12,18 @@ type SortKey = "name" | "close" | "change_pct" | "rsi" | "cap";
 
 // 기간 필터: 최근 N봉(거래일) 내 발생. 기본 1주
 const WINDOWS = [
-  { label: "오늘", bars: 0 },
+  { label: "당일", bars: 0 },
   { label: "1주", bars: 5 },
   { label: "1개월", bars: 21 },
   { label: "3개월", bars: 63 },
 ];
 const DEFAULT_WINDOW = 5;
+
+// "2026-07-22" → "7/22" (기준일 표시용). 지연 시세라 '당일'은 데이터 기준일을 뜻한다.
+function shortDate(date?: string): string {
+  const m = date?.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return m ? `${+m[1]}/${+m[2]}` : "";
+}
 
 // 시가총액 하한 필터 (억원). 0 = 전체
 const CAP_TIERS = [
@@ -75,13 +81,16 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       .catch(() => setError(true));
   }, []);
 
-  // 사용자가 필터를 바꿨을 때만 URL 동기화 (프리셋 페이지 /screen/[slug]의
-  // 예쁜 URL은 사용자가 손대기 전까지 유지)
+  // 필터 상태를 URL에 동기화. 지표를 다 해제해도 기간·시총 파라미터가 있으면
+  // /screen에 머문다(홈 '/'으로 보내면 컴포넌트가 재마운트되며 기간·시총이
+  // 초기값으로 리셋되는 문제 방지). 전부 기본값일 때만 홈으로.
   function syncUrl(next: Set<FlagKey>, bars: number, cap: number) {
     const flags = [...next].join(",");
-    const within = bars !== DEFAULT_WINDOW ? `&within=${bars}` : "";
-    const capp = cap > 0 ? `&cap=${cap}` : "";
-    const target = flags ? `/screen?flags=${flags}${within}${capp}` : "/";
+    const parts: string[] = [];
+    if (flags) parts.push(`flags=${flags}`);
+    if (bars !== DEFAULT_WINDOW) parts.push(`within=${bars}`);
+    if (cap > 0) parts.push(`cap=${cap}`);
+    const target = parts.length ? `/screen?${parts.join("&")}` : "/";
     const current =
       pathname + (searchParams.size ? `?${searchParams.toString()}` : "");
     if (target !== current) router.replace(target, { scroll: false });
@@ -178,8 +187,9 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
                 type="button"
                 className={`filter-chip window-chip${windowBars === w.bars ? " on" : ""}`}
                 onClick={() => setWindow(w.bars)}
+                title={w.bars === 0 ? "데이터 기준일(전일) 당일" : undefined}
               >
-                {w.label}
+                {w.bars === 0 && data?.date ? shortDate(data.date) : w.label}
               </button>
             ))}
           </div>
