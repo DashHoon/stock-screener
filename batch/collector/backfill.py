@@ -10,6 +10,7 @@
 
 import datetime as dt
 import logging
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -18,6 +19,19 @@ from batch import config
 log = logging.getLogger(__name__)
 
 COLUMNS = ["date", "open", "high", "low", "close", "volume"]
+
+KST = ZoneInfo("Asia/Seoul")
+# 장 마감(15:30) 후 이 시각(KST)을 넘겼으면 당일 봉을 확정 종가로 취급한다.
+# 그 전(장중)이면 오늘 봉은 미완성이라 버린다. 러너가 UTC라 KST로 명시 계산.
+SETTLE_HOUR = 16
+
+
+def latest_complete_date() -> str:
+    """확정된 최신 일봉 날짜(KST 기준). 장 마감·정산 후면 오늘, 아니면 어제."""
+    now = dt.datetime.now(KST)
+    if now.hour >= SETTLE_HOUR:
+        return now.date().isoformat()
+    return (now.date() - dt.timedelta(days=1)).isoformat()
 
 
 def cache_path(code: str):
@@ -71,9 +85,8 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
     out["volume"] = out["volume"].astype("int64")
     # 거래정지 등으로 OHLC가 0인 행 제거
     out = out[(out[["open", "high", "low", "close"]] != 0).all(axis=1)]
-    # 오늘(미완성 봉) 제거
-    today = dt.date.today().isoformat()
-    return out[out["date"] < today].reset_index(drop=True)
+    # 확정 최신일까지만 유지 (장중이면 오늘 미완성 봉 제외, 마감 후면 오늘 포함)
+    return out[out["date"] <= latest_complete_date()].reset_index(drop=True)
 
 
 def update_one(code: str, start: str | None = None) -> int:
@@ -89,7 +102,7 @@ def update_one(code: str, start: str | None = None) -> int:
             dt.date.today() - dt.timedelta(days=365 * config.BACKFILL_YEARS)
         ).isoformat()
 
-    if fetch_from >= dt.date.today().isoformat():
+    if fetch_from > latest_complete_date():
         return 0
 
     raw = _fetch_range(code, fetch_from)
@@ -174,6 +187,26 @@ def update_all(
             rate = len(chunk) / max(time.time() - t0, 0.1)
             cooldown = 90 if rate < 1 else 30  # 느려졌으면 조르기 신호 → 더 쉼
             time.sleep(cooldown)
+
+    # 네이버 조르기로 타임아웃 난 종목은 잠시 쉬었다 재시도한다 (증분 수집 한정).
+    # 동시요청을 낮춰 얌전히 재시도하면 대부분 회수된다 (실측 4% → 1% 미만).
+    if not rebuild:
+        for attempt in range(1, 3):
+            failed = [c for c, v in result.items() if v == -1]
+            if not failed:
+                break
+            time.sleep(20)
+            log.info("타임아웃 %d종목 재시도 (%d차)", len(failed), attempt)
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = {pool.submit(fetch, code): code for code in failed}
+                for fut in as_completed(futures):
+                    code = futures[fut]
+                    try:
+                        result[code] = fut.result()
+                    except Exception as e:
+                        log.warning("%s 재시도 실패: %s", code, e)
+                        result[code] = -1
+
     ok = sum(1 for v in result.values() if v >= 0)
     log.info("백필 완료: 성공 %d / 실패 %d", ok, len(codes) - ok)
     return result

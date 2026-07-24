@@ -57,5 +57,7 @@ def fetch_index_ohlcv(sym: str) -> pd.DataFrame | None:
         out[c] = out[c].astype(float)
     out["volume"] = out["volume"].fillna(0).astype("int64")
     out = out[(out[["open", "high", "low", "close"]] > 0).all(axis=1)]
-    today = dt.date.today().isoformat()
-    return out[out["date"] < today].reset_index(drop=True)
+    # 장중이면 오늘 미완성 봉 제외, 마감 후면 오늘 포함 (종목 수집과 동일 기준)
+    from batch.collector.backfill import latest_complete_date
+
+    return out[out["date"] <= latest_complete_date()].reset_index(drop=True)

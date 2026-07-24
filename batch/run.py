@@ -58,14 +58,15 @@ def market_latest_date() -> str | None:
     try:
         import FinanceDataReader as fdr
 
+        from batch.collector.backfill import latest_complete_date
+
         start = (dt.date.today() - dt.timedelta(days=10)).isoformat()
         df = fdr.DataReader("KS11", start)
         if df is None or df.empty:
             return None
-        today = dt.date.today().isoformat()
-        dates = [str(d)[:10] for d in df.index]
-        past = [d for d in dates if d < today]  # 오늘 미완성 봉 제외
-        return past[-1] if past else None
+        complete = latest_complete_date()  # 장중이면 어제, 마감 후면 오늘까지
+        dates = [d for d in (str(x)[:10] for x in df.index) if d <= complete]
+        return dates[-1] if dates else None
     except Exception:
         log.exception("시장 최신 거래일 조회 실패")
         return None
@@ -223,6 +224,10 @@ def main() -> None:
         help="전 종목 캐시를 새로 받아 교체 (수정주가 보정) 후 계산·산출",
     )
     parser.add_argument("--no-collect", action="store_true", help="수집 생략")
+    parser.add_argument(
+        "--collect-only", action="store_true",
+        help="시세 수집만 하고 계산·산출은 생략 (저녁 워밍업 슬롯용)",
+    )
     parser.add_argument("--limit", type=int, default=0, help="앞 N종목만 (개발용)")
     args = parser.parse_args()
 
@@ -241,6 +246,11 @@ def main() -> None:
     if args.backfill:
         backfill.update_all(codes)
         log.info("백필 완료 (%.0f초)", time.time() - t0)
+        return
+
+    if args.collect_only:
+        collect(codes)
+        log.info("수집만 완료 (%.0f초)", time.time() - t0)
         return
 
     if args.rebuild_all:
