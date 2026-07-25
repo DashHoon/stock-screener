@@ -9,6 +9,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# [중요] 먼저 main을 origin에 push한다. 크론(daily-batch.yml)은 origin/main으로
+# data 브랜치를 다시 빌드하므로, 로컬 main 커밋을 origin에 안 올리면 밤 크론이
+# 옛 코드로 사이트를 덮어쓴다 (2026-07-25 발생). data만 push하면 이 사고가 난다.
+echo "[0] main → origin push (크론이 최신 코드로 빌드하도록)"
+git push origin main
+
 echo "[1/4] 최신 시세 수집 + 전체 재산출"
 .venv/bin/python -m batch.run
 
