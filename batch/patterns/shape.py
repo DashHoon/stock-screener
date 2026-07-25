@@ -36,8 +36,8 @@ SHAPE_CUTS = {
     "pat_diamond": (36, 56),
     "pat_double_bottom": (65, 77),
     "pat_double_top": (63, 75),
-    "pat_flag_bear": (47, 73),
-    "pat_flag_bull": (25, 55),
+    "pat_flag_bear": (67, 79),
+    "pat_flag_bull": (70, 81),
     "pat_hs_inv": (62, 71),
     "pat_hs_top": (58, 68),
     "pat_round_bottom": (58, 70),
@@ -54,7 +54,8 @@ SHAPE_CUTS = {
 
 # 같은 역할의 극점이 반복되어 '수평 대칭'을 따질 수 있는 패턴들.
 # (쌍바닥의 두 바닥, H&S의 양 어깨, 컵·라운드의 좌우 림 …)
-# 플래그·다이아몬드는 꺾은선의 점들이 서로 역할이 달라 대칭성을 적용하지 않는다.
+# 다이아몬드는 꺾은선의 점들이 서로 역할이 달라 대칭성을 적용하지 않는다.
+# (플래그는 고점선·저점선 채널이라 아래 채널 채점 경로를 탄다)
 SYMMETRIC_KINDS = frozenset({
     "pat_double_bottom", "pat_double_top",
     "pat_triple_bottom", "pat_triple_top",

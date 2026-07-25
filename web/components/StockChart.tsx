@@ -119,15 +119,18 @@ interface Settings {
   candle: boolean; // 단기 캔들 패턴 (장악형 등) 마킹
 }
 
+// 첫 진입 기본값: 이평선만 켬. 나머지 표시는 사용자가 필요할 때 직접 켜도록 둔다
+// (한꺼번에 다 켜져 있으면 캔들이 마커·선에 묻혀 차트가 읽히지 않는다).
+// 한 번 바꾼 설정은 localStorage에 남아 다음 방문에도 유지된다.
 const DEFAULT_SETTINGS: Settings = {
   height: "lg",
   chartType: "candle",
-  div: true,
-  macdCross: true,
+  div: false,
+  macdCross: false,
   ma: true,
-  bb: true,
-  pattern: true,
-  candle: true,
+  bb: false,
+  pattern: false,
+  candle: false,
 };
 
 function loadSettings(): Settings {
@@ -465,16 +468,16 @@ export default function StockChart({ data }: { data: ChartData }) {
         const bottom = BULL_KINDS.has(pat.kind);
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
-          color: c, lineWidth: 2, lineStyle: 0,
+          color: c, lineWidth: 1, lineStyle: 0,
           priceLineVisible: false, lastValueVisible: false,
-          pointMarkersVisible: true, pointMarkersRadius: 3,
+          pointMarkersVisible: true, pointMarkersRadius: 2,
         });
         zig.setData(pat.points.map(([d, v]) => ({ time: ts(d), value: v })));
         if (pat.points2?.length) {
           chart.addSeries(LineSeries, {
-            color: c, lineWidth: 2, lineStyle: 0,
+            color: c, lineWidth: 1, lineStyle: 0,
             priceLineVisible: false, lastValueVisible: false,
-            pointMarkersVisible: true, pointMarkersRadius: 3,
+            pointMarkersVisible: true, pointMarkersRadius: 2,
           }).setData(pat.points2.map(([d, v]) => ({ time: ts(d), value: v })));
         }
 

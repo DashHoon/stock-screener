@@ -8,7 +8,7 @@
 import numpy as np
 import pandas as pd
 
-from batch.patterns.util import PatternHit
+from batch.patterns.util import PatternHit, fit_line
 
 POLE_BARS = 15
 POLE_MIN_PCT = 20.0
@@ -85,15 +85,24 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
                 flag_ext_i = int(np.argmin(seg) if bull else np.argmax(seg)) + i + 1
             last_end[tag] = completed_at if completed_at is not None else i
 
-            pts = [(int(j0), float(base)), (int(i), pole_top)]
-            if flag_ext_i is not None:
-                pts.append((int(flag_ext_i), float(lows[flag_ext_i] if bull else highs[flag_ext_i])))
+            # 깃발(조정) 구간을 고점선·저점선 채널로 그린다. 예전처럼 깃대 시작~깃발
+            # 저점을 잇는 꺾은선으로 그리면 대각선이 차트를 가로질러 캔들을 가린다.
+            f0 = int(i)                                   # 깃대 끝 = 깃발 시작
+            f1 = int(completed_at if completed_at is not None else n - 1)
+            if f1 - f0 < 2:
+                continue
+            xs = list(range(f0, f1 + 1))
+            up = fit_line(xs, [float(highs[k]) for k in xs])
+            lo = fit_line(xs, [float(lows[k]) for k in xs])
+            pts_u = [(f0, float(up.at(f0))), (f1, float(up.at(f1)))]
+            pts_l = [(f0, float(lo.at(f0))), (f1, float(lo.at(f1)))]
             out.append(PatternHit(
                 kind="pat_flag_bull" if bull else "pat_flag_bear",
                 completed_at=completed_at,
                 forming=forming,
                 neckline=pole_top,
-                points=pts,
+                points=pts_u,     # 깃발 고점선
+                points2=pts_l,    # 깃발 저점선
                 confirmed_at=int(i),
             ))
     return out
