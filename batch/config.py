@@ -69,11 +69,12 @@ CUP_MAX_LEN = 180           # 최대 봉 수 (~9개월)
 CUP_RIM_TOL_PCT = 6.0       # 좌우 림 높이 차 허용 %
 CUP_MIN_DEPTH_PCT = 10.0    # 컵 깊이(림 대비) 최소 %
 CUP_MAX_DEPTH_PCT = 50.0    # 최대 % (그 이상은 붕괴이지 컵이 아님)
-CUP_BOTTOM_ZONE = (0.15, 0.85)  # 바닥 위치가 컵 구간의 이 비율 범위 안 (가운데)
-CUP_ROUND_R2 = 0.35         # 종가의 2차 곡선 적합 R² 최소치 (U자 검증)
+CUP_BOTTOM_ZONE = (0.30, 0.70)  # 바닥 위치가 컵 구간의 이 비율 범위 안 (가운데)
+CUP_ROUND_R2 = 0.55         # 종가의 2차 곡선 적합 R² 최소치 (U자 검증)
+CUP_MIN_CURVE_GAIN = 0.20   # 포물선이 직선보다 이만큼은 잘 맞아야 (추세→컵 둔갑 방지)
 # V자 배제: 바닥권(깊이 하위 15%) 체류 봉 비율. 포물선 U는 ~39%, 직선 V는 ~15%
 CUP_FLAT_ZONE = 0.15
-CUP_FLAT_FRAC = 0.18
+CUP_FLAT_FRAC = 0.25
 HANDLE_MIN_LEN = 5          # 핸들 최소 봉 수 (우림 후 돌파까지 최소 대기)
 HANDLE_MAX_LEN = 40         # 핸들·돌파 대기 최대 봉 수
 HANDLE_MAX_DEPTH_FRAC = 0.5 # 핸들 저점이 컵 깊이의 상위 절반에 있어야 함

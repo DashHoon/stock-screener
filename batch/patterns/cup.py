@@ -44,7 +44,12 @@ class CupPattern:
 
 
 def _round_ok(closes: np.ndarray) -> bool:
-    """컵 구간 종가가 위로 오목한 2차 곡선에 그럴듯하게 맞는가."""
+    """컵 구간 종가가 위로 오목한 2차 곡선에 그럴듯하게 맞는가.
+
+    R²만 보면 '완만한 하락 추세'도 통과한다 — 직선은 곡률이 0에 가까운 포물선이라
+    2차 적합이 잘 맞기 때문이다. 그래서 곡선이 직선보다 확실히 나은지(곡선 이득)를
+    함께 요구해 추세가 컵으로 둔갑하는 것을 막는다.
+    """
     n = len(closes)
     if n < 10:
         return False
@@ -53,12 +58,14 @@ def _round_ok(closes: np.ndarray) -> bool:
     coef = np.polyfit(x, y, 2)
     if coef[0] <= 0:  # 위로 볼록(뒤집힌 U)은 컵이 아님
         return False
-    fit = np.polyval(coef, x)
-    ss_res = float(np.sum((y - fit) ** 2))
     ss_tot = float(np.sum((y - y.mean()) ** 2))
     if ss_tot <= 0:
         return False
-    return 1 - ss_res / ss_tot >= config.CUP_ROUND_R2
+    r2_par = 1 - float(np.sum((y - np.polyval(coef, x)) ** 2)) / ss_tot
+    if r2_par < config.CUP_ROUND_R2:
+        return False
+    r2_lin = 1 - float(np.sum((y - np.polyval(np.polyfit(x, y, 1), x)) ** 2)) / ss_tot
+    return (r2_par - r2_lin) >= config.CUP_MIN_CURVE_GAIN
 
 
 def detect_cup_handle(ind: pd.DataFrame) -> list[CupPattern]:

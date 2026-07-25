@@ -107,8 +107,16 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
                 continue
             used.add(key)
 
-        pts_u = [(int(i), float(highs[i])) for i in hs]
-        pts_l = [(int(i), float(lows[i])) for i in ls]
+        # 적합한 추세선을 '직선 + 돌파 지점까지 연장'해서 그린다.
+        # 실제 고점들을 지그재그로 이으면 꺾인 선이라 어디를 돌파했는지 안 보인다.
+        # 돌파 판정도 이 직선(upper.at/lower.at)으로 하므로 화면과 판정이 일치한다.
+        # 직선이 모든 고점을 정확히 지나지는 않지만 추세를 대표하면 충분하다.
+        x0 = int(start)
+        x1 = int(completed_at if completed_at is not None else min(deadline, n - 1))
+        if x1 <= x0:
+            continue
+        pts_u = [(x0, float(upper.at(x0))), (x1, float(upper.at(x1)))]
+        pts_l = [(x0, float(lower.at(x0))), (x1, float(lower.at(x1)))]
         neck_ref = completed_at if completed_at is not None else anchor
         neckline = upper.at(neck_ref) if (break_up in (True, None)) else lower.at(neck_ref)
         out.append(PatternHit(
