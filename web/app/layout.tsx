@@ -4,6 +4,7 @@ import "./globals.css";
 import AdSlot from "@/components/AdSlot";
 import StickyAd from "@/components/StickyAd";
 import StockSearch from "@/components/StockSearch";
+import ThemeToggle from "@/components/ThemeToggle";
 import { loadLatest } from "@/lib/data";
 import { SITE_URL } from "@/lib/site";
 
@@ -39,6 +40,15 @@ export default async function RootLayout({
   }
   return (
     <html lang="ko">
+      <head>
+        {/* 첫 페인트 전에 저장된 테마를 적용 — 라이트로 그려졌다 다크로 바뀌는 깜빡임 방지 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}",
+          }}
+        />
+      </head>
       <body>
         <header className="site-header">
           <div className="container">
@@ -51,6 +61,7 @@ export default async function RootLayout({
               <Link href="/guide">지표 가이드</Link>
             </nav>
             <StockSearch />
+            <ThemeToggle />
             {date && <span className="data-date">전일({date}) 기준 데이터</span>}
           </div>
         </header>

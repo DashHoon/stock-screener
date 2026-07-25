@@ -290,6 +290,7 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [infoInd, setInfoInd] = useState<{ title: string; desc: string } | null>(null); // 지표 설명
   const [ready, setReady] = useState(false);
   const [showAmbiguous, setShowAmbiguous] = useState(false); // C등급(모호한 형태)까지 표시
+  const [themeTick, setThemeTick] = useState(0); // 테마 전환 시 차트 재생성용
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
@@ -308,6 +309,10 @@ export default function StockChart({ data }: { data: ChartData }) {
   useEffect(() => {
     setSettings(loadSettings());
     setReady(true);
+    // 차트는 CSS 변수 색을 캔버스에 굽기 때문에 테마가 바뀌면 다시 그려야 한다
+    const onTheme = () => setThemeTick((v) => v + 1);
+    window.addEventListener("themechange", onTheme);
+    return () => window.removeEventListener("themechange", onTheme);
   }, []);
 
   // 종목·타임프레임이 바뀌면 '최근 것 위주'로 기본 표시를 다시 잡는다.
@@ -365,6 +370,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       up: css.getPropertyValue("--up").trim(),
       down: css.getPropertyValue("--down").trim(),
       accent: css.getPropertyValue("--accent").trim(),
+      band: css.getPropertyValue("--band-fill").trim(),
     };
 
     const chart = createChart(el, {
@@ -418,7 +424,7 @@ export default function StockChart({ data }: { data: ChartData }) {
     if (settings.bb) {
       // 밴드 내부를 옅은 노랑으로 채워 상·하단 범위를 한눈에 보이게 한다
       candles.attachPrimitive(
-        makeBandFill(current.dates, current.bb_upper, current.bb_lower, ts),
+        makeBandFill(current.dates, current.bb_upper, current.bb_lower, ts, color.band || undefined),
       );
       chart.addSeries(LineSeries, { color: color.muted, ...thin })
         .setData(lineData(current.dates, current.bb_upper));
@@ -649,7 +655,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, showAmbiguous]);
+  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, showAmbiguous, themeTick]);
 
   return (
     <div>
