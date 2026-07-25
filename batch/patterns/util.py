@@ -63,6 +63,23 @@ def fit_line(xs: list[int], ys: list[float]) -> Line:
     return Line(float(slope), float(intercept), r2)
 
 
+def fit_envelope_line(xs: list[int], ys: list[float], upper: bool) -> Line:
+    """추세선 적합 — 기울기는 회귀로 잡고, 선은 극점에 붙인다.
+
+    최소제곱선은 점들의 '한가운데'를 지나므로 고점 절반이 선 위로 삐져나온다.
+    사람이 긋는 저항선은 고점들을 스치듯 지나가므로, 회귀 기울기는 그대로 두고
+    절편만 밀어 올려(내려) 가장 튀어나온 점에 닿게 한다.
+
+    upper=True면 모든 점이 선 아래(저항선), False면 모두 위(지지선)에 놓인다.
+    """
+    line = fit_line(xs, ys)
+    if len(xs) < 2:
+        return line
+    resid = [y - line.at(x) for x, y in zip(xs, ys)]
+    shift = max(resid) if upper else min(resid)
+    return Line(line.slope, line.intercept + shift, line.r2)
+
+
 def slope_pct(line: Line, ref_price: float) -> float:
     """기울기를 '봉당 %'로 정규화 (가격 규모 무관 비교용)."""
     if ref_price <= 0:

@@ -31,25 +31,25 @@ SHAPE_B = 50
 # 쐐기는 늘 A, 플래그는 늘 C가 된다. 그래서 "같은 패턴 종류 안에서 얼마나 뚜렷한가"로
 # 정규화한다 — 400종목 33,429건 표본의 35/70 백분위 (2026-07 측정).
 SHAPE_CUTS = {
-    "pat_broadening": (75, 83),
+    "pat_broadening": (70, 78),
     "pat_cup_handle": (57, 66),
     "pat_diamond": (36, 56),
     "pat_double_bottom": (65, 77),
     "pat_double_top": (63, 75),
-    "pat_flag_bear": (67, 79),
-    "pat_flag_bull": (70, 81),
+    "pat_flag_bear": (70, 82),
+    "pat_flag_bull": (70, 79),
     "pat_hs_inv": (62, 71),
     "pat_hs_top": (58, 68),
     "pat_round_bottom": (63, 72),
     "pat_round_top": (69, 76),
-    "pat_tri_asc": (81, 89),
-    "pat_tri_desc": (80, 90),
-    "pat_tri_sym_down": (74, 85),
-    "pat_tri_sym_up": (82, 90),
+    "pat_tri_asc": (75, 87),
+    "pat_tri_desc": (72, 84),
+    "pat_tri_sym_down": (72, 83),
+    "pat_tri_sym_up": (80, 90),
     "pat_triple_bottom": (69, 79),
     "pat_triple_top": (69, 77),
-    "pat_wedge_fall": (82, 90),
-    "pat_wedge_rise": (80, 89),
+    "pat_wedge_fall": (82, 91),
+    "pat_wedge_rise": (79, 89),
 }
 
 # 같은 역할의 극점이 반복되어 '수평 대칭'을 따질 수 있는 패턴들.

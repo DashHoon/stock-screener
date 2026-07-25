@@ -14,7 +14,9 @@
 import pandas as pd
 
 from batch import config
-from batch.patterns.util import PatternHit, fit_line, price_pivots, slope_pct
+from batch.patterns.util import (
+    PatternHit, fit_envelope_line, fit_line, price_pivots, slope_pct,
+)
 
 FLAT_EPS = 0.08    # 봉당 % — 이하면 수평 취급
 TREND_EPS = 0.12   # 봉당 % — 이상이어야 추세로 취급
@@ -48,8 +50,9 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
         span = anchor - start
         if span < MIN_STRUCT_SPAN:
             continue
-        upper = fit_line(hs, [highs[i] for i in hs])
-        lower = fit_line(ls, [lows[i] for i in ls])
+        # 저항선은 고점 위, 지지선은 저점 아래에 놓이도록 극점에 붙인다
+        upper = fit_envelope_line(hs, [highs[i] for i in hs], upper=True)
+        lower = fit_envelope_line(ls, [lows[i] for i in ls], upper=False)
         if upper.r2 < MIN_R2 or lower.r2 < MIN_R2:
             continue
         ref = float(closes[anchor])

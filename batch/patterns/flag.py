@@ -8,7 +8,7 @@
 import numpy as np
 import pandas as pd
 
-from batch.patterns.util import PatternHit, fit_line
+from batch.patterns.util import PatternHit, fit_envelope_line
 
 POLE_BARS = 15
 POLE_MIN_PCT = 20.0
@@ -92,8 +92,8 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             if f1 - f0 < 2:
                 continue
             xs = list(range(f0, f1 + 1))
-            up = fit_line(xs, [float(highs[k]) for k in xs])
-            lo = fit_line(xs, [float(lows[k]) for k in xs])
+            up = fit_envelope_line(xs, [float(highs[k]) for k in xs], upper=True)
+            lo = fit_envelope_line(xs, [float(lows[k]) for k in xs], upper=False)
             pts_u = [(f0, float(up.at(f0))), (f1, float(up.at(f1)))]
             pts_l = [(f0, float(lo.at(f0))), (f1, float(lo.at(f1)))]
             out.append(PatternHit(
