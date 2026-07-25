@@ -12,7 +12,14 @@ from batch.patterns.util import PatternHit, fit_envelope_line
 
 POLE_BARS = 15
 POLE_MIN_PCT = 20.0
+# 상승플래그는 사용자가 가장 신뢰하는 패턴 — 재현율 우선으로 폴대 기준을 완화한다
+# (2026-07-26 결정, 느슨한 후보는 형태 등급이 구분). 하락플래그는 기존 유지.
+POLE_MIN_PCT_BULL = 15.0
 FLAG_MIN_LEN = 5
+FLAG_MIN_LEN_BULL = 3    # 짧은 눌림(3~4봉) 뒤 재돌파도 플래그로 인정
+# 같은 방향 플래그 중복 방지 간격. FLAG_MAX_LEN(60)과 묶여 있으면 강한 추세에서
+# 연속으로 나오는 플래그를 3개월씩 놓친다 — 별도 상수로 분리.
+FLAG_DEDUP_GAP = 15
 FLAG_MAX_LEN = 60        # 실무 박스 조정 포함 (~3개월. 25봉은 하이닉스류 장기 조정을 놓침)
 FLAG_MAX_RETRACE = 0.62  # 조정 깊이 ≤ 깃대의 62% (피보나치 61.8% 되돌림까지 허용)
 # 깃발 채널의 봉당 기울기(%) 허용 한계 — 깃발은 폴대의 '반대 방향' 조정이어야 한다.
@@ -37,12 +44,12 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             if base <= 0:
                 continue
             chg = (closes[i] / base - 1) * 100
-            if bull and chg < POLE_MIN_PCT:
+            if bull and chg < POLE_MIN_PCT_BULL:
                 continue
             if not bull and chg > -POLE_MIN_PCT:
                 continue
             tag = "bull" if bull else "bear"
-            if i - last_end[tag] < FLAG_MAX_LEN:  # 같은 깃대 중복 방지
+            if i - last_end[tag] < FLAG_DEDUP_GAP:  # 같은 깃대 중복 방지
                 continue
 
             # 깃대 끝 확장: 종가가 계속 신고(신저)면 깃대가 이어지는 중
@@ -66,7 +73,7 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
                     if closes[j] < pole_top - pole_h * FLAG_MAX_RETRACE:
                         ok = False  # 조정이 너무 깊음
                         break
-                    if j - e >= FLAG_MIN_LEN and closes[j] > pole_top:
+                    if j - e >= FLAG_MIN_LEN_BULL and closes[j] > pole_top:
                         completed_at = j
                         flag_ext_i = int(np.argmin(lows[e + 1 : j])) + e + 1 if j > e + 1 else None
                         break

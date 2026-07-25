@@ -18,7 +18,7 @@ from batch.patterns.util import (
     Line, PatternHit, fit_envelope_line, fit_line, price_pivots, slope_pct,
 )
 
-FLAT_EPS = 0.08    # 봉당 % — 이하면 수평 취급
+FLAT_EPS = 0.10    # 봉당 % — 이하면 수평 취급
 TREND_EPS = 0.12   # 봉당 % — 이상이어야 추세로 취급
 MAX_STRUCT_SPAN = 100
 MIN_STRUCT_SPAN = 20
@@ -26,6 +26,15 @@ MIN_R2 = 0.45
 CONVERGE_RATIO = 0.75   # 끝 폭 ≤ 시작 폭 × 이 값 (수렴형)
 DIVERGE_RATIO = 1.35    # 끝 폭 ≥ 시작 폭 × 이 값 (브로드닝)
 BREAK_WINDOW = 25
+
+# ── 신뢰 3종(상승삼각형·삼각수렴) 재현율 우선 완화 ──────────────────────
+# 사용자가 가장 신뢰하는 패턴은 '살짝 틀려도 되니 놓치지 않는 것'이 우선이다
+# (2026-07-26 결정). 느슨해진 후보의 품질은 형태 등급(A/B/C)이 구분해 준다.
+FAVORED = ("pat_tri_asc", "pat_tri_sym")
+RISE_EPS = 0.08             # 신뢰 종류의 추세 기울기 하한 (기본 0.12보다 완화)
+MIN_R2_LOOSE = 0.32         # 신뢰 종류의 추세선 적합 하한
+CONVERGE_RATIO_LOOSE = 0.85 # 삼각수렴: 완만한 수렴도 허용
+BREAK_WINDOW_LOOSE = 40     # 신뢰 종류는 돌파 대기 기간도 길게
 
 
 def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
@@ -44,8 +53,11 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
         lo = anchor - MAX_STRUCT_SPAN
         hs = [i for i in ph if lo <= i <= anchor][-4:]
         ls = [i for i in pl if lo <= i <= anchor][-4:]
-        if len(hs) < 3 or len(ls) < 3:
+        # 신뢰 종류는 한쪽 피벗이 2개여도 시도한다 (손으로 긋는 삼각형은 2+3이면
+        # 충분할 때가 많다). 그 외 종류는 기존대로 3+3을 요구 — 분류 후 걸러낸다.
+        if len(hs) < 2 or len(ls) < 2 or len(hs) + len(ls) < 5:
             continue
+        strict_pivots = len(hs) >= 3 and len(ls) >= 3
         start = min(hs[0], ls[0])
         span = anchor - start
         if span < MIN_STRUCT_SPAN:
@@ -53,8 +65,8 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
         # 저항선은 고점 위, 지지선은 저점 아래에 놓이도록 극점에 붙인다
         upper = fit_envelope_line(hs, [highs[i] for i in hs], upper=True)
         lower = fit_envelope_line(ls, [lows[i] for i in ls], upper=False)
-        if upper.r2 < MIN_R2 or lower.r2 < MIN_R2:
-            continue
+        if upper.r2 < MIN_R2_LOOSE or lower.r2 < MIN_R2_LOOSE:
+            continue  # 최소 하한 — 종류 확정 후 신뢰 3종 외에는 MIN_R2로 다시 거른다
         ref = float(closes[anchor])
         su, sl = slope_pct(upper, ref), slope_pct(lower, ref)
         w_start = upper.at(start) - lower.at(start)
@@ -62,15 +74,16 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
         if w_start <= 0:
             continue
         converging = w_end <= w_start * CONVERGE_RATIO
+        converging_loose = w_end <= w_start * CONVERGE_RATIO_LOOSE
         diverging = w_end >= w_start * DIVERGE_RATIO
 
         kind = None
         break_up: bool | None = None  # True=위 돌파가 완성, False=아래 이탈, None=양방향(수렴)
-        if abs(su) <= FLAT_EPS and sl >= TREND_EPS:
+        if abs(su) <= FLAT_EPS and sl >= RISE_EPS:
             kind, break_up = "pat_tri_asc", True
         elif abs(sl) <= FLAT_EPS and su <= -TREND_EPS:
             kind, break_up = "pat_tri_desc", False
-        elif su <= -TREND_EPS and sl >= TREND_EPS and converging:
+        elif su <= -RISE_EPS and sl >= RISE_EPS and converging_loose:
             kind, break_up = "pat_tri_sym", None
         elif su >= TREND_EPS and sl >= TREND_EPS and converging and sl > su:
             kind, break_up = "pat_wedge_rise", False
@@ -80,6 +93,16 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
             kind, break_up = "pat_broadening", False
         if kind is None:
             continue
+
+        # 신뢰 3종 외에는 원래의 엄격한 기준을 그대로 적용
+        favored = kind in FAVORED
+        if not favored:
+            if not strict_pivots:
+                continue
+            if upper.r2 < MIN_R2 or lower.r2 < MIN_R2:
+                continue
+            if kind == "pat_tri_sym" and not converging:
+                continue  # (도달 불가하지만 명시적으로)
 
         # 수평으로 분류된 선은 '완전한 수평선'으로 강제한다.
         # FLAT_EPS 이내의 잔기울기를 그대로 그리면 상승삼각형의 상단이 살짝
@@ -94,7 +117,7 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
         scan_from = anchor + config.PAT_PIVOT_RIGHT
         if scan_from >= n:
             continue
-        deadline = min(anchor + BREAK_WINDOW, n - 1)
+        deadline = min(anchor + (BREAK_WINDOW_LOOSE if favored else BREAK_WINDOW), n - 1)
         completed_at = None
         completed_kind = kind
         for j in range(scan_from, deadline + 1):
