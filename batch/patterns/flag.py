@@ -1,6 +1,6 @@
 """플래그/페넌트 (급등락 깃대 + 짧은 조정 후 재돌파). 페넌트(수렴형)도 포함해 판정.
 
-- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 5~25봉 얕은 조정(깃대의
+- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 5~60봉 얕은 조정(깃대의
   상위 FLAG_MAX_RETRACE 이내, 고점 갱신 없음) → 조정 구간 고점 상향 돌파 = 완성
 - 하락 플래그: 대칭 (급락 → 짧은 반등/횡보 → 저점 하향 이탈)
 """
@@ -13,8 +13,8 @@ from batch.patterns.util import PatternHit, fit_envelope_line
 POLE_BARS = 15
 POLE_MIN_PCT = 20.0
 FLAG_MIN_LEN = 5
-FLAG_MAX_LEN = 25
-FLAG_MAX_RETRACE = 0.5   # 조정 깊이 ≤ 깃대의 50%
+FLAG_MAX_LEN = 60        # 실무 박스 조정 포함 (~3개월. 25봉은 하이닉스류 장기 조정을 놓침)
+FLAG_MAX_RETRACE = 0.62  # 조정 깊이 ≤ 깃대의 62% (피보나치 61.8% 되돌림까지 허용)
 # 깃발 채널의 봉당 기울기(%) 허용 한계 — 깃발은 폴대의 '반대 방향' 조정이어야 한다.
 # 하락플래그의 깃발은 반등(상승)/횡보, 상승플래그의 깃발은 눌림(하락)/횡보.
 # 폴대와 같은 방향으로 계속 흘러내리는 건 플래그가 아니라 그냥 추세 지속이다.
@@ -93,10 +93,12 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             # 저점을 잇는 꺾은선으로 그리면 대각선이 차트를 가로질러 캔들을 가린다.
             f0 = int(i)                                   # 깃대 끝 = 깃발 시작
             f1 = int(completed_at if completed_at is not None else n - 1)
-            # 이탈 봉은 채널 적합에서 제외한다 — 넣으면 급락(급등) 봉이 기울기를
-            # 폴대 방향으로 끌어내려 깃발이 하락 채널처럼 그려진다 (2026-07 삼성전자
-            # 오탐의 원인). 선은 이탈 지점까지 연장해 '채널을 벗어나는 모습'을 보인다.
-            fit_end = f1 - 1 if completed_at is not None else f1
+            # 채널 적합·방향 검증은 '조정 구간'(폴대 끝 ~ 조정 극점)으로 한다.
+            # 이탈 봉이나 점진적 돌파 램프가 적합에 섞이면 깃발 기울기가 돌파 방향으로
+            # 왜곡된다 (삼성전자 오탐·하이닉스 미탐의 공통 원인). 램프는 돌파 과정이지
+            # 깃발이 아니다. 선은 이탈 지점까지 연장해 '채널을 벗어나는 모습'을 보인다.
+            fit_end = int(flag_ext_i) if flag_ext_i is not None else (
+                f1 - 1 if completed_at is not None else f1)
             if fit_end - f0 < 2:
                 continue
             xs = list(range(f0, fit_end + 1))
