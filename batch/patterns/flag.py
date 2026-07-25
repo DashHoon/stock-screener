@@ -15,6 +15,10 @@ POLE_MIN_PCT = 20.0
 FLAG_MIN_LEN = 5
 FLAG_MAX_LEN = 25
 FLAG_MAX_RETRACE = 0.5   # 조정 깊이 ≤ 깃대의 50%
+# 깃발 채널의 봉당 기울기(%) 허용 한계 — 깃발은 폴대의 '반대 방향' 조정이어야 한다.
+# 하락플래그의 깃발은 반등(상승)/횡보, 상승플래그의 깃발은 눌림(하락)/횡보.
+# 폴대와 같은 방향으로 계속 흘러내리는 건 플래그가 아니라 그냥 추세 지속이다.
+FLAG_COUNTER_EPS = 0.10
 
 
 def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
@@ -89,11 +93,24 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             # 저점을 잇는 꺾은선으로 그리면 대각선이 차트를 가로질러 캔들을 가린다.
             f0 = int(i)                                   # 깃대 끝 = 깃발 시작
             f1 = int(completed_at if completed_at is not None else n - 1)
-            if f1 - f0 < 2:
+            # 이탈 봉은 채널 적합에서 제외한다 — 넣으면 급락(급등) 봉이 기울기를
+            # 폴대 방향으로 끌어내려 깃발이 하락 채널처럼 그려진다 (2026-07 삼성전자
+            # 오탐의 원인). 선은 이탈 지점까지 연장해 '채널을 벗어나는 모습'을 보인다.
+            fit_end = f1 - 1 if completed_at is not None else f1
+            if fit_end - f0 < 2:
                 continue
-            xs = list(range(f0, f1 + 1))
+            xs = list(range(f0, fit_end + 1))
             up = fit_envelope_line(xs, [float(highs[k]) for k in xs], upper=True)
             lo = fit_envelope_line(xs, [float(lows[k]) for k in xs], upper=False)
+
+            # 깃발 방향 검증: 폴대 반대(또는 횡보)여야 진짜 플래그다.
+            ref = float(closes[fit_end]) or 1.0
+            mid_slope = (up.slope + lo.slope) / 2 / ref * 100  # 봉당 %
+            if bull and mid_slope > FLAG_COUNTER_EPS:
+                continue  # 상승플래그의 깃발이 위로 계속 오르면 눌림이 아님
+            if not bull and mid_slope < -FLAG_COUNTER_EPS:
+                continue  # 하락플래그의 깃발이 계속 흘러내리면 반등이 아님
+
             pts_u = [(f0, float(up.at(f0))), (f1, float(up.at(f1)))]
             pts_l = [(f0, float(lo.at(f0))), (f1, float(lo.at(f1)))]
             out.append(PatternHit(
