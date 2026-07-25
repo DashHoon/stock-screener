@@ -16,6 +16,7 @@ import {
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import FlagInfoModal from "@/components/FlagInfoModal";
+import { makeBandFill } from "@/components/bandFill";
 import type { ChartData, FlagKey, TimeframeData, TimeframeKey } from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
@@ -407,6 +408,10 @@ export default function StockChart({ data }: { data: ChartData }) {
 
     const thin = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false };
     if (settings.bb) {
+      // 밴드 내부를 옅은 노랑으로 채워 상·하단 범위를 한눈에 보이게 한다
+      candles.attachPrimitive(
+        makeBandFill(current.dates, current.bb_upper, current.bb_lower, ts),
+      );
       chart.addSeries(LineSeries, { color: color.muted, ...thin })
         .setData(lineData(current.dates, current.bb_upper));
       chart.addSeries(LineSeries, { color: color.border, ...thin })
