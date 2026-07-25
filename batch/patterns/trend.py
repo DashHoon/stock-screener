@@ -15,7 +15,7 @@ import pandas as pd
 
 from batch import config
 from batch.patterns.util import (
-    PatternHit, fit_envelope_line, fit_line, price_pivots, slope_pct,
+    Line, PatternHit, fit_envelope_line, fit_line, price_pivots, slope_pct,
 )
 
 FLAT_EPS = 0.08    # 봉당 % — 이하면 수평 취급
@@ -80,6 +80,15 @@ def detect_trendline_patterns(ind: pd.DataFrame) -> list[PatternHit]:
             kind, break_up = "pat_broadening", False
         if kind is None:
             continue
+
+        # 수평으로 분류된 선은 '완전한 수평선'으로 강제한다.
+        # FLAT_EPS 이내의 잔기울기를 그대로 그리면 상승삼각형의 상단이 살짝
+        # 틀어져 보인다. 정의대로 — 상승삼각형 상단은 피벗 고점들의 최고가,
+        # 하락삼각형 하단은 피벗 저점들의 최저가에 놓인 수평 저항/지지선.
+        if kind == "pat_tri_asc":
+            upper = Line(0.0, max(float(highs[i]) for i in hs), upper.r2)
+        elif kind == "pat_tri_desc":
+            lower = Line(0.0, min(float(lows[i]) for i in ls), lower.r2)
 
         # 돌파 스캔 (앵커 피벗 확정 이후)
         scan_from = anchor + config.PAT_PIVOT_RIGHT
