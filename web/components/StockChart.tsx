@@ -110,6 +110,7 @@ const TF_PERIODS: Record<TimeframeKey, { label: string; days: number | null }[]>
 
 interface Settings {
   height: HeightKey;
+  chartType: "candle" | "line"; // 가격 표시 방식
   div: boolean;
   macdCross: boolean;
   ma: boolean;
@@ -120,6 +121,7 @@ interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   height: "lg",
+  chartType: "candle",
   div: true,
   macdCross: true,
   ma: true,
@@ -402,23 +404,36 @@ export default function StockChart({ data }: { data: ChartData }) {
     }
 
     // pane 0: 캔들 + BB + 이평선
-    const candles = chart.addSeries(CandlestickSeries, {
-      upColor: color.up,
-      downColor: color.down,
-      borderUpColor: color.up,
-      borderDownColor: color.down,
-      wickUpColor: color.up,
-      wickDownColor: color.down,
-    });
-    candles.setData(
-      current.dates.map((d, i) => ({
-        time: ts(d),
-        open: current.open[i],
-        high: current.high[i],
-        low: current.low[i],
-        close: current.close[i],
-      })),
-    );
+    // 가격 시리즈 — 캔들 또는 라인(종가). 마커·넥라인·밴드 채움은 모두 이 시리즈에 붙는다.
+    let candles;
+    if (settings.chartType === "line") {
+      candles = chart.addSeries(LineSeries, {
+        color: color.accent,
+        lineWidth: 2,
+        priceLineVisible: true,
+      });
+      candles.setData(
+        current.dates.map((d, i) => ({ time: ts(d), value: current.close[i] })),
+      );
+    } else {
+      candles = chart.addSeries(CandlestickSeries, {
+        upColor: color.up,
+        downColor: color.down,
+        borderUpColor: color.up,
+        borderDownColor: color.down,
+        wickUpColor: color.up,
+        wickDownColor: color.down,
+      });
+      candles.setData(
+        current.dates.map((d, i) => ({
+          time: ts(d),
+          open: current.open[i],
+          high: current.high[i],
+          low: current.low[i],
+          close: current.close[i],
+        })),
+      );
+    }
 
     const thin = { lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false };
     if (settings.bb) {
@@ -669,6 +684,23 @@ export default function StockChart({ data }: { data: ChartData }) {
               onClick={() => setTfKey(k)}
             >
               {TF_LABEL[k]}
+            </button>
+          ))}
+        </div>
+        <div className="toolbar-group">
+          {(
+            [
+              ["candle", "캔들"],
+              ["line", "라인"],
+            ] as ["candle" | "line", string][]
+          ).map(([t, label]) => (
+            <button
+              key={t}
+              type="button"
+              className={settings.chartType === t ? "on" : ""}
+              onClick={() => update({ chartType: t })}
+            >
+              {label}
             </button>
           ))}
         </div>
