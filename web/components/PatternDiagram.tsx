@@ -432,16 +432,26 @@ const DIAGRAMS: Record<string, ReactElement> = {
   ),
 };
 
-// 형성 중(_form) 키는 완성 패턴 도해를 재사용
+// 형성 중(_form) 키는 완성 패턴 도해를 재사용 (배치가 쓰는 전 종류 등록)
 const FORM_BASE: Record<string, string> = {
   pat_double_bottom_form: "pat_double_bottom",
   pat_double_top_form: "pat_double_top",
+  pat_triple_bottom_form: "pat_triple_bottom",
+  pat_triple_top_form: "pat_triple_top",
   pat_cup_handle_form: "pat_cup_handle",
+  pat_round_bottom_form: "pat_round_bottom",
+  pat_round_top_form: "pat_round_top",
   pat_hs_inv_form: "pat_hs_inv",
   pat_hs_top_form: "pat_hs_top",
+  pat_tri_asc_form: "pat_tri_asc",
+  pat_tri_desc_form: "pat_tri_desc",
   pat_tri_sym_form: "pat_tri_sym",
+  pat_wedge_rise_form: "pat_wedge_rise",
+  pat_wedge_fall_form: "pat_wedge_fall",
   pat_flag_bull_form: "pat_flag_bull",
   pat_flag_bear_form: "pat_flag_bear",
+  pat_broadening_form: "pat_broadening",
+  pat_diamond_form: "pat_diamond",
 };
 
 export function PatternDiagram({ flagKey }: { flagKey: string }) {
