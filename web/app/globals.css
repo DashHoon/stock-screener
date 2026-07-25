@@ -681,6 +681,11 @@ a {
 .pattern-chips-wrap {
   margin: 0 0 10px;
 }
+.pattern-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
 .pattern-chips {
   display: flex;
   flex-wrap: wrap;

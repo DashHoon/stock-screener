@@ -76,6 +76,10 @@ const MA_DEFS = [
 // 일봉 첫 진입 시 보여줄 봉 수 (최근 100거래일)
 const INITIAL_DAILY_BARS = 100;
 
+// 기본으로 켜둘 패턴 종류 수. 실측상 대부분 1~3종류라 그대로 보이고,
+// 드물게 많이 잡힌 종목만 자동으로 접힌다 (칩을 눌러 언제든 켤 수 있음).
+const DEFAULT_PATTERN_KINDS = 3;
+
 const HEIGHTS = { md: 520, lg: 720, xl: 920 } as const;
 type HeightKey = keyof typeof HEIGHTS;
 
@@ -296,6 +300,25 @@ export default function StockChart({ data }: { data: ChartData }) {
     setSettings(loadSettings());
     setReady(true);
   }, []);
+
+  // 종목·타임프레임이 바뀌면 '최근 것 위주'로 기본 표시를 다시 잡는다.
+  // 형성 중 → 최근 완성 순으로 DEFAULT_PATTERN_KINDS 종류만 켜고 나머지는 접는다.
+  useEffect(() => {
+    const pats = (data.tf[tfKey] ?? data.tf.d).patterns ?? [];
+    const recentFirst = [...pats].sort((a, b) =>
+      (b.forming ? "9999-99-99" : (b.completed_date ?? "")).localeCompare(
+        a.forming ? "9999-99-99" : (a.completed_date ?? ""),
+      ),
+    );
+    const keep = new Set<string>();
+    for (const p of recentFirst) {
+      if (keep.size >= DEFAULT_PATTERN_KINDS && !keep.has(p.kind)) break;
+      keep.add(p.kind);
+    }
+    setHiddenPat(
+      new Set(pats.map((p) => p.kind).filter((k) => !keep.has(k))),
+    );
+  }, [data, tfKey]);
 
   function update(patch: Partial<Settings>) {
     setSettings((prev) => {
@@ -693,6 +716,11 @@ export default function StockChart({ data }: { data: ChartData }) {
       </div>
       {settings.pattern && patternKinds.length > 0 && (
         <div className="pattern-chips-wrap">
+          {patternKinds.some((k) => hiddenPat.has(k)) && (
+            <div className="pattern-hint">
+              겹침을 줄이려고 최근 패턴 위주로 표시 중입니다 — 흐린 칩을 누르면 함께 볼 수 있어요.
+            </div>
+          )}
           {(
             [
               ["상승", "📈", patternKinds.filter((k) => BULL_KINDS.has(k))],

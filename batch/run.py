@@ -96,6 +96,20 @@ def collect(codes: list[str]) -> None:
     backfill.update_all(codes)
 
 
+def recent_chart_patterns(patterns: list, n_bars: int) -> list:
+    """차트에 그릴 패턴만 추린다 — 최근(RECENT_MAX_BARS 내) 완성 또는 형성 중.
+
+    과거 10년치를 전부 그리면 선이 차트를 뒤덮는다. 종목·지수 공통으로 쓴다
+    (지수에 이 필터가 빠져 코스닥 28개가 통째로 그려지던 문제, 2026-07-25 수정).
+    """
+    return [
+        p for p in patterns
+        if p.forming
+        or (p.completed_at is not None
+            and n_bars - 1 - p.completed_at <= config.RECENT_MAX_BARS)
+    ]
+
+
 def compute_and_write(stocks) -> dict:
     """캐시의 전 종목을 계산해 JSON 산출. 통계 dict를 돌려준다."""
     entries: list[dict] = []
@@ -128,13 +142,7 @@ def compute_and_write(stocks) -> dict:
             # 차트 패턴 (일봉): 완성=돌파일 기준, 형성 중=오늘 상태
             patterns = detect_all_patterns(ohlcv)
             n_bars = len(ind)
-            # 차트 마킹은 최근(3개월 내 완성 또는 형성 중)만 — 과거 패턴 전부 그리면 뒤덮임
-            chart_patterns = [
-                p for p in patterns
-                if p.forming
-                or (p.completed_at is not None
-                    and n_bars - 1 - p.completed_at <= config.RECENT_MAX_BARS)
-            ]
+            chart_patterns = recent_chart_patterns(patterns, n_bars)
             if not is_stale:
                 for p in patterns:
                     if p.completed_at is not None:
@@ -191,7 +199,7 @@ def compute_and_write(stocks) -> dict:
                 continue
             i_ind = compute_indicators(iohlcv)
             _f, i_events = compute_flags(i_ind)
-            i_pats = detect_all_patterns(iohlcv)
+            i_pats = recent_chart_patterns(detect_all_patterns(iohlcv), len(i_ind))
             i_tf: dict[str, dict] = {}
             for key, freq, bars in tf_specs:
                 if freq is None:
