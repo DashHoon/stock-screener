@@ -297,6 +297,10 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [ready, setReady] = useState(false);
   const [showAmbiguous, setShowAmbiguous] = useState(false); // C등급(모호한 형태)까지 표시
   const [themeTick, setThemeTick] = useState(0); // 테마 전환 시 차트 재생성용
+  // 스크리너에서 패턴 조건으로 걸러 들어온 경우(?pat=...) 그 패턴은 무조건 보여준다
+  // — 기본 패턴 OFF·C등급 숨김·최근 3종 제한을 모두 무시 (아니면 '검색엔 나오는데
+  //   차트엔 안 보이는' 불일치가 생긴다). 세션 한정이며 localStorage엔 저장하지 않는다.
+  const [highlightPats, setHighlightPats] = useState<Set<string>>(new Set());
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
@@ -305,7 +309,7 @@ export default function StockChart({ data }: { data: ChartData }) {
   const patternKinds = [
     ...new Set(
       (current.patterns ?? [])
-        .filter((p) => showAmbiguous || p.grade !== "C")
+        .filter((p) => showAmbiguous || p.grade !== "C" || highlightPats.has(p.kind))
         .map((p) => p.kind),
     ),
   ];
@@ -321,6 +325,19 @@ export default function StockChart({ data }: { data: ChartData }) {
     return () => window.removeEventListener("themechange", onTheme);
   }, []);
 
+  // ?pat=pat_double_top,... 파싱 — 해당 패턴 강제 표시 + 패턴 토글 켜기(저장 안 함)
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("pat");
+    if (!raw) return;
+    const kinds = raw
+      .split(",")
+      .map((k) => k.replace(/_form$/, ""))
+      .filter((k) => k.startsWith("pat_"));
+    if (!kinds.length) return;
+    setHighlightPats(new Set(kinds));
+    setSettings((prev) => (prev.pattern ? prev : { ...prev, pattern: true }));
+  }, []);
+
   // 종목·타임프레임이 바뀌면 '최근 것 위주'로 기본 표시를 다시 잡는다.
   // 형성 중 → 최근 완성 순으로 DEFAULT_PATTERN_KINDS 종류만 켜고 나머지는 접는다.
   useEffect(() => {
@@ -330,7 +347,7 @@ export default function StockChart({ data }: { data: ChartData }) {
         a.forming ? "9999-99-99" : (a.completed_date ?? ""),
       ),
     );
-    const keep = new Set<string>();
+    const keep = new Set<string>(highlightPats); // 스크리너에서 걸러 온 패턴은 항상 표시
     for (const p of recentFirst) {
       if (keep.size >= DEFAULT_PATTERN_KINDS && !keep.has(p.kind)) break;
       keep.add(p.kind);
@@ -338,7 +355,7 @@ export default function StockChart({ data }: { data: ChartData }) {
     setHiddenPat(
       new Set(pats.map((p) => p.kind).filter((k) => !keep.has(k))),
     );
-  }, [data, tfKey]);
+  }, [data, tfKey, highlightPats]);
 
   function update(patch: Partial<Settings>) {
     setSettings((prev) => {
@@ -465,7 +482,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       for (const pat of current.patterns) {
         if (hiddenPat.has(pat.kind)) continue;
         // C등급 = 형태가 모호한 것. 기본은 숨기고 '모호한 형태도 보기'로 노출
-        if (!showAmbiguous && pat.grade === "C") continue;
+        if (!showAmbiguous && pat.grade === "C" && !highlightPats.has(pat.kind)) continue;
         const bottom = BULL_KINDS.has(pat.kind);
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {

@@ -225,6 +225,14 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   const arrow = (key: SortKey) =>
     sortKey === key ? (sortDesc ? " ▾" : " ▴") : "";
 
+  // 선택된 패턴 조건(pat_*)을 종목 링크에 실어 보낸다. 형성중(_form)은 기본 키로.
+  const selectedPats = [...selected]
+    .filter((k) => k.startsWith("pat_"))
+    .map((k) => k.replace(/_form$/, ""));
+  const patParam = selectedPats.length
+    ? `?pat=${[...new Set(selectedPats)].join(",")}`
+    : "";
+
   return (
     <div>
       {noFilter && data?.indices && data.indices.length > 0 && (
@@ -426,7 +434,10 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
           {rows.map((s) => (
             <tr key={s.code}>
               <td className="name">
-                <Link href={`/stock/${s.code}`}>{s.name}</Link>
+                {/* 패턴 조건으로 걸러 들어가는 경우 차트가 그 패턴을 강제 표시하도록 전달
+                    (차트는 기본이 패턴 OFF·C등급 숨김이라, 안 넘기면 '검색엔 나오는데
+                     차트엔 안 보이는' 불일치가 생긴다) */}
+                <Link href={`/stock/${s.code}${patParam}`}>{s.name}</Link>
                 <span className="code">{s.code}</span>
                 {s.mkt && (
                   <span className={`mkt-tag ${s.mkt === "KOSPI" ? "kospi" : "kosdaq"}`}>
