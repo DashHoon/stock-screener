@@ -56,13 +56,14 @@ const BULL_KINDS = new Set([
   "pat_tri_sym", "pat_flag_bull",
 ]);
 
-// 캔들 패턴 표시 순서 (상승 → 하락 → 중립). 라벨·방향·설명은 flags.ts 메타 재사용
+// 캔들 패턴 표시 순서 (상승 → 하락 → 중립).
+// 라벨·방향·설명 메타는 flags.ts를 캔들·차트패턴 공용으로 쓴다
 const CDL_ORDER = [
   "cdl_engulf_bull", "cdl_hammer", "cdl_pierce", "cdl_morning",
   "cdl_engulf_bear", "cdl_shooting", "cdl_darkcloud", "cdl_evening",
   "cdl_doji",
 ];
-function cdlMeta(kind: string): FlagMeta | undefined {
+function flagMeta(kind: string): FlagMeta | undefined {
   return FLAG_BY_KEY.get(kind as FlagKey);
 }
 
@@ -531,7 +532,7 @@ export default function StockChart({ data }: { data: ChartData }) {
     if (settings.candle && current.candles) {
       for (const [kind, dates] of Object.entries(current.candles)) {
         if (hiddenCdl.has(kind)) continue;
-        const meta = cdlMeta(kind);
+        const meta = flagMeta(kind);
         const bull = meta?.bullish;
         for (const d of dates) {
           candleMarkers.push({
@@ -814,6 +815,7 @@ export default function StockChart({ data }: { data: ChartData }) {
                   {kinds.map((kind) => {
                     const shown = !hiddenPat.has(kind);
                     const bull = BULL_KINDS.has(kind);
+                    const meta = flagMeta(kind); // 패턴 설명 메타 (flags.ts 공용)
                     return (
                       <button
                         key={kind}
@@ -829,6 +831,19 @@ export default function StockChart({ data }: { data: ChartData }) {
                         }
                       >
                         {PATTERN_LABEL[kind]?.[2] ?? kind}
+                        {meta && (
+                          <span
+                            role="button"
+                            aria-label={`${meta.label} 설명`}
+                            className="chip-info"
+                            onClick={(e) => {
+                              e.stopPropagation(); // 칩 토글과 분리
+                              setInfoFlag(meta);
+                            }}
+                          >
+                            ⓘ
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -856,7 +871,7 @@ export default function StockChart({ data }: { data: ChartData }) {
             🕯 캔들 패턴:
           </button>
           {candleKinds.map((kind) => {
-            const meta = cdlMeta(kind);
+            const meta = flagMeta(kind);
             const shown = !hiddenCdl.has(kind);
             const dirCls =
               meta?.bullish === true ? " bull" : meta?.bullish === false ? " bear" : "";
