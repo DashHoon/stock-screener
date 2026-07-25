@@ -289,11 +289,19 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // ⓘ 설명 팝오버
   const [infoInd, setInfoInd] = useState<{ title: string; desc: string } | null>(null); // 지표 설명
   const [ready, setReady] = useState(false);
+  const [showAmbiguous, setShowAmbiguous] = useState(false); // C등급(모호한 형태)까지 표시
 
   const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
-  // 현재 차트에 실제로 그려진 패턴 종류들 (겹침 정리용 개별 토글 대상)
-  const patternKinds = [...new Set((current.patterns ?? []).map((p) => p.kind))];
+  // 현재 차트에 실제로 그려질 패턴 종류들 (겹침 정리용 개별 토글 대상).
+  // C등급을 숨긴 상태면 칩도 함께 감춰야 '켜져 있는데 안 그려지는' 혼란이 없다.
+  const patternKinds = [
+    ...new Set(
+      (current.patterns ?? [])
+        .filter((p) => showAmbiguous || p.grade !== "C")
+        .map((p) => p.kind),
+    ),
+  ];
   // 캔들 패턴 종류 (발생 있는 것만, 상승→하락→중립 순)
   const candleKinds = CDL_ORDER.filter((k) => current.candles?.[k]?.length);
 
@@ -431,6 +439,8 @@ export default function StockChart({ data }: { data: ChartData }) {
       const lastDate = current.dates[current.dates.length - 1];
       for (const pat of current.patterns) {
         if (hiddenPat.has(pat.kind)) continue;
+        // C등급 = 형태가 모호한 것. 기본은 숨기고 '모호한 형태도 보기'로 노출
+        if (!showAmbiguous && pat.grade === "C") continue;
         const bottom = BULL_KINDS.has(pat.kind);
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
@@ -463,7 +473,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: c,
               shape: bottom ? "arrowUp" : "arrowDown",
-              text: PATTERN_LABEL[pat.kind]?.[0] ?? pat.kind,
+              text: `${PATTERN_LABEL[pat.kind]?.[0] ?? pat.kind}${pat.grade ? ` [${pat.grade}]` : ""}`,
             },
           ]);
         } else if (pat.forming) {
@@ -473,7 +483,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: color.muted,
               shape: "circle",
-              text: PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind,
+              text: `${PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind}${pat.grade ? ` [${pat.grade}]` : ""}`,
             },
           ]);
         }
@@ -639,7 +649,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl]);
+  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, showAmbiguous]);
 
   return (
     <div>
@@ -721,11 +731,18 @@ export default function StockChart({ data }: { data: ChartData }) {
       </div>
       {settings.pattern && patternKinds.length > 0 && (
         <div className="pattern-chips-wrap">
-          {patternKinds.some((k) => hiddenPat.has(k)) && (
-            <div className="pattern-hint">
-              겹침을 줄이려고 최근 패턴 위주로 표시 중입니다 — 흐린 칩을 누르면 함께 볼 수 있어요.
-            </div>
-          )}
+          <div className="pattern-hint">
+            {patternKinds.some((k) => hiddenPat.has(k)) &&
+              "겹침을 줄이려고 최근 패턴 위주로 표시 중입니다 — 흐린 칩을 누르면 함께 볼 수 있어요. "}
+            패턴 이름 옆 <b>[A/B/C]</b>는 형태가 얼마나 뚜렷한지를 나타냅니다.
+            <button
+              type="button"
+              className="ambiguous-toggle"
+              onClick={() => setShowAmbiguous((v) => !v)}
+            >
+              {showAmbiguous ? "모호한 형태(C) 숨기기" : "모호한 형태(C)도 보기"}
+            </button>
+          </div>
           {(
             [
               ["상승", "📈", patternKinds.filter((k) => BULL_KINDS.has(k))],

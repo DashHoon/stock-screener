@@ -105,6 +105,10 @@ export interface PatternMark {
   neckline: number;
   completed_date: string | null;
   forming: boolean;
+  /** 형태 신뢰도 등급 — A(뚜렷)/B(보통)/C(모호). 같은 패턴 종류 안에서 정규화 */
+  grade?: "A" | "B" | "C";
+  /** 형태 점수 0~100 (참고용) */
+  shape?: number;
 }
 
 export interface TimeframeData {

@@ -12,6 +12,7 @@ from batch.patterns.double import detect_double_patterns
 from batch.patterns.flag import detect_flags
 from batch.patterns.multi import detect_head_shoulders, detect_triple
 from batch.patterns.round import detect_round
+from batch.patterns.shape import grade_shapes
 from batch.patterns.trend import detect_trendline_patterns
 
 # 완성(sig) 키 목록 — 백테스트 이벤트 등록에도 사용
@@ -84,5 +85,6 @@ def detect_all_patterns(ohlcv: pd.DataFrame) -> list:
         + list(detect_diamond(ohlcv))
     )
     pats = dedupe_patterns(pats)
+    grade_shapes(ohlcv, pats)  # 형태 신뢰도 등급 (차트·스크리너 공통)
     pats.sort(key=lambda p: p.completed_at if p.completed_at is not None else len(ohlcv))
     return pats

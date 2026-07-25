@@ -24,6 +24,8 @@ class PatternHit:
     points: list = field(default_factory=list)   # 시간 오름차순 꺾은선
     points2: list = field(default_factory=list)  # 보조선 (추세선 계열의 아래선 등)
     confirmed_at: int = 0
+    shape: int = 0          # 형태 신뢰도 0~100 (shape.grade_shapes가 채움)
+    grade: str = "C"        # A(뚜렷)/B(보통)/C(모호)
 
 
 def price_pivots(ind: pd.DataFrame) -> tuple[list[int], list[int]]:

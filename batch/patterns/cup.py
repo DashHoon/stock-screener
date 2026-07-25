@@ -35,6 +35,8 @@ class CupPattern:
     completed_at: int | None
     forming: bool
     points: list         # [(idx, price), ...]
+    shape: int = 0       # 형태 신뢰도 (shape.grade_shapes가 채움)
+    grade: str = "C"
 
     @property
     def confirmed_at(self) -> int:

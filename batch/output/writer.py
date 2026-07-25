@@ -96,6 +96,8 @@ def timeframe_payload(
             "kind": p.kind,
             "points": [[dates[i], round(float(v), 2)] for i, v in pts],
             "neckline": p.neckline,
+            "grade": getattr(p, "grade", "B"),   # 형태 신뢰도 A/B/C
+            "shape": int(getattr(p, "shape", 0)),
             "completed_date": (
                 dates[p.completed_at - offset]
                 if p.completed_at is not None and p.completed_at - offset < len(dates)

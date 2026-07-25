@@ -681,6 +681,21 @@ a {
 .pattern-chips-wrap {
   margin: 0 0 10px;
 }
+.ambiguous-toggle {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ambiguous-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .pattern-hint {
   font-size: 11.5px;
   color: var(--muted);
