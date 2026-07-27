@@ -19,7 +19,6 @@ export default function GuidePage() {
         도구라는 점을 염두에 두고 활용하세요.
       </p>
 
-      <AdSlot id="guide-top" variant="banner" />
 
       <h2>RSI (상대강도지수)</h2>
       <p>

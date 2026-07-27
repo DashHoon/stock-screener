@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import AdSlot from "@/components/AdSlot";
 import Analytics from "@/components/Analytics";
 import StickyAd from "@/components/StickyAd";
 import StockSearch from "@/components/StockSearch";
@@ -69,9 +68,6 @@ export default async function RootLayout({
             {date && <span className="data-date">전일({date}) 기준 데이터</span>}
           </div>
         </header>
-        <div className="container">
-          <AdSlot id="global-top" variant="banner" />
-        </div>
         <main className="container">{children}</main>
         <footer className="site-footer">
           <div className="container">

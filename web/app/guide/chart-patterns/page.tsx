@@ -19,7 +19,6 @@ export default function ChartPatternsGuide() {
         마우스를 올리면 실제 그림과 넥라인을 볼 수 있습니다.
       </p>
 
-      <AdSlot id="cp-top" variant="banner" />
 
       <h2>상승(바닥·지속) 패턴</h2>
       <ul>

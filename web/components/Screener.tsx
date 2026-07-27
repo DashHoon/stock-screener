@@ -74,6 +74,20 @@ function fmtCap(cap: number): string {
   return `${cap.toLocaleString()}억`;
 }
 
+/** 좁은 화면 여부. 표(가로 964px)를 카드 목록으로 바꿔 그리는 데 쓴다.
+ *  결과 행이 수백 개가 될 수 있어 표·카드를 둘 다 그려두고 CSS로 숨기면 DOM이 두 배가 된다. */
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${bp}px)`);
+    const on = () => setM(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [bp]);
+  return m;
+}
+
 function badgesWithin(s: StockSignal, bars: number) {
   return (Object.keys(s.sig) as FlagKey[])
     .filter((k) => (s.sig[k] ?? Infinity) <= bars && FLAG_BY_KEY.has(k))
@@ -110,6 +124,10 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   const savedScreens = useScreens(); // 저장한 스크리닝 조건 (localStorage)
   const [sortKey, setSortKey] = useState<SortKey>("change_pct");
   const [sortDesc, setSortDesc] = useState(true);
+  // 모바일에서는 조건 패널을 접어둔다. 펼쳐두면 필터가 2,400px을 차지해
+  // 결과를 보려면 4화면을 스크롤해야 한다 (375px 실측).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetch("/data/signals/latest.json")
@@ -277,7 +295,19 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
           ))}
         </div>
       )}
-      <div className="filter-panel">
+      <button
+        type="button"
+        className="filter-toggle"
+        aria-expanded={filtersOpen}
+        onClick={() => setFiltersOpen((o) => !o)}
+      >
+        <span>
+          조건 설정
+          {selected.size > 0 && <em className="filter-count">{selected.size}</em>}
+        </span>
+        <span className="filter-caret">{filtersOpen ? "▲" : "▼"}</span>
+      </button>
+      <div className={`filter-panel${filtersOpen ? " open" : ""}`}>
         <div className="filter-group">
           <div className="filter-group-name">발생 시점 (선택한 모든 조건이 이 기간 안에 발생)</div>
           <div className="filter-options">
@@ -407,8 +437,83 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
         )}
       </div>
 
-      <AdSlot id="screener-results-top" variant="banner" />
 
+      {isMobile ? (
+        <>
+          <div className="sort-bar">
+            <span className="sort-bar-label">정렬</span>
+            {(
+              [
+                ["change_pct", "등락률"],
+                ["cap", "시총"],
+                ["rsi", "RSI"],
+                ["name", "종목명"],
+              ] as [SortKey, string][]
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                className={sortKey === k ? "on" : ""}
+                onClick={() => sortBy(k)}
+              >
+                {label}
+                {sortKey === k && (sortDesc ? " ↓" : " ↑")}
+              </button>
+            ))}
+          </div>
+          <ul className="stock-cards">
+            {rows.map((s) => (
+              <li key={s.code} className="stock-card">
+                <Link href={`/stock/${s.code}${patParam}`} className="sc-head">
+                  <span className="sc-name">{s.name}</span>
+                  <span className="code">{s.code}</span>
+                  {s.mkt && (
+                    <span className={`mkt-tag ${s.mkt === "KOSPI" ? "kospi" : "kosdaq"}`}>
+                      {s.mkt === "KOSPI" ? "코스피" : "코스닥"}
+                    </span>
+                  )}
+                  <span className="sc-price">
+                    <b>{s.close.toLocaleString()}</b>
+                    <span
+                      className={
+                        (s.change_pct ?? 0) > 0
+                          ? "pct-up"
+                          : (s.change_pct ?? 0) < 0
+                            ? "pct-down"
+                            : ""
+                      }
+                    >
+                      {s.change_pct == null
+                        ? "-"
+                        : `${s.change_pct > 0 ? "+" : ""}${s.change_pct.toFixed(2)}%`}
+                    </span>
+                  </span>
+                </Link>
+                <div className="sc-sub">
+                  <span>시총 {fmtCap(s.cap ?? -1)}</span>
+                  <span>RSI {s.rsi ?? "-"}</span>
+                  <Sparkline data={s.m} width={70} height={22} />
+                </div>
+                {badgesWithin(s, windowBars).length > 0 && (
+                  <div className="sc-badges">
+                    {badgesWithin(s, windowBars).map(({ meta, ago }) => (
+                      <span
+                        key={meta.key}
+                        className={`badge${
+                          meta.bullish === true ? " bull" : meta.bullish === false ? " bear" : ""
+                        }`}
+                      >
+                        {meta.short}
+                        {ago > 0 && <em className="badge-ago">{ago}일</em>}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
       <div className="table-wrap">
       <table className="stock-table">
         <thead>
@@ -480,6 +585,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
         </tbody>
       </table>
       </div>
+      )}
 
       <AdSlot id="screener-results-bottom" variant="banner" />
     </div>

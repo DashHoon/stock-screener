@@ -321,10 +321,134 @@ a {
 .result-meta .count {
   font-weight: 700;
   font-size: 16px;
+  white-space: nowrap; /* 좁은 화면에서 "58 / 종목"으로 끊기지 않게 */
 }
 .result-meta .hint {
   font-size: 12.5px;
   color: var(--muted);
+}
+
+/* 모바일 전용: 조건 패널 접기 버튼 (데스크톱은 패널이 항상 펼쳐져 있어 숨긴다) */
+.filter-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 0;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filter-count {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 700;
+}
+.filter-caret {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* 모바일 결과 카드 목록 (표는 가로 964px이라 375px 화면에서 못 씀) */
+.stock-cards {
+  list-style: none;
+  margin: 12px 0 0;
+}
+.stock-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sc-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sc-name {
+  font-weight: 700;
+  font-size: 15.5px;
+}
+.sc-price {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+.sc-price b {
+  font-size: 15px;
+}
+.sc-sub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sc-sub svg {
+  margin-left: auto;
+}
+.sc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+/* 모바일 정렬 바 (표 헤더 클릭 대신) */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.sort-bar-label {
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sort-bar button {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sort-bar button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .filter-toggle {
+    display: flex;
+  }
+  .filter-panel {
+    display: none;
+  }
+  .filter-panel.open {
+    display: block;
+  }
 }
 
 /* table */
@@ -664,6 +788,9 @@ a {
   display: flex;
   align-items: center;
   gap: 4px;
+  /* 좁은 화면에서 칩이 찌그러지면 글자가 한 자씩 세로로 쌓인다 (모바일 375px에서
+     "다이버전스" 칩이 51×107px로 깨졌음). 줄바꿈은 허용하되 압축은 막는다. */
+  flex-shrink: 0;
 }
 .toolbar-label {
   color: var(--muted);
@@ -671,6 +798,8 @@ a {
 }
 .chart-toolbar button {
   padding: 4px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--surface);
@@ -690,6 +819,8 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -709,6 +840,24 @@ a {
   gap: 8px;
   font-weight: 600;
   font-size: 12px;
+}
+/* 차트 설정 접기 — 데스크톱은 항상 펼쳐두고 버튼을 숨긴다 */
+.toolbar-more {
+  display: contents;
+}
+.toolbar-more-btn {
+  display: none;
+}
+@media (max-width: 640px) {
+  .toolbar-more-btn {
+    display: inline-block;
+  }
+  .toolbar-more {
+    display: none;
+  }
+  .toolbar-more.open {
+    display: contents;
+  }
 }
 
 /* 패턴 개별 표시 토글 (겹침 정리) */
@@ -821,15 +970,6 @@ a {
   gap: 2px;
 }
 
-/* 모바일: 광고를 차트보다 먼저 */
-.mobile-top-ad {
-  display: none;
-}
-@media (max-width: 640px) {
-  .mobile-top-ad {
-    display: block;
-  }
-}
 .notice {
   font-size: 12.5px;
   color: var(--muted);

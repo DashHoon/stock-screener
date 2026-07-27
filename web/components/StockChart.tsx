@@ -296,6 +296,7 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [infoInd, setInfoInd] = useState<{ title: string; desc: string } | null>(null); // 지표 설명
   const [ready, setReady] = useState(false);
   const [showAmbiguous, setShowAmbiguous] = useState(false); // C등급(모호한 형태)까지 표시
+  const [moreOpen, setMoreOpen] = useState(false); // 모바일 차트 설정 펼침 (데스크톱은 항상 펼침)
   const [themeTick, setThemeTick] = useState(0); // 테마 전환 시 차트 재생성용
   // 스크리너에서 패턴 조건으로 걸러 들어온 경우(?pat=...) 그 패턴은 무조건 보여준다
   // — 기본 패턴 OFF·C등급 숨김·최근 3종 제한을 모두 무시 (아니면 '검색엔 나오는데
@@ -396,11 +397,16 @@ export default function StockChart({ data }: { data: ChartData }) {
       band: css.getPropertyValue("--band-fill").trim(),
     };
 
+    // 좁은 화면에서는 축 글자를 줄인다. 가격축 폭은 라벨 텍스트 크기로 정해지는데,
+    // 375px 화면에서 축이 86px(전체의 25%)을 가져가 캔들 영역이 254px밖에 안 됐다.
+    const narrow = el.clientWidth < 420;
+
     const chart = createChart(el, {
       height: HEIGHTS[settings.height],
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: color.muted,
+        fontSize: narrow ? 10 : 12,
         panes: { separatorColor: color.border, enableResize: false },
       },
       grid: {
@@ -424,6 +430,18 @@ export default function StockChart({ data }: { data: ChartData }) {
       (window as unknown as Record<string, unknown>).__chart = chart;
     }
 
+    // 가격축 라벨 포맷. 기본값은 "440000.00"처럼 소수점을 붙여, 모바일에서 가격축이
+    // 화면 폭의 45%를 잡아먹었다 (375px 실측). 국내주가는 정수이므로 천단위 구분만 쓴다.
+    // 지수(코스피 2,800.45)처럼 작은 값은 소수 2자리를 남긴다.
+    const priceFormat = {
+      type: "custom" as const,
+      minMove: 0.01,
+      formatter: (p: number) =>
+        Math.abs(p) >= 1000
+          ? Math.round(p).toLocaleString("ko-KR")
+          : p.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    };
+
     // pane 0: 캔들 + BB + 이평선
     // 가격 시리즈 — 캔들 또는 라인(종가). 마커·넥라인·밴드 채움은 모두 이 시리즈에 붙는다.
     let candles;
@@ -432,12 +450,14 @@ export default function StockChart({ data }: { data: ChartData }) {
         color: color.accent,
         lineWidth: 2,
         priceLineVisible: true,
+        priceFormat,
       });
       candles.setData(
         current.dates.map((d, i) => ({ time: ts(d), value: current.close[i] })),
       );
     } else {
       candles = chart.addSeries(CandlestickSeries, {
+        priceFormat,
         upColor: color.up,
         downColor: color.down,
         borderUpColor: color.up,
@@ -725,6 +745,17 @@ export default function StockChart({ data }: { data: ChartData }) {
             </button>
           ))}
         </div>
+        {/* 모바일에서는 아래 설정들을 접어둔다. 다 펼치면 툴바가 차트보다 먼저
+            화면을 채운다 (375px 실측 234px). 봉 종류·차트 종류만 항상 보인다. */}
+        <button
+          type="button"
+          className="toolbar-more-btn"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((o) => !o)}
+        >
+          차트 설정 {moreOpen ? "▲" : "▼"}
+        </button>
+        <div className={`toolbar-more${moreOpen ? " open" : ""}`}>
         <div className="toolbar-group">
           {TF_PERIODS[tfKey].map((p) => (
             <button key={p.label} type="button" onClick={() => setPeriod(p.days)}>
@@ -787,6 +818,7 @@ export default function StockChart({ data }: { data: ChartData }) {
             ))}
           </div>
         )}
+        </div>
       </div>
       {settings.pattern && patternKinds.length > 0 && (
         <div className="pattern-chips-wrap">

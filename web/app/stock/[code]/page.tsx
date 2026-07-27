@@ -65,11 +65,6 @@ export default async function StockPage({
         <StockActions code={data.code} name={data.name} />
       </div>
 
-      <div className="mobile-top-ad">
-        <AdSlot id="stock-mobile-top" />
-      </div>
-      <AdSlot id="stock-top" variant="banner" />
-
       <StockChart data={data} />
 
       <AdSlot id="stock-mid" variant="rect" />

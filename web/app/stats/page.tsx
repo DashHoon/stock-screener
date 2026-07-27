@@ -74,7 +74,6 @@ export default async function StatsPage() {
         내 중복 신호는 표본에서 제외해 부풀림을 방지했습니다.
       </p>
 
-      <AdSlot id="stats-top" variant="banner" />
 
       <div className="stats-baseline">
         <strong>시장 기준선</strong> (같은 기간 임의 시점 매수 시):{" "}

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import AdSlot from "@/components/AdSlot";
 
 export const metadata: Metadata = {
   title: "면책조항 — 투자 유의 안내",
@@ -52,8 +51,6 @@ export default function DisclaimerPage() {
         책임을 지지 않습니다.
       </p>
 
-      <AdSlot id="disclaimer-mid" variant="rect" />
-
       <h2>5. 외부 링크·광고</h2>
       <p>
         서비스에는 제3자 광고 및 외부 사이트 링크가 포함될 수 있으며, 해당 광고와
@@ -64,7 +61,6 @@ export default function DisclaimerPage() {
         본 문서는 예고 없이 변경될 수 있으며, 변경 시 본 페이지에 게시합니다.
       </p>
 
-      <AdSlot id="disclaimer-bottom" variant="banner" />
     </div>
   );
 }

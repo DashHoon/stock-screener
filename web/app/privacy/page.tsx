@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import AdSlot from "@/components/AdSlot";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
@@ -62,8 +61,6 @@ export default function PrivacyPage() {
         </li>
       </ul>
 
-      <AdSlot id="privacy-mid" variant="rect" />
-
       <h2>4. 접속 로그 및 이용 통계(Google Analytics)</h2>
       <p>
         서비스 호스팅 및 안정적 운영을 위해 호스팅 사업자(예: Vercel)가 접속 IP,
@@ -114,7 +111,6 @@ export default function PrivacyPage() {
         페이지를 통해 고지합니다.
       </p>
 
-      <AdSlot id="privacy-bottom" variant="banner" />
     </div>
   );
 }

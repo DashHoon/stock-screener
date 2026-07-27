@@ -19,7 +19,6 @@ export default function CandlestickGuide() {
         신호로 잡습니다.
       </p>
 
-      <AdSlot id="cs-top" variant="banner" />
 
       <h2>상승 반전형</h2>
       <ul>

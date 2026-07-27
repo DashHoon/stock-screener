@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import AdSlot from "@/components/AdSlot";
 import Screener from "@/components/Screener";
 import { FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
 
@@ -30,7 +29,6 @@ export default function ScreenPage({
       <Suspense>
         <Screener initialFlags={initialFlags} />
       </Suspense>
-      <AdSlot id="screen-bottom" />
     </>
   );
 }
