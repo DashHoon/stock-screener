@@ -76,9 +76,9 @@
 애드센스 심사와 검색 노출 모두에 도움이 됩니다. **이건 제가 코드로 만들어 드릴 수 있습니다.**
 
 ### 할 일
-- [ ] `robots.txt` + `sitemap.xml` 생성 → **(개발) 내가 구현**
-- [ ] **Google Search Console**(search.google.com/search-console) 사이트 등록 → 소유권 확인 → 사이트맵 제출 → **직접**
-- [ ] (선택) 네이버 서치어드바이저 등록 → **직접**
+- [x] `robots.txt` + `sitemap.xml` 생성 → **(개발) 완료**
+- [x] 네이버 서치어드바이저 등록 → **완료**
+- [ ] **Google Search Console 등록 + Google Analytics 설치** → 단계별 순서는 **[ANALYTICS_GUIDE.md](ANALYTICS_GUIDE.md)** 참고 (코드는 이미 심어둠, 값만 넣으면 됨) → **직접**
 
 ---
 

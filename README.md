@@ -6,6 +6,7 @@
 
 - **라이브**: https://stock-screener-flame-omega.vercel.app
 - 계획서: [PLAN.md](PLAN.md) · 할 일: [TODO.md](TODO.md) · 스펙: [CLAUDE.md](CLAUDE.md) · 배포 셋업: [SETUP_GUIDE.md](SETUP_GUIDE.md)
+- 공개 준비: [PUBLISH_GUIDE.md](PUBLISH_GUIDE.md) · 트래픽 분석 설치: [ANALYTICS_GUIDE.md](ANALYTICS_GUIDE.md)
 
 ## 구조
 

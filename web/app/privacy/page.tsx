@@ -24,8 +24,8 @@ export default function PrivacyPage() {
 
       <h2>2. 브라우저 로컬 저장(localStorage)</h2>
       <p>
-        관심종목, 최근 본 종목, 저장한 스크리닝 조건, 차트 설정·그리기 등
-        편의 기능은 이용자{" "}
+        관심종목, 최근 본 종목, 저장한 스크리닝 조건, 차트 설정(테마·표시 지표)
+        등 편의 기능은 이용자{" "}
         <strong>브라우저(localStorage)에만 저장</strong>되며 서비스 서버로
         전송되지 않습니다. 브라우저 데이터를 삭제하면 함께 삭제됩니다.
       </p>
@@ -64,13 +64,43 @@ export default function PrivacyPage() {
 
       <AdSlot id="privacy-mid" variant="rect" />
 
-      <h2>4. 접속 로그</h2>
+      <h2>4. 접속 로그 및 이용 통계(Google Analytics)</h2>
       <p>
-        서비스 호스팅 및 안정적 운영을 위해 호스팅 사업자(예: Vercel) 및 분석
-        도구가 접속 IP, 브라우저 종류, 방문 페이지 등 일반적인 로그를 자동으로
-        수집·처리할 수 있습니다. 이는 서비스 운영·보안·통계 목적에 한해
-        사용됩니다.
+        서비스 호스팅 및 안정적 운영을 위해 호스팅 사업자(예: Vercel)가 접속 IP,
+        브라우저 종류, 방문 페이지 등 일반적인 로그를 자동으로 수집·처리할 수
+        있습니다.
       </p>
+      <p>
+        또한 본 서비스는 방문자 수와 이용 패턴을 파악하기 위해{" "}
+        <strong>Google Analytics</strong>를 사용합니다. Google Analytics는 쿠키를
+        통해 방문 페이지, 체류 시간, 유입 경로, 기기·브라우저 종류 등의 정보를
+        수집하며, 이 정보는 <strong>개인을 식별하지 않는 형태</strong>로 통계
+        목적에만 사용됩니다.
+      </p>
+      <ul>
+        <li>
+          수집을 원하지 않으시면{" "}
+          <a
+            href="https://tools.google.com/dlpage/gaoptout"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google Analytics 차단 브라우저 부가기능
+          </a>
+          을 설치하거나, 브라우저 설정에서 쿠키를 차단할 수 있습니다.
+        </li>
+        <li>
+          Google의 데이터 처리 방식은{" "}
+          <a
+            href="https://policies.google.com/technologies/partner-sites"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google 파트너 사이트 정책
+          </a>
+          에서 확인할 수 있습니다.
+        </li>
+      </ul>
 
       <h2>5. 개인정보의 제3자 제공</h2>
       <p>

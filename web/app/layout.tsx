@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import AdSlot from "@/components/AdSlot";
+import Analytics from "@/components/Analytics";
 import StickyAd from "@/components/StickyAd";
 import StockSearch from "@/components/StockSearch";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -23,6 +24,9 @@ export const metadata: Metadata = {
   },
   robots: { index: true, follow: true },
   verification: {
+    // 구글 서치 콘솔 소유 확인 — Vercel 환경변수로 넣는다 (ANALYTICS_GUIDE.md).
+    // 값이 없으면 태그 자체가 렌더되지 않아 아무 영향이 없다.
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
     other: {
       "naver-site-verification": "7225b845dcedf04f93882d87daefdb1b9be49597",
     },
@@ -88,6 +92,7 @@ export default async function RootLayout({
           </div>
         </footer>
         <StickyAd />
+        <Analytics />
       </body>
     </html>
   );
