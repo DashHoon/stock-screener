@@ -207,6 +207,15 @@ const DIAGRAMS: Record<string, ReactElement> = {
       <TriUp x={196} y={54} />
     </>
   ),
+  pat_bwedge_fall: (
+    <>
+      {/* 두 경계선 모두 우하향, 아래가 더 가팔라 폭이 벌어짐 → 상단 상향 돌파 */}
+      <L d="M40 38 L204 58" c={MUTED} w={1.5} dash="4 4" />
+      <L d="M40 68 L206 112" c={MUTED} w={1.5} dash="4 4" />
+      <L d="M44 40 L72 76 L100 46 L132 92 L162 53 L188 106 L208 26" />
+      <TriUp x={198} y={30} />
+    </>
+  ),
   pat_tri_asc: (
     <>
       <L d="M40 46 L200 46" c={MUTED} w={1.5} dash="4 4" />
@@ -270,6 +279,15 @@ const DIAGRAMS: Record<string, ReactElement> = {
       <L d="M40 92 L196 46" c={MUTED} w={1.5} dash="4 4" />
       <L d="M42 86 L70 44 L100 68 L128 38 L156 58 L182 42 L212 92" />
       <TriDown x={196} y={84} c={DOWN} />
+    </>
+  ),
+  pat_bwedge_rise: (
+    <>
+      {/* 두 경계선 모두 우상향, 위가 더 가팔라 폭이 벌어짐 → 하단 하향 이탈 */}
+      <L d="M40 62 L204 17" c={MUTED} w={1.5} dash="4 4" />
+      <L d="M40 92 L206 73" c={MUTED} w={1.5} dash="4 4" />
+      <L d="M44 90 L72 54 L100 85 L132 37 L162 78 L188 24 L208 104" />
+      <TriDown x={198} y={108} c={DOWN} />
     </>
   ),
   pat_tri_desc: (
@@ -448,6 +466,8 @@ const FORM_BASE: Record<string, string> = {
   pat_tri_sym_form: "pat_tri_sym",
   pat_wedge_rise_form: "pat_wedge_rise",
   pat_wedge_fall_form: "pat_wedge_fall",
+  pat_bwedge_rise_form: "pat_bwedge_rise",
+  pat_bwedge_fall_form: "pat_bwedge_fall",
   pat_flag_bull_form: "pat_flag_bull",
   pat_flag_bear_form: "pat_flag_bear",
   pat_broadening_form: "pat_broadening",

@@ -44,6 +44,8 @@ const PATTERN_LABEL: Record<string, [string, string, string]> = {
   pat_tri_sym_down: ["삼각수렴 하향 이탈", "삼각수렴 형성중", "수렴↓"],
   pat_wedge_rise: ["상승쐐기 이탈", "상승쐐기 형성중", "상승쐐기"],
   pat_wedge_fall: ["하락쐐기 돌파", "하락쐐기 형성중", "하락쐐기"],
+  pat_bwedge_rise: ["상승확대쐐기 이탈", "상승확대쐐기 형성중", "상승확대쐐기"],
+  pat_bwedge_fall: ["하락확대쐐기 돌파", "하락확대쐐기 형성중", "하락확대쐐기"],
   pat_flag_bull: ["상승플래그 돌파", "상승플래그 형성중", "상승플래그"],
   pat_flag_bear: ["하락플래그 이탈", "하락플래그 형성중", "하락플래그"],
   pat_broadening: ["브로드닝 이탈", "브로드닝 형성중", "브로드닝"],
@@ -52,8 +54,8 @@ const PATTERN_LABEL: Record<string, [string, string, string]> = {
 
 const BULL_KINDS = new Set([
   "pat_double_bottom", "pat_cup_handle", "pat_hs_inv", "pat_triple_bottom",
-  "pat_round_bottom", "pat_wedge_fall", "pat_tri_asc", "pat_tri_sym_up",
-  "pat_tri_sym", "pat_flag_bull",
+  "pat_round_bottom", "pat_wedge_fall", "pat_bwedge_fall", "pat_tri_asc",
+  "pat_tri_sym_up", "pat_tri_sym", "pat_flag_bull",
 ]);
 
 // 캔들 패턴 표시 순서 (상승 → 하락 → 중립).

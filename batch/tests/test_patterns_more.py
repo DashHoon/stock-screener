@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 
+from batch.patterns import trend
 from batch.patterns.flag import detect_flags
 from batch.patterns.multi import detect_head_shoulders, detect_triple
 from batch.patterns.round import detect_round
@@ -85,6 +86,54 @@ def test_falling_wedge():
     df = _df(seq)
     hits = [p for p in detect_trendline_patterns(df) if p.kind == "pat_wedge_fall"]
     assert hits and hits[0].completed_at is not None
+
+
+def test_broadening_wedge_rise():
+    # 고점열 상승(110→146, 봉당 +2.0) + 저점열 완만히 상승(100→112, 봉당 +0.67)
+    # → 폭 확대. 마지막에 상승 지지선을 아래로 이탈 → 완성(하락 시그널).
+    seq = [100.0] * 3
+    tops = [110, 122, 134, 146]
+    bots = [100, 104, 108, 112]
+    for t, b in zip(tops, bots):
+        seq += _leg(seq[-1], t, 6) + _leg(t, b, 6)
+    seq += _leg(seq[-1], 96, 8) + [96.0] * 8      # 하단 이탈
+    df = _df(seq)
+    hits = [p for p in detect_trendline_patterns(df) if p.kind == "pat_bwedge_rise"]
+    assert hits and hits[0].completed_at is not None
+
+
+def test_broadening_wedge_fall():
+    # 고점열 완만히 하락(130→118) + 저점열 가파르게 하락(118→82) → 폭 확대.
+    # 마지막에 하락 저항선을 위로 돌파 → 완성(상승 시그널).
+    seq = [124.0] * 3
+    tops = [130, 126, 122, 118]
+    bots = [118, 106, 94, 82]
+    for t, b in zip(tops, bots):
+        seq += _leg(seq[-1], t, 6) + _leg(t, b, 6)
+    seq += _leg(seq[-1], 125, 8) + [125.0] * 8    # 상단 돌파
+    df = _df(seq)
+    hits = [p for p in detect_trendline_patterns(df) if p.kind == "pat_bwedge_fall"]
+    assert hits and hits[0].completed_at is not None
+
+
+def test_parallel_channel_is_not_broadening_wedge(monkeypatch):
+    # 거의 평행한 상승 채널(위 +2.0, 아래 +1.7 = 기울기비 0.85).
+    # 창이 길면 미세한 기울기 차만으로 폭이 1.5배를 넘어 확대비 게이트를
+    # 통과한다 — BWEDGE_SLOPE_K가 이런 채널을 걸러내야 한다.
+    seq = [104.0] * 3
+    seq += _leg(104, 110, 6)          # 고점 x=8
+    seq += _leg(110, 102.1, 3)        # 저점 x=11
+    seq += _leg(102.1, 134, 9)        # 고점 x=20
+    seq += _leg(134, 122.5, 3)        # 저점 x=23
+    seq += _leg(122.5, 158, 9)        # 고점 x=32
+    seq += _leg(158, 142.9, 3)        # 저점 x=35
+    seq += _leg(142.9, 182, 9)        # 고점 x=44
+    seq += _leg(182, 150, 10) + [150.0] * 8   # 하단 이탈
+    df = _df(seq)
+    assert [p for p in detect_trendline_patterns(df) if p.kind == "pat_bwedge_rise"] == []
+    # 게이트만 풀면 잡히는 파형인지 확인 — 통과 사유가 '게이트'임을 보장한다
+    monkeypatch.setattr(trend, "BWEDGE_SLOPE_K", 1.0)
+    assert [p for p in detect_trendline_patterns(df) if p.kind == "pat_bwedge_rise"]
 
 
 def test_bull_flag():

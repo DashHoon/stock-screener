@@ -25,6 +25,7 @@ PATTERN_KINDS = (
     "pat_round_bottom", "pat_round_top",
     "pat_tri_asc", "pat_tri_desc", "pat_tri_sym_up", "pat_tri_sym_down",
     "pat_wedge_rise", "pat_wedge_fall",
+    "pat_bwedge_rise", "pat_bwedge_fall",
     "pat_flag_bull", "pat_flag_bear",
     "pat_broadening", "pat_diamond",
 )

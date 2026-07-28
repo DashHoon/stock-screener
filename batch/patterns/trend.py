@@ -14,6 +14,8 @@
 - 삼각수렴: 위 하락 + 아래 상승 → 돌파 방향에 따라 up/down
 - 상승쐐기: 둘 다 상승하며 수렴 → 아래 이탈 시 완성 (하락)
 - 하락쐐기: 둘 다 하락하며 수렴 → 위 돌파 시 완성 (상승)
+- 상승 확대 쐐기: 둘 다 상승하며 확대 → 아래 이탈 시 완성 (하락)
+- 하락 확대 쐐기: 둘 다 하락하며 확대 → 위 돌파 시 완성 (상승)
 - 브로드닝: 위 상승 + 아래 하락(확대) → 아래 이탈 시 완성 (하락)
 """
 
@@ -27,6 +29,15 @@ FLAT_EPS = 0.10    # 봉당 % — 이하면 수평 취급
 TREND_EPS = 0.12   # 봉당 % — 이상이어야 추세로 취급
 CONVERGE_RATIO = 0.75   # 끝 폭 ≤ 시작 폭 × 이 값 (수렴형)
 DIVERGE_RATIO = 1.35    # 끝 폭 ≥ 시작 폭 × 이 값 (브로드닝)
+# 확대 쐐기(둘 다 같은 방향 기울기 + 벌어짐)는 대칭 메가폰(브로드닝)과 기하가
+# 달라 확대 임계를 공유하지 않는다. 메가폰은 위·아래가 서로 반대로 벌어져
+# 폭이 급격히 커지지만, 확대 쐐기는 같은 방향으로 기울어 벌어짐이 완만해
+# 후보가 훨씬 많이 나온다 → 별도(더 엄격한) 상수로 방출량을 따로 조인다.
+BWEDGE_DIVERGE_RATIO = 1.50   # 확대 쐐기: 끝 폭 ≥ 시작 폭 × 이 값
+# 확대비만으로는 평행 채널이 통과한다: 창이 길면 기울기가 거의 같아도(su≈sl)
+# 누적 폭 차이가 임계를 넘기 때문. '완만한 쪽 |기울기| ≤ 가파른 쪽 × K'를
+# 함께 요구해 두 선이 실제로 벌어지는 각을 이루는 경우만 남긴다.
+BWEDGE_SLOPE_K = 0.60
 BREAK_WINDOW = 25       # 구조 확정(confirmed_at) 후 돌파 대기 봉 수
 
 # 연속 스윙 윈도우 크기. 같은 e에서 여러 m이 같은 종류로 분류되면 터치 최다 1개만.
@@ -119,6 +130,10 @@ def _eval_window(
     converging = w_end <= w_start * CONVERGE_RATIO
     converging_loose = w_end <= w_start * CONVERGE_RATIO_LOOSE
     diverging = w_end >= w_start * DIVERGE_RATIO
+    # 확대 쐐기: 폭 w(x)=upper-lower, dw/dx = su - sl 이므로 부호와 무관하게
+    # '확대 ⟺ su > sl'. 수렴 쐐기(sl > su)와 상호 배타적이다.
+    bw_diverging = w_end >= w_start * BWEDGE_DIVERGE_RATIO
+    bw_angled = min(abs(su), abs(sl)) <= max(abs(su), abs(sl)) * BWEDGE_SLOPE_K
 
     kind = None
     break_up: bool | None = None  # True=위 돌파가 완성, False=아래 이탈, None=양방향(수렴)
@@ -132,6 +147,14 @@ def _eval_window(
         kind, break_up = "pat_wedge_rise", False
     elif su <= -TREND_EPS and sl <= -TREND_EPS and converging and su < sl:
         kind, break_up = "pat_wedge_fall", True
+    elif (su >= TREND_EPS and sl >= TREND_EPS and bw_diverging
+          and su > sl and bw_angled):
+        # 상승 확대 쐐기: 둘 다 상승, 위가 더 가파름 → 하단(상승 지지선) 이탈
+        kind, break_up = "pat_bwedge_rise", False
+    elif (su <= -TREND_EPS and sl <= -TREND_EPS and bw_diverging
+          and su > sl and bw_angled):
+        # 하락 확대 쐐기: 둘 다 하락, 아래가 더 가파름 → 상단(하락 저항선) 돌파
+        kind, break_up = "pat_bwedge_fall", True
     elif su >= TREND_EPS and sl <= -TREND_EPS and diverging:
         kind, break_up = "pat_broadening", False
     if kind is None:
@@ -229,7 +252,13 @@ def detect_trendline_patterns(ind: pd.DataFrame, ctx: SwingCtx | None = None) ->
     cands: list[dict] = []
     for scale, span_lim in SPAN_LIMITS.items():
         swings = ctx.swings(scale)
-        # (스윙 위치 e, 분류 종류) → 터치 수가 가장 많은 후보 하나
+        # (스윙 위치 e, 분류 종류) → 대표 후보 하나.
+        # 우선순위는 '완성 > 형성 중' 다음 터치 수 — 창 크기(m)만 다른 두 후보가
+        # 터치 동점이면 먼저 평가된 쪽이 남는데, 하필 형성 중이 완성을 밀어내면
+        # 그날 떠야 할 돌파 시그널이 통째로 사라진다 (리뷰 실측 2/227건).
+        def _rank(c: dict) -> tuple:
+            return (c["completed_at"] is not None, c["touches"])
+
         best: dict[tuple[int, str], dict] = {}
         for e in range(len(swings)):
             if swings[e].confirmed_at is None:
@@ -241,7 +270,7 @@ def detect_trendline_patterns(ind: pd.DataFrame, ctx: SwingCtx | None = None) ->
                 if cand is None:
                     continue
                 key = (e, cand["kind"])
-                if key not in best or cand["touches"] > best[key]["touches"]:
+                if key not in best or _rank(cand) > _rank(best[key]):
                     best[key] = cand
         cands.extend(best.values())
 
