@@ -92,29 +92,43 @@ export const FLAG_GROUPS: FlagGroup[] = [
       { key: "cdl_doji", label: "도지 (변동폭 큰 날)", short: "도지", bullish: null, desc: "시가와 종가가 거의 같은 도지 캔들. 방향 결정 보류·추세 전환 경고." },
     ],
   },
+  // 배치는 모든 패턴 종류에 대해 kind+"_form" 시그널을 쓴다 — 여기 빠지면
+  // '차트에는 그려지는데 검색은 안 되는' 불일치가 생기므로 전 종류를 등록한다.
+  // 완성 패턴과 같은 기준으로 상승/하락을 나눈다. bullish를 채워야 '시그널 방향'
+  // 필터에서도 잡힌다 (전부 null이던 때는 방향을 고르면 형성 중 그룹이 통째로 사라졌다).
   {
-    // 배치는 모든 패턴 종류에 대해 kind+"_form" 시그널을 쓴다 — 여기 빠지면
-    // '차트에는 그려지는데 검색은 안 되는' 불일치가 생기므로 전 종류를 등록한다.
-    name: "패턴 형성 중",
+    name: "상승 패턴 형성 중",
     flags: [
-      { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_triple_bottom_form", label: "3중바닥 형성 중", short: "3중바닥形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_hs_inv_form", label: "역H&S 형성 중", short: "역H&S形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_cup_handle_form", label: "컵앤핸들 형성 중", short: "컵핸들形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_round_bottom_form", label: "라운드바텀 형성 중", short: "라운드바텀形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_wedge_fall_form", label: "하락쐐기 형성 중", short: "하락쐐기形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_tri_asc_form", label: "상승삼각형 형성 중", short: "상승삼각形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_flag_bull_form", label: "상승 플래그 형성 중", short: "상승플래그形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_double_top_form", label: "더블탑 형성 중", short: "더블탑形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_triple_top_form", label: "트리플탑 형성 중", short: "트리플탑形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_hs_top_form", label: "H&S 형성 중", short: "H&S形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_round_top_form", label: "라운드탑 형성 중", short: "라운드탑形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_wedge_rise_form", label: "상승쐐기 형성 중", short: "상승쐐기形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_tri_desc_form", label: "하락삼각형 형성 중", short: "하락삼각形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_flag_bear_form", label: "하락 플래그 형성 중", short: "하락플래그形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_broadening_form", label: "브로드닝 형성 중", short: "브로드닝形", bullish: null, desc: FORMING_DESC },
-      { key: "pat_diamond_form", label: "다이아몬드 형성 중", short: "다이아몬드形", bullish: null, desc: FORMING_DESC },
+      { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_triple_bottom_form", label: "3중바닥 형성 중", short: "3중바닥形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_hs_inv_form", label: "역H&S 형성 중", short: "역H&S形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_cup_handle_form", label: "컵앤핸들 형성 중", short: "컵핸들形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_round_bottom_form", label: "라운드바텀 형성 중", short: "라운드바텀形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_wedge_fall_form", label: "하락쐐기 형성 중", short: "하락쐐기形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_tri_asc_form", label: "상승삼각형 형성 중", short: "상승삼각形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_flag_bull_form", label: "상승 플래그 형성 중", short: "상승플래그形", bullish: true, desc: FORMING_DESC },
+    ],
+  },
+  {
+    name: "하락 패턴 형성 중",
+    flags: [
+      { key: "pat_double_top_form", label: "더블탑 형성 중", short: "더블탑形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_triple_top_form", label: "트리플탑 형성 중", short: "트리플탑形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_hs_top_form", label: "H&S 형성 중", short: "H&S形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_round_top_form", label: "라운드탑 형성 중", short: "라운드탑形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_wedge_rise_form", label: "상승쐐기 형성 중", short: "상승쐐기形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_tri_desc_form", label: "하락삼각형 형성 중", short: "하락삼각形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_flag_bear_form", label: "하락 플래그 형성 중", short: "하락플래그形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_broadening_form", label: "브로드닝 형성 중", short: "브로드닝形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_diamond_form", label: "다이아몬드 형성 중", short: "다이아몬드形", bullish: false, desc: FORMING_DESC },
+    ],
+  },
+  {
+    // 대칭삼각형은 완성돼야 방향이 정해진다 (위로 뚫으면 수렴↑, 아래로 이탈하면 수렴↓).
+    // 형성 중에는 어느 쪽도 아니므로 상승·하락 어디에도 넣지 않는다.
+    name: "형성 중 (방향 미정)",
+    flags: [
+      { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴形", bullish: null, desc: "대칭삼각형이 수렴 중인 상태입니다. 위로 뚫릴지 아래로 이탈할지는 아직 정해지지 않았습니다." },
     ],
   },
 ];
