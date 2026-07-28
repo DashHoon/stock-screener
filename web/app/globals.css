@@ -1244,3 +1244,90 @@ a {
     display: none;
   }
 }
+
+/* ── 업종별 시황 맵 (트리맵) ─────────────────────────────────── */
+:root {
+  --tm-flat: #f1f3f6; /* 등락 없음 = 중립 배경. 상승/하락 색을 여기에 섞는다 */
+}
+:root[data-theme="dark"] {
+  --tm-flat: #232733;
+}
+
+.treemap-wrap {
+  position: relative;
+  width: 100%;
+  margin: 14px 0 18px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--tm-flat);
+}
+.tm-tile {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--bg);
+  color: var(--fg);
+  text-align: center;
+  line-height: 1.15;
+}
+a.tm-tile:hover {
+  outline: 2px solid var(--fg);
+  outline-offset: -2px;
+  z-index: 2;
+}
+.tm-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  font-weight: 700;
+  /* 배경이 진할 때도 읽히도록 얇은 외곽선 */
+  text-shadow: 0 1px 2px var(--bg);
+}
+.tm-name {
+  overflow: hidden;
+  max-width: 100%;
+  word-break: keep-all; /* 한글은 단어 단위로만 줄바꿈 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.tm-pct {
+  font-weight: 600;
+  opacity: 0.85;
+}
+.tm-up {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sector-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.sector-links a {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.sector-links a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

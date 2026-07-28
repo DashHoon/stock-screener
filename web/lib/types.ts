@@ -67,6 +67,10 @@ export interface StockSignal {
   cap: number;
   /** 시장 구분 ('KOSPI' | 'KOSDAQ' | '') */
   mkt?: string;
+  /** 통계청 업종명 (업종맵 2단계) */
+  ind?: string;
+  /** 섹터 대분류 (업종맵 1단계). batch/sectors.py의 SECTOR_ORDER 값 */
+  sec?: string;
   /** 시그널별 마지막 발생이 몇 봉 전인지 (0=오늘). 63봉(~3개월) 초과는 생략 */
   sig: Partial<Record<FlagKey, number>>;
   rsi: number | null;

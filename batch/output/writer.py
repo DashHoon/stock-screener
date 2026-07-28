@@ -20,6 +20,7 @@ def _round(v, nd=2):
 def stock_entry(
     code: str, name: str, ind: pd.DataFrame, sig: dict[str, int],
     marcap: int = -1, market: str = "",
+    industry: str = "", sector: str = "",
 ) -> dict:
     """latest.json의 stocks[] 한 건. sig = {시그널: 마지막 발생 N봉 전(0=오늘)}
 
@@ -37,6 +38,8 @@ def stock_entry(
         "change_pct": change_pct,
         "cap": int(marcap),
         "mkt": market,
+        "ind": industry,  # 통계청 업종명 (업종맵 2단계)
+        "sec": sector,    # 투자자용 섹터 대분류 (업종맵 1단계)
         "sig": sig,
         "rsi": _round(last["rsi"], 1),
         "m": [int(x) for x in ind["close"].iloc[-20:]],  # 최근 20봉 스파크라인

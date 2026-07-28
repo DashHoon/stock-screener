@@ -60,6 +60,7 @@ export default async function RootLayout({
             </Link>
             <nav>
               <Link href="/">스크리너</Link>
+              <Link href="/map">업종맵</Link>
               <Link href="/stats">백테스트</Link>
               <Link href="/guide">지표 가이드</Link>
             </nav>

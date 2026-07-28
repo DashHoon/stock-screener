@@ -147,6 +147,8 @@ def compute_and_write(stocks) -> dict:
                     row.code, row.name, ind, sig,
                     marcap=int(getattr(row, "marcap", -1)),
                     market=str(getattr(row, "market", "")),
+                    industry=str(getattr(row, "industry", "") or ""),
+                    sector=str(getattr(row, "sector", "") or ""),
                 )
             )
 
