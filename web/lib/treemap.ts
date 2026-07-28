@@ -102,21 +102,45 @@ export function changeColor(pct: number | null | undefined): string {
     : `color-mix(in srgb, var(--down) ${Math.round(a * 100)}%, var(--tm-flat))`;
 }
 
-/** 타일 크기와 이름 길이에 맞는 글자 크기. 너무 작으면 라벨을 생략한다(null).
- *  글자 수를 안 보면 "자동차·부품"이 "다동차·부품"처럼 양옆이 잘린다
- *  (가운데 정렬이라 넘친 만큼 좌우가 같이 깎인다). */
+/** 타일에 들어갈 글자 크기. 넣을 수 없으면 null (색만 보여준다).
+ *
+ *  가로만 보면 안 된다 — 가운데 정렬이라 넘친 만큼 좌우가 같이 깎여
+ *  "자동차·부품"이 "다동차·부품"으로 보인다. 폭·높이·줄수를 함께 따진다.
+ */
 export function labelSize(
   w: number,
   h: number,
   label: string,
-): { name: number; pct: number } | null {
-  if (w < 34 || h < 22) return null;
-  const side = Math.min(w, h);
-  // 한글은 글자 폭이 대략 1em. 좌우 여백 8px을 빼고 들어갈 수 있는 크기를 구한다.
-  // 타일이 높으면 두 줄까지 쓴다 — "소프트웨어·인터넷"처럼 긴 이름을 살리기 위함.
-  const lines = h >= 52 ? 2 : 1;
-  const byWidth = (w - 8) / Math.max(Math.ceil(label.length / lines), 1);
-  const name = Math.min(side / 4.2, 22, byWidth);
-  if (name < 8) return null; // 이 크기면 읽을 수 없다 — 색만 보여준다
-  return { name, pct: Math.max(8, name * 0.72) };
+  opts: { pct?: boolean } = {},
+): { name: number; pct: number; lines: number } | null {
+  const showPct = opts.pct !== false;
+  if (w < 30 || h < 18) return null;
+
+  const padX = 6;
+  const padY = 4;
+  const avail = w - padX;
+  // 굵은 한글은 글자 폭이 글자 크기보다 약간 넓다. 1.04로 잡아 여유를 둔다.
+  const CHAR_W = 1.04;
+  const chars = Math.max(label.length, 1);
+
+  // "미래에셋증권"처럼 띄어쓰기·가운뎃점이 없는 한글 이름은 줄바꿈이 안 된다
+  // (word-break: keep-all). 2줄로 계산해 글자를 키우면 한 줄로 삐져나와 잘린다.
+  const canWrap = /[\s·&]/.test(label);
+  for (const lines of canWrap ? [1, 2] : [1]) {
+    // 그 줄 수로 나눠 담았을 때 한 줄 최대 글자 수
+    const perLine = Math.ceil(chars / lines);
+    const byWidth = avail / (perLine * CHAR_W);
+    // 세로: 이름 lines줄(줄간 1.15) + 등락률 한 줄(이름의 0.72배)
+    const heightUnits = lines * 1.15 + (showPct ? 0.72 * 1.2 : 0);
+    const byHeight = (h - padY) / heightUnits;
+    const name = Math.min(byWidth, byHeight, 22);
+    if (name >= 9) return { name, pct: Math.max(8, name * 0.72), lines };
+  }
+
+  // 등락률을 빼면 들어가는지 한 번 더 본다 (작은 타일은 이름만이라도 보이게)
+  if (showPct) {
+    const only = labelSize(w, h, label, { pct: false });
+    if (only) return { ...only, pct: 0 };
+  }
+  return null;
 }

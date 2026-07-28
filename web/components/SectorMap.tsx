@@ -10,19 +10,24 @@ import { SECTOR_ORDER, sectorSlug } from "@/lib/sectors";
 // 타일 넓이를 시가총액에 그대로 비례시키면 한 종목이 화면을 다 먹는다
 // (반도체 섹터에서 SK하이닉스 1,104조 : 2위 약 10조 = 110:1). 제곱근으로 압축해
 // 순서와 규모감은 유지하면서 작은 종목도 보이게 한다.
-const AREA_EXP = 0.5;
-const area = (cap: number) => Math.pow(Math.max(cap, 0), AREA_EXP);
+const area = (cap: number) => Math.sqrt(Math.max(cap, 0));
 
-// 2단계에서 한 화면에 그릴 최대 종목 수. 이 이상은 타일이 1px대라 못 읽는다.
+// 2단계(섹터 페이지)에서 한 화면에 그릴 최대 종목 수
 const MAX_TILES = 45;
+
+// 1단계 섹터 타일 안에 종목을 겹쳐 그릴 최소 크기와 머리글 높이
+const NEST_MIN_W = 92;
+const NEST_MIN_H = 76;
+const HEAD_H = 19;
+// 종목 타일 하나에 필요한 최소 넓이(px²) — 섹터마다 몇 종목을 넣을지 여기서 정해진다
+const PX_PER_STOCK = 2100;
 
 interface Node {
   key: string;
   value: number; // 타일 넓이 (시가총액을 압축한 값)
-  change: number | null; // 시총가중 등락률 (타일 색)
+  change: number | null;
   label: string;
-  href?: string; // 종목 타일이면 상세 페이지
-  count?: number;
+  href?: string;
 }
 
 /** 시가총액 가중 평균 등락률. 단순 평균을 쓰면 소형주 급등이 섹터 색을 뒤집는다. */
@@ -38,15 +43,52 @@ function weightedChange(items: StockSignal[]): number | null {
   return w > 0 ? sum / w : null;
 }
 
-function group(stocks: StockSignal[], by: (s: StockSignal) => string): Map<string, StockSignal[]> {
-  const m = new Map<string, StockSignal[]>();
-  for (const s of stocks) {
-    const k = by(s) || "기타";
-    const arr = m.get(k);
-    if (arr) arr.push(s);
-    else m.set(k, [s]);
-  }
-  return m;
+function pctText(p: number | null): string {
+  return p == null ? "-" : `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+}
+
+function stockNode(s: StockSignal): Node {
+  return {
+    key: s.code,
+    label: s.name,
+    value: area(s.cap ?? 0),
+    change: s.change_pct ?? null,
+    href: `/stock/${s.code}`,
+  };
+}
+
+/** 타일 하나. 라벨 크기는 타일 크기와 이름 길이에 맞춰 계산한다. */
+function TileBox({ t, cls }: { t: Tile<Node>; cls: string }) {
+  const font = labelSize(t.w, t.h, t.item.label);
+  const inner = font ? (
+    <span className="tm-label" style={{ fontSize: font.name }}>
+      <span className="tm-name" style={{ WebkitLineClamp: font.lines }}>
+        {t.item.label}
+      </span>
+      {font.pct > 0 && (
+        <span className="tm-pct" style={{ fontSize: font.pct }}>
+          {pctText(t.item.change)}
+        </span>
+      )}
+    </span>
+  ) : null;
+  const style = {
+    left: t.x,
+    top: t.y,
+    width: t.w,
+    height: t.h,
+    background: changeColor(t.item.change),
+  };
+  const title = `${t.item.label} ${pctText(t.item.change)}`;
+  return t.item.href ? (
+    <Link href={t.item.href} className={cls} style={style} title={title} prefetch={false}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={cls} style={style} title={title}>
+      {inner}
+    </div>
+  );
 }
 
 export default function SectorMap({
@@ -60,14 +102,13 @@ export default function SectorMap({
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
-  // 컨테이너 크기를 재서 그린다 (창 크기·회전에 따라 다시 계산)
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
     const measure = () => {
       const w = el.clientWidth;
-      // 세로는 화면 비율에 맞춘다. 모바일에서 가로로 납작하면 타일이 못 읽힌다.
-      const h = w < 560 ? Math.round(w * 1.25) : Math.round(Math.min(w * 0.58, 640));
+      // 좁은 화면은 세로로 길게 잡아야 타일이 읽힌다
+      const h = w < 560 ? Math.round(w * 1.35) : Math.round(Math.min(w * 0.62, 700));
       setSize({ w, h });
     };
     measure();
@@ -76,90 +117,92 @@ export default function SectorMap({
     return () => ro.disconnect();
   }, []);
 
-  const nodes: Node[] = useMemo(() => {
-    const pool = sector
-      ? data.stocks.filter((s) => (s.sec || "기타") === sector)
-      : data.stocks;
-
-    if (!sector) {
-      // 1단계: 섹터별
-      const g = group(pool, (s) => s.sec || "기타");
-      return SECTOR_ORDER.filter((k) => g.has(k)).map((k) => {
-        const items = g.get(k)!;
-        return {
-          key: k,
-          label: k,
-          value: area(items.reduce((a, b) => a + Math.max(b.cap ?? 0, 0), 0)),
-          change: weightedChange(items),
-          count: items.length,
-          href: `/map/${sectorSlug(k)}`,
-        };
-      });
-    }
-    // 2단계: 그 섹터의 개별 종목 (시총 상위만)
-    return [...pool]
+  /** 2단계(섹터 페이지): 그 섹터 종목만 평면으로 */
+  const flatTiles = useMemo(() => {
+    if (!sector || size.w <= 0) return [];
+    const pool = data.stocks.filter((s) => (s.sec || "기타") === sector);
+    const nodes = [...pool]
       .sort((a, b) => (b.cap ?? 0) - (a.cap ?? 0))
       .slice(0, MAX_TILES)
-      .map((s) => ({
-        key: s.code,
-        label: s.name,
-        value: area(s.cap ?? 0),
-        change: s.change_pct ?? null,
-        href: `/stock/${s.code}`,
-      }));
-  }, [data, sector]);
+      .map(stockNode);
+    return squarify(nodes, size.w, size.h);
+  }, [data, sector, size]);
 
-  const tiles: Tile<Node>[] = useMemo(
-    () => (size.w > 0 ? squarify(nodes, size.w, size.h) : []),
-    [nodes, size],
-  );
+  /** 1단계: 섹터 사각형 + 그 안에 대형 종목 중첩 */
+  const groups = useMemo(() => {
+    if (sector || size.w <= 0) return [];
+    const bySec = new Map<string, StockSignal[]>();
+    for (const s of data.stocks) {
+      const k = s.sec || "기타";
+      const arr = bySec.get(k);
+      if (arr) arr.push(s);
+      else bySec.set(k, [s]);
+    }
+    const nodes: Node[] = SECTOR_ORDER.filter((k) => bySec.has(k)).map((k) => {
+      const items = bySec.get(k)!;
+      return {
+        key: k,
+        label: k,
+        value: area(items.reduce((a, b) => a + Math.max(b.cap ?? 0, 0), 0)),
+        change: weightedChange(items),
+        href: `/map/${sectorSlug(k)}`,
+      };
+    });
+
+    return squarify(nodes, size.w, size.h).map((g) => {
+      const items = (bySec.get(g.item.key) ?? [])
+        .slice()
+        .sort((a, b) => (b.cap ?? 0) - (a.cap ?? 0));
+      // 작은 섹터 칸에 종목을 우겨넣으면 아무것도 안 읽힌다 — 섹터 이름만 남긴다
+      if (g.w < NEST_MIN_W || g.h < NEST_MIN_H) {
+        return { g, nested: false, inner: [] as Tile<Node>[] };
+      }
+      const innerH = g.h - HEAD_H;
+      const count = Math.max(1, Math.min(24, Math.floor((g.w * innerH) / PX_PER_STOCK)));
+      const inner = squarify(items.slice(0, count).map(stockNode), g.w, innerH);
+      return { g, nested: true, inner };
+    });
+  }, [data, sector, size]);
 
   return (
     <div className="treemap-wrap" ref={boxRef} style={{ height: size.h || undefined }}>
-      {tiles.map((t) => {
-        const font = labelSize(t.w, t.h, t.item.label);
-        const pct = t.item.change;
-        const body = (
-          <>
-            {font && (
-              <span className="tm-label" style={{ fontSize: font.name }}>
-                <span className="tm-name">{t.item.label}</span>
-                {t.h > 34 && (
-                  <span className="tm-pct" style={{ fontSize: font.pct }}>
-                    {pct == null ? "-" : `${pct > 0 ? "+" : ""}${pct.toFixed(2)}%`}
-                  </span>
-                )}
-              </span>
-            )}
-          </>
-        );
-        const style = {
-          left: t.x,
-          top: t.y,
-          width: t.w,
-          height: t.h,
-          background: changeColor(pct),
-        };
-        const title = `${t.item.label} ${pct == null ? "" : `${pct > 0 ? "+" : ""}${pct.toFixed(2)}%`}`;
-        return t.item.href ? (
-          <Link
-            key={t.item.key}
-            href={t.item.href}
-            className="tm-tile"
-            style={style}
-            title={title}
-            prefetch={false}
+      {/* 섹터 페이지 — 종목만 */}
+      {sector && flatTiles.map((t) => <TileBox key={t.item.key} t={t} cls="tm-tile" />)}
+
+      {/* 전체 맵 — 섹터 상자 안에 대형 종목 */}
+      {!sector &&
+        groups.map(({ g, nested, inner }) => (
+          <div
+            key={g.item.key}
+            className="tm-group"
+            style={{ left: g.x, top: g.y, width: g.w, height: g.h }}
           >
-            {body}
-          </Link>
-        ) : (
-          <div key={t.item.key} className="tm-tile" style={style} title={title}>
-            {body}
+            {nested ? (
+              <>
+                <Link
+                  href={g.item.href!}
+                  className="tm-group-head"
+                  style={{ height: HEAD_H, background: changeColor(g.item.change) }}
+                  title={`${g.item.label} ${pctText(g.item.change)}`}
+                >
+                  <span className="tm-group-name">{g.item.label}</span>
+                  <span className="tm-group-pct">{pctText(g.item.change)}</span>
+                </Link>
+                <div className="tm-group-body" style={{ top: HEAD_H }}>
+                  {inner.map((t) => (
+                    <TileBox key={t.item.key} t={t} cls="tm-tile tm-sub" />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <TileBox t={{ item: g.item, x: 0, y: 0, w: g.w, h: g.h }} cls="tm-tile" />
+            )}
           </div>
-        );
-      })}
-      {tiles.length === 0 && <p className="notice">불러오는 중…</p>}
-      {/* 드릴다운 상태에서 스와이프 대신 쓸 상위 복귀 (뒤로가기도 동작) */}
+        ))}
+
+      {size.w > 0 && flatTiles.length === 0 && groups.length === 0 && (
+        <p className="notice">불러오는 중…</p>
+      )}
       {sector && (
         <button type="button" className="tm-up" onClick={() => router.push("/map")}>
           ↑ 전체 업종

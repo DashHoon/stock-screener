@@ -82,6 +82,9 @@ export default async function RootLayout({
             </p>
             <p>데이터 출처: 공공데이터포털(금융위원회 주식시세정보), KRX, 네이버 금융.</p>
             <nav className="footer-links">
+              <Link href="/">스크리너</Link>
+              <Link href="/map">업종맵</Link>
+              <Link href="/stats">백테스트</Link>
               <Link href="/guide">지표 가이드</Link>
               <Link href="/disclaimer">면책조항</Link>
               <Link href="/privacy">개인정보처리방침</Link>
