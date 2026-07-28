@@ -18,7 +18,10 @@ const MAX_TILES = 45;
 // 1단계 섹터 타일 안에 종목을 겹쳐 그릴 최소 크기와 머리글 높이
 const NEST_MIN_W = 92;
 const NEST_MIN_H = 76;
-const HEAD_H = 19;
+const HEAD_H = 20;
+// 섹터 상자 사이 간격. 붙여 놓으면 종목 칸 경계와 구분이 안 돼
+// 어디까지가 한 업종인지 읽히지 않는다.
+const GROUP_GAP = 5;
 // 종목 타일 하나에 필요한 최소 넓이(px²) — 섹터마다 몇 종목을 넣을지 여기서 정해진다
 const PX_PER_STOCK = 2100;
 
@@ -149,7 +152,15 @@ export default function SectorMap({
       };
     });
 
-    return squarify(nodes, size.w, size.h).map((g) => {
+    return squarify(nodes, size.w, size.h).map((raw) => {
+      // 간격만큼 안쪽으로 줄여 섹터끼리 떨어뜨린다
+      const g = {
+        item: raw.item,
+        x: raw.x + GROUP_GAP / 2,
+        y: raw.y + GROUP_GAP / 2,
+        w: Math.max(raw.w - GROUP_GAP, 1),
+        h: Math.max(raw.h - GROUP_GAP, 1),
+      };
       const items = (bySec.get(g.item.key) ?? [])
         .slice()
         .sort((a, b) => (b.cap ?? 0) - (a.cap ?? 0));

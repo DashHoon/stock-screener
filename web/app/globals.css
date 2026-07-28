@@ -1248,9 +1248,11 @@ a {
 /* ── 업종별 시황 맵 (트리맵) ─────────────────────────────────── */
 :root {
   --tm-flat: #f1f3f6; /* 등락 없음 = 중립 배경. 상승/하락 색을 여기에 섞는다 */
+  --tm-edge: #6b7280; /* 업종 상자 테두리 */
 }
 :root[data-theme="dark"] {
   --tm-flat: #232733;
+  --tm-edge: #8b93a3;
 }
 
 .treemap-wrap {
@@ -1298,10 +1300,15 @@ a.tm-tile:hover {
 .tm-group {
   position: absolute;
   overflow: hidden;
+  border-radius: 4px;
+  /* 종목 칸 경계(1px)보다 뚜렷한 테두리로 업종 단위를 구분한다 */
+  box-shadow: 0 0 0 1px var(--tm-edge);
 }
 .tm-group-head {
   position: absolute;
   inset: 0 0 auto 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--tm-edge);
   display: flex;
   align-items: center;
   justify-content: space-between;
