@@ -13,6 +13,7 @@ from batch.patterns.flag import detect_flags
 from batch.patterns.multi import detect_head_shoulders, detect_triple
 from batch.patterns.round import detect_round
 from batch.patterns.shape import grade_shapes
+from batch.patterns.swing import build_ctx
 from batch.patterns.trend import detect_trendline_patterns
 
 # 완성(sig) 키 목록 — 백테스트 이벤트 등록에도 사용
@@ -74,15 +75,16 @@ def dedupe_patterns(pats: list) -> list:
 
 
 def detect_all_patterns(ohlcv: pd.DataFrame) -> list:
+    ctx = build_ctx(ohlcv)  # 스윙 구조는 한 번만 계산해 전 탐지기가 공유
     pats = (
-        list(detect_double_patterns(ohlcv))
-        + list(detect_cup_handle(ohlcv))
-        + list(detect_head_shoulders(ohlcv))
-        + list(detect_triple(ohlcv))
-        + list(detect_round(ohlcv))
-        + list(detect_trendline_patterns(ohlcv))
+        list(detect_double_patterns(ohlcv, ctx))
+        + list(detect_cup_handle(ohlcv, ctx))
+        + list(detect_head_shoulders(ohlcv, ctx))
+        + list(detect_triple(ohlcv, ctx))
+        + list(detect_round(ohlcv, ctx))
+        + list(detect_trendline_patterns(ohlcv, ctx))
         + list(detect_flags(ohlcv))
-        + list(detect_diamond(ohlcv))
+        + list(detect_diamond(ohlcv, ctx))
     )
     pats = dedupe_patterns(pats)
     grade_shapes(ohlcv, pats)  # 형태 신뢰도 등급 (차트·스크리너 공통)

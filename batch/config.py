@@ -54,12 +54,21 @@ DIV_RSI_BEAR_ZONE = 60.0
 # 30% 미만의 작은 조정(소규모 증자 등)은 여기서 못 잡고 주 1회 전체 재백필이 보정한다.
 REBUILD_JUMP_PCT = 25.0
 
+# --- 스윙(ZigZag) 구조 — 패턴 탐지 공통 기반 (2026-07-28 방법론 결정) ---
+# 반전 임계 = max(k × ATR14, p% × 종가). 종목 변동성에 자동 적응해
+# 잔파동이 스윙으로 잡히지 않는다. minor=단기 구조, major=장기 구조.
+SWING_ATR_PERIOD = 14
+SWING_MINOR_ATR_MULT = 2.0
+SWING_MINOR_MIN_PCT = 3.0
+SWING_MAJOR_ATR_MULT = 4.0
+SWING_MAJOR_MIN_PCT = 6.0
+SWING_TOUCH_ATR = 0.5       # 추세선 '터치' 인정 거리 (ATR 배수)
+SWING_VIOL_ATR = 0.25       # 추세선 위반(잘못된 쪽 이탈) 허용 한도 (ATR 배수)
+
 # --- 차트 패턴 (쌍바닥/더블탑) ---
-PAT_PIVOT_LEFT = 5          # 가격 피벗 좌우 lookback (RSI 피벗보다 넓게 — 주요 스윙만)
-PAT_PIVOT_RIGHT = 5
+# 피벗 lookback·간격 상수는 스윙 이식(2026-07-28)으로 제거 — 간격은
+# double.py의 DB_GAP(스케일별)이 대체한다.
 PAT_TOL_PCT = 3.0           # 두 바닥(꼭대기)의 가격 유사 허용 오차 %
-PAT_MIN_GAP = 10            # 두 바닥 사이 최소 봉 수
-PAT_MAX_GAP = 60            # 두 바닥 사이 최대 봉 수
 PAT_MIN_DEPTH_PCT = 5.0     # 넥라인이 바닥 대비 최소 이만큼 높아야 (잡음 제거)
 PAT_BREAKOUT_WINDOW = 40    # 두 번째 바닥 확정 후 돌파를 기다리는 최대 봉 수
 

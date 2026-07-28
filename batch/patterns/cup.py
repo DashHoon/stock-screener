@@ -1,7 +1,11 @@
-"""컵앤핸들(Cup and Handle) 탐지.
+"""컵앤핸들(Cup and Handle) 탐지 — ATR 적응형 스윙 기반.
+
+림(rim) 후보를 고정 lookback 피벗이 아니라 스윙 구조에서 가져온다
+(2026-07-28 스윙 이식): **minor 스윙 고점 ∪ major 스윙 고점**의 idx 합집합.
+잔파동 고점이 림으로 연결되는 오탐이 원천 차단된다.
 
 판정 규칙 (오닐 정의를 일봉 규칙으로 번역):
-1. 좌림(L)·우림(R): 피벗 고점 쌍, 간격 CUP_MIN_LEN~CUP_MAX_LEN, 높이 차 ≤ CUP_RIM_TOL_PCT
+1. 좌림(L)·우림(R): 스윙 고점 쌍, 간격 CUP_MIN_LEN~CUP_MAX_LEN, 높이 차 ≤ CUP_RIM_TOL_PCT
 2. 컵 깊이: 림 평균 대비 CUP_MIN_DEPTH_PCT~CUP_MAX_DEPTH_PCT
 3. U자형 검증 (V자 반등 배제):
    - 바닥 위치가 컵 구간의 가운데(CUP_BOTTOM_ZONE)
@@ -12,6 +16,10 @@
 5. 완성: 우림 이후 HANDLE_MIN_LEN~HANDLE_MAX_LEN 봉 안에 종가가 우림 고가를 상향
    돌파한 날. 형성 중: 핸들 구간 진행 중(무효화 전, 대기 기한 내).
 
+미래 참조: 돌파 스캔은 우림 다음 봉부터지만 HANDLE_MIN_LEN(5)이 스윙 확정 지연의
+역할을 해 왔으므로 현행 유지. 잠정 스윙(confirmed_at=None)은 림으로 쓰지 않는다
+— forming도 '구조 확정 후 돌파 전' 상태여야 하므로 (공통 규칙 3·4).
+
 같은 우림을 공유하는 후보 중에는 림 높이 차가 가장 작은 것 하나만 남긴다.
 """
 
@@ -21,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from batch import config
-from batch.indicators.divergence import find_pivots
+from batch.patterns.swing import SwingCtx, build_ctx
 
 
 @dataclass
@@ -68,22 +76,39 @@ def _round_ok(closes: np.ndarray) -> bool:
     return (r2_par - r2_lin) >= config.CUP_MIN_CURVE_GAIN
 
 
-def detect_cup_handle(ind: pd.DataFrame) -> list[CupPattern]:
+def _rim_candidates(ctx: SwingCtx) -> tuple[list[int], dict[int, bool]]:
+    """림 후보 = minor ∪ major 스윙 고점 idx (오름차순, 중복 제거).
+
+    같은 idx가 두 스케일에 다 있으면 하나로 합치고, 어느 한 스케일에서라도
+    확정(confirmed_at is not None)이면 확정으로 본다.
+    """
+    confirmed: dict[int, bool] = {}
+    for s in ctx.minor + ctx.major:
+        if not s.is_high:
+            continue
+        confirmed[s.idx] = confirmed.get(s.idx, False) or (s.confirmed_at is not None)
+    return sorted(confirmed), confirmed
+
+
+def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[CupPattern]:
+    if ctx is None:
+        ctx = build_ctx(ind)
     n = len(ind)
     highs = ind["high"].astype(float).to_numpy()
     lows = ind["low"].astype(float).to_numpy()
     closes = ind["close"].astype(float).to_numpy()
 
-    pivot_highs, _ = find_pivots(
-        pd.Series(highs), config.PAT_PIVOT_LEFT, config.PAT_PIVOT_RIGHT
-    )
-    pivot_highs = sorted(int(i) for i in pivot_highs)
+    rim_idx, rim_confirmed = _rim_candidates(ctx)
 
     out: list[CupPattern] = []
     best_by_rim: dict[int, tuple[float, CupPattern]] = {}  # 우림별 최적 후보
 
-    for ri, r in enumerate(pivot_highs):
-        for l in reversed(pivot_highs[:ri]):
+    for ri, r in enumerate(rim_idx):
+        if not rim_confirmed[r]:
+            continue  # 잠정 우림 = 구조 미확정 → 완성·forming 모두 불가
+        for l in reversed(rim_idx[:ri]):
+            if not rim_confirmed[l]:
+                continue  # 잠정 스윙은 구조(좌림)에 못 쓴다
             span = r - l
             if span < config.CUP_MIN_LEN:
                 continue
@@ -117,7 +142,7 @@ def detect_cup_handle(ind: pd.DataFrame) -> list[CupPattern]:
             if not _round_ok(closes[l : r + 1]):
                 continue
 
-            # 핸들·돌파 스캔 (우림 피벗 확정 이후)
+            # 핸들·돌파 스캔 — HANDLE_MIN_LEN이 스윙 확정 지연 역할 (모듈 docstring)
             neckline = float(rim_r)
             invalid_level = bottom + depth_abs * config.HANDLE_MAX_DEPTH_FRAC
             deadline = min(r + config.HANDLE_MAX_LEN, n - 1)

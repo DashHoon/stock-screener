@@ -1,4 +1,9 @@
-"""라운드 바텀(접시형 바닥, 상승 반전) / 라운드 탑(하락 반전).
+"""라운드 바텀(접시형 바닥, 상승 반전) / 라운드 탑(하락 반전) — ATR 적응형 스윙 기반.
+
+좌측 림 후보를 고정 lookback 피벗이 아니라 **major 스윙**에서 가져온다
+(2026-07-28 스윙 이식): 라운드바텀 림 = major 스윙 고점, 라운드탑 림 = major 스윙
+저점. 장기 완만한 구조이므로 major 스케일만 본다. 잠정 스윙(confirmed_at=None)은
+구조에 쓰지 않는다.
 
 컵앤핸들과 같은 곡선 검증을 쓰되 핸들 없이 좌측 림 레벨 회복(돌파)으로 완성한다.
 컵보다 길고 완만한 구간을 본다.
@@ -7,9 +12,9 @@
 import numpy as np
 import pandas as pd
 
-from batch import config
 from batch.patterns.cup import _round_ok
-from batch.patterns.util import PatternHit, price_pivots
+from batch.patterns.swing import SwingCtx, build_ctx
+from batch.patterns.util import PatternHit
 
 RB_MIN_LEN = 60
 RB_MAX_LEN = 240
@@ -22,17 +27,21 @@ RB_FLAT_ZONE = 0.20
 RB_BREAK_WINDOW = 60
 
 
-def detect_round(ind: pd.DataFrame) -> list[PatternHit]:
+def detect_round(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[PatternHit]:
+    if ctx is None:
+        ctx = build_ctx(ind)
     n = len(ind)
     highs = ind["high"].astype(float).to_numpy()
     lows = ind["low"].astype(float).to_numpy()
     closes = ind["close"].astype(float).to_numpy()
-    ph, pl = price_pivots(ind)
+    # 림 후보: major 스윙만 (확정된 것만 — 잠정 극점은 구조에 못 쓴다)
+    major_highs = [s.idx for s in ctx.major if s.is_high and s.confirmed_at is not None]
+    major_lows = [s.idx for s in ctx.major if not s.is_high and s.confirmed_at is not None]
 
     out: list[PatternHit] = []
 
     def scan(bottom: bool):
-        rims = ph if bottom else pl
+        rims = major_highs if bottom else major_lows
         ext = lows if bottom else highs      # 바닥/천장 극값
         rim_ext = highs if bottom else lows  # 림 기준
         used: set[int] = set()

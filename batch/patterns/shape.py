@@ -29,27 +29,27 @@ SHAPE_B = 50
 
 # 종류별 등급 기준선 (B컷, A컷). 계열마다 점수 스케일이 달라 절대값으로 비교하면
 # 쐐기는 늘 A, 플래그는 늘 C가 된다. 그래서 "같은 패턴 종류 안에서 얼마나 뚜렷한가"로
-# 정규화한다 — 400종목 33,429건 표본의 35/70 백분위 (2026-07 측정).
+# 정규화한다 — 323종목 31,637건 표본의 35/70 백분위 (2026-07-28, 스윙 이식 후 재측정).
 SHAPE_CUTS = {
-    "pat_broadening": (70, 78),
-    "pat_cup_handle": (57, 66),
-    "pat_diamond": (36, 56),
-    "pat_double_bottom": (65, 77),
-    "pat_double_top": (63, 75),
+    "pat_broadening": (75, 86),
+    "pat_cup_handle": (52, 64),
+    "pat_diamond": (34, 55),
+    "pat_double_bottom": (67, 77),
+    "pat_double_top": (65, 76),
     "pat_flag_bear": (52, 67),
     "pat_flag_bull": (54, 73),
-    "pat_hs_inv": (62, 71),
-    "pat_hs_top": (58, 68),
-    "pat_round_bottom": (63, 72),
-    "pat_round_top": (69, 76),
-    "pat_tri_asc": (63, 74),
-    "pat_tri_desc": (74, 87),
-    "pat_tri_sym_down": (72, 83),
-    "pat_tri_sym_up": (80, 90),
-    "pat_triple_bottom": (69, 79),
-    "pat_triple_top": (69, 77),
-    "pat_wedge_fall": (82, 91),
-    "pat_wedge_rise": (79, 89),
+    "pat_hs_inv": (60, 69),
+    "pat_hs_top": (57, 68),
+    "pat_round_bottom": (62, 71),
+    "pat_round_top": (68, 77),
+    "pat_tri_asc": (56, 68),
+    "pat_tri_desc": (74, 86),
+    "pat_tri_sym_down": (70, 82),
+    "pat_tri_sym_up": (74, 86),
+    "pat_triple_bottom": (71, 78),
+    "pat_triple_top": (70, 77),
+    "pat_wedge_fall": (77, 88),
+    "pat_wedge_rise": (73, 84),
 }
 
 # 같은 역할의 극점이 반복되어 '수평 대칭'을 따질 수 있는 패턴들.
@@ -115,7 +115,10 @@ def _prominence_score(points: list, neckline: float) -> float:
     return float(np.clip((amp - 0.01) / 0.02, 0.0, 1.0))
 
 
-def _channel_score(closes: np.ndarray, upper: list, lower: list) -> tuple[float, float]:
+def _channel_score(
+    closes: np.ndarray, upper: list, lower: list,
+    span: tuple | None = None,
+) -> tuple[float, float]:
     """채널형(삼각형·쐐기·플래그) 전용 — (수렴도 안착률, 접촉 균형).
 
     이 계열은 가격이 두 추세선 사이를 지그재그하는 것이 정상이므로, 단일 꺾은선
@@ -130,6 +133,10 @@ def _channel_score(closes: np.ndarray, upper: list, lower: list) -> tuple[float,
     ly = [float(p[1]) for p in lower]
     i0 = max(ux[0], lx[0])
     i1 = min(ux[-1], lx[-1])
+    if span is not None:
+        # 추세선 계열은 선을 돌파 지점까지 연장해 그린다 — 채점은 구조 구간만.
+        # 돌파 대기 드리프트가 섞이면 같은 형태라도 대기가 길수록 점수가 깎인다.
+        i0, i1 = max(i0, int(span[0])), min(i1, int(span[1]))
     if i1 <= i0 or i1 >= len(closes):
         return 0.0, 0.0
     grid = np.arange(i0, i1 + 1)
@@ -157,16 +164,17 @@ def _channel_score(closes: np.ndarray, upper: list, lower: list) -> tuple[float,
 def score_shape(
     closes: np.ndarray, points: list, neckline: float,
     points2: list | None = None, kind: str = "",
+    span: tuple | None = None,
 ) -> int:
     """형태 신뢰도 0~100. 계열별로 채점 기준이 다르다.
 
-    채널형(points2 보유): 채널 안착률 + 위아래 접촉 균형
+    채널형(points2 보유): 채널 안착률 + 위아래 접촉 균형 (span = 구조 구간 한정)
     대칭형(SYMMETRIC_KINDS): 꺾은선 적합도 + 좌우 대칭 + 돌출도
     그 외(플래그·다이아몬드 등): 꺾은선 적합도 + 돌출도
     """
     pro = _prominence_score(points, neckline)
     if points2:
-        inside, balance = _channel_score(closes, points, points2)
+        inside, balance = _channel_score(closes, points, points2, span)
         return int(round(inside * 55 + balance * 30 + pro * 15))
     fit = _fit_score(closes, points)
     sym = _symmetry_score(points) if kind in SYMMETRIC_KINDS else None
@@ -184,6 +192,7 @@ def grade_shapes(ohlcv: pd.DataFrame, pats: list) -> list:
         s = score_shape(
             closes, p.points, float(p.neckline),
             getattr(p, "points2", None), p.kind,
+            getattr(p, "score_span", None),
         )
         p.shape = s
         b_cut, a_cut = SHAPE_CUTS.get(p.kind, (SHAPE_B, SHAPE_A))

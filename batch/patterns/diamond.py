@@ -1,16 +1,23 @@
 """다이아몬드 탑 (고점권에서 변동폭 확대 → 수렴 → 하향 이탈, 하락 반전).
 
+2026-07-28 스윙 기반 이식: head 후보를 고정 lookback 피벗(price_pivots)이 아니라
+ATR 적응형 ZigZag 스윙 고점(minor ∪ major 합집합)에서 뽑는다. 잔파동 고점이
+head로 잡혀 생기던 오탐이 줄어든다. 4분할 폭 검증·이탈 스캔 로직은 기존 유지.
+
 근사 규칙:
-1. 주요 고점(윈도 내 최고가 피벗) 중심으로 전후 구간을 본다
-2. 구간을 4등분해 고저 폭이 [확대 → 최대 → 수렴] 순서: q2·q3 폭이 q1·q4보다 큼
-3. 중심 고점이 구간 최고이고, 시작·끝 종가가 서로 ±10% 이내 (마름모 좌우 꼭짓점)
-4. 완성: 구간 끝 이후 구간 저가(수렴부 지지) 하향 이탈
+1. 스윙 고점(head) 중심으로 전후 구간 [head-half, head+half]를 본다
+2. 구간을 4등분해 고저 폭이 [확대 → 최대 → 수렴] 순서: 가운데 폭이 양끝 폭보다 큼
+3. 중심 고점이 구간 최고이고, 시작·끝 종가가 서로 ±DIA_END_TOL_PCT% 이내
+   (마름모 좌우 꼭짓점)
+4. 완성: 구간 끝(b) 이후 구간 저가(수렴부 지지) 하향 이탈 — b가 이미
+   head+half라서 b부터 스캔해도 미래 참조가 없다 (구조가 b 시점에 확정됨)
 """
 
 import numpy as np
 import pandas as pd
 
-from batch.patterns.util import PatternHit, price_pivots
+from batch.patterns.swing import build_ctx
+from batch.patterns.util import PatternHit
 
 DIA_HALF_MIN = 20    # 중심 고점 기준 좌우 최소 봉수
 DIA_HALF_MAX = 40
@@ -19,12 +26,19 @@ DIA_END_TOL_PCT = 6.0   # 좌우 꼭짓점 종가 유사성
 DIA_BREAK_WINDOW = 25
 
 
-def detect_diamond(ind: pd.DataFrame) -> list[PatternHit]:
+def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
+    if ctx is None:
+        ctx = build_ctx(ind)
     n = len(ind)
     closes = ind["close"].astype(float).to_numpy()
     highs = ind["high"].astype(float).to_numpy()
     lows = ind["low"].astype(float).to_numpy()
-    ph, _ = price_pivots(ind)
+    # head 후보: minor ∪ major 스윙 고점 (idx 정렬 합집합, 중복 제거).
+    # 잠정 스윙(confirmed_at=None)도 포함 — 구조 확정은 스윙 확정이 아니라
+    # 구간 끝 b 도달로 판정하므로 미래 참조가 생기지 않고, head가 구간 최고인지는
+    # 아래에서 재검증한다.
+    ph = sorted({s.idx for s in ctx.minor if s.is_high}
+                | {s.idx for s in ctx.major if s.is_high})
 
     out: list[PatternHit] = []
     used: set[int] = set()

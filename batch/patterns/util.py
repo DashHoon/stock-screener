@@ -1,12 +1,12 @@
-"""패턴 탐지 공통 유틸 — 피벗 추출, 추세선 적합, 공통 결과 타입."""
+"""패턴 탐지 공통 유틸 — 추세선 적합, 공통 결과 타입.
+
+피벗 기반 탐지는 2026-07-28 스윙(ZigZag) 구조로 이식됐다 — swing.py 참고.
+여기 남은 fit_line/fit_envelope_line은 flag.py(봉 단위 채널)와 넥라인 계산에 쓰인다.
+"""
 
 from dataclasses import dataclass, field
 
 import numpy as np
-import pandas as pd
-
-from batch import config
-from batch.indicators.divergence import find_pivots
 
 
 @dataclass
@@ -26,19 +26,10 @@ class PatternHit:
     confirmed_at: int = 0
     shape: int = 0          # 형태 신뢰도 0~100 (shape.grade_shapes가 채움)
     grade: str = "C"        # A(뚜렷)/B(보통)/C(모호)
-
-
-def price_pivots(ind: pd.DataFrame) -> tuple[list[int], list[int]]:
-    """(피벗 고점 인덱스, 피벗 저점 인덱스) — 고가/저가 기준, 표준 패턴 피벗."""
-    highs, _ = find_pivots(
-        pd.Series(ind["high"].astype(float).to_numpy()),
-        config.PAT_PIVOT_LEFT, config.PAT_PIVOT_RIGHT,
-    )
-    _, lows = find_pivots(
-        pd.Series(ind["low"].astype(float).to_numpy()),
-        config.PAT_PIVOT_LEFT, config.PAT_PIVOT_RIGHT,
-    )
-    return sorted(int(i) for i in highs), sorted(int(i) for i in lows)
+    # 형태 채점에 쓸 구조 구간 (시작, 끝). 추세선 계열은 선을 돌파 지점까지
+    # 연장해 그리므로 points 범위로 채점하면 '돌파 대기 드리프트'가 점수를
+    # 오염시킨다 — 채점은 이 구간으로 한정한다. None이면 points 범위 그대로.
+    score_span: tuple | None = None
 
 
 @dataclass
