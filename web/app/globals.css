@@ -970,6 +970,35 @@ a {
   gap: 2px;
 }
 
+@media (max-width: 640px) {
+  /* 툴바 그룹을 한 줄에 하나씩 세로로 쌓는다. 가로로 흘려두면 그룹 경계가
+     사라져 무엇끼리 한 묶음인지 읽히지 않는다. */
+  .chart-toolbar {
+    gap: 8px;
+  }
+  .chart-toolbar > .toolbar-group,
+  .toolbar-more > .toolbar-group {
+    flex-basis: 100%;
+  }
+  /* 지표 토글 6개는 2열 격자로 — 폭이 제각각이라 가로로 흘리면 들쭉날쭉해진다 */
+  .toolbar-group.toggles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  /* ⓘ 자리를 항상 비워둔다. 설명 버튼이 있는 칩만 좁아져 폭이 들쭉날쭉해지는 걸 막는다 */
+  .toolbar-group.toggles .toggle-wrap {
+    display: grid;
+    grid-template-columns: 1fr 18px;
+    align-items: center;
+    min-width: 0;
+  }
+  .toolbar-group.toggles .toolbar-toggle {
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
 .notice {
   font-size: 12.5px;
   color: var(--muted);
