@@ -205,6 +205,22 @@ a {
   min-height: 60px;
 }
 
+/* 실제 광고가 나가는 자리 (자리표시자와 달리 점선 테두리 없이 광고만 보이게) */
+.ad-unit {
+  margin: 20px 0;
+  text-align: center;
+}
+.ad-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ad-box {
+  display: flex;
+  justify-content: center;
+}
+
 /* 모바일 하단 고정 광고 (앵커) */
 .sticky-ad {
   position: fixed;
