@@ -1403,3 +1403,47 @@ a.tm-tile:hover {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+/* ── 차트 그리기 (추세선·박스) ───────────────────────────────── */
+.chart-host {
+  position: relative;
+}
+/* 평소에는 포인터를 통과시켜 차트 확대·이동을 방해하지 않는다.
+   도구를 고른 동안(.active)만 레이어가 포인터를 받고, 그 외에는 도형 자체만 받는다. */
+.draw-layer {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.draw-layer.active {
+  pointer-events: auto;
+}
+.draw-layer.pen {
+  cursor: crosshair;
+}
+.draw-shape {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  pointer-events: stroke;
+  cursor: move;
+}
+.draw-shape.box {
+  fill: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: all;
+}
+.draw-shape.sel {
+  stroke-width: 2.2;
+}
+.draw-handle {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: nwse-resize;
+}
+.draw-tools button {
+  font-size: 12.5px;
+}

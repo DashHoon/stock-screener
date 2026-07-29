@@ -15,6 +15,11 @@ import {
 } from "lightweight-charts";
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
+import ChartDrawings, {
+  type DrawTool,
+  type PriceSeries,
+  type Shape,
+} from "@/components/ChartDrawings";
 import FlagInfoModal from "@/components/FlagInfoModal";
 import { makeBandFill } from "@/components/bandFill";
 import type {
@@ -292,6 +297,39 @@ function attachPaneLabels(
 export default function StockChart({ data }: { data: ChartData }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  // 추세선·박스 그리기 — 가격 시리즈가 있어야 가격↔픽셀 변환이 된다
+  const priceSeriesRef = useRef<PriceSeries | null>(null);
+  const [drawTool, setDrawTool] = useState<DrawTool>(null);
+  const [shapes, setShapesState] = useState<Shape[]>([]);
+  const [paneH, setPaneH] = useState(0);
+  const [paneTop, setPaneTop] = useState(0);
+  const [drawVer, setDrawVer] = useState(0);
+
+  // 그린 도형은 종목별로 브라우저에 남긴다 (서버 저장 없음)
+  const drawKey = `chartDraw:${data.code}`;
+  useEffect(() => {
+    setDrawTool(null);
+    try {
+      setShapesState(JSON.parse(localStorage.getItem(drawKey) ?? "[]"));
+    } catch {
+      setShapesState([]);
+    }
+  }, [drawKey]);
+
+  const setShapes = useCallback(
+    (fn: (prev: Shape[]) => Shape[]) => {
+      setShapesState((prev) => {
+        const next = fn(prev);
+        try {
+          localStorage.setItem(drawKey, JSON.stringify(next));
+        } catch {
+          /* 용량 초과 등은 무시 — 그리기는 부가 기능이다 */
+        }
+        return next;
+      });
+    },
+    [drawKey],
+  );
   // 토글/높이 변경으로 차트를 재생성할 때 확대 범위를 유지하기 위한 보관용.
   // 종목·타임프레임이 그대로일 때만 복원한다(바뀌면 시간축이 달라 무의미).
   const savedRangeRef = useRef<LogicalRange | null>(null);
@@ -722,6 +760,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       createSeriesMarkers(macdLine, macdCrossMarkers(current, color.up, color.down));
     }
 
+    priceSeriesRef.current = candles;
     const panes = chart.panes();
     if (panes.length >= 4) {
       panes[0].setStretchFactor(3);
@@ -729,6 +768,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       panes[2].setStretchFactor(1);
       panes[3].setStretchFactor(1);
     }
+
 
     // 같은 종목·타임프레임에서 토글/높이만 바뀐 재생성이면 확대 범위를 복원한다.
     // 종목이나 일/주/월이 바뀌면 시간축이 달라지므로 전체 맞춤(fitContent).
@@ -738,9 +778,28 @@ export default function StockChart({ data }: { data: ChartData }) {
 
     // 폭 0(숨김 탭 등)으로 만들어진 차트는 폭이 생기는 순간 다시 맞춘다
     let fitted = false;
+    // 그리기 레이어는 가격 패널만 덮어야 한다. 아래 패널까지 덮으면 그 영역에서
+    // 가격 변환이 실패해 선이 안 그려진다. panes[0].getHeight()는 실제 렌더 높이를
+    // 돌려주지 않아(894/0/0/0) DOM에서 직접 잰다.
+    const measurePane = () => {
+      try {
+        const pane0 = chart.panes()[0]?.getHTMLElement?.();
+        if (!pane0) return;
+        const a = pane0.getBoundingClientRect();
+        const b = el.getBoundingClientRect();
+        if (a.height < 1) return;
+        setPaneTop(Math.round(a.top - b.top));
+        setPaneH(Math.round(a.height));
+        setDrawVer((v) => v + 1);
+      } catch {
+        /* 못 재면 그리기 레이어를 띄우지 않는다 */
+      }
+    };
+
     const resize = () => {
       const w = el.clientWidth;
       chart.applyOptions({ width: w });
+      measurePane();
       if (w > 0 && !fitted) {
         fitted = true;
         if (fitPendingRef.current) {
@@ -864,6 +923,28 @@ export default function StockChart({ data }: { data: ChartData }) {
               {h === "md" ? "보통" : h === "lg" ? "크게" : "최대"}
             </button>
           ))}
+        </div>
+        <div className="toolbar-group draw-tools">
+          <span className="toolbar-label">그리기</span>
+          <button
+            type="button"
+            className={drawTool === "line" ? "on" : ""}
+            onClick={() => setDrawTool((t) => (t === "line" ? null : "line"))}
+          >
+            ╱ 추세선
+          </button>
+          <button
+            type="button"
+            className={drawTool === "box" ? "on" : ""}
+            onClick={() => setDrawTool((t) => (t === "box" ? null : "box"))}
+          >
+            ▭ 박스
+          </button>
+          {shapes.length > 0 && (
+            <button type="button" onClick={() => setShapes(() => [])}>
+              전체 지우기
+            </button>
+          )}
         </div>
         <div className="toolbar-group toggles">
           {(
@@ -1063,7 +1144,22 @@ export default function StockChart({ data }: { data: ChartData }) {
           </div>
         </div>
       )}
-      <div ref={ref} className="chart-wrap" />
+      <div className="chart-host">
+        <div ref={ref} className="chart-wrap" />
+        {paneH > 0 && (
+          <ChartDrawings
+            chart={chartRef.current}
+            series={priceSeriesRef.current}
+            tool={drawTool}
+            onToolDone={() => setDrawTool(null)}
+            shapes={shapes}
+            setShapes={setShapes}
+            paneHeight={paneH}
+            paneTop={paneTop}
+            version={drawVer}
+          />
+        )}
+      </div>
     </div>
   );
 }
