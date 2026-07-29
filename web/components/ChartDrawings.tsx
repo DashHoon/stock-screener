@@ -29,22 +29,24 @@ const HANDLE_R = 5;
 export default function ChartDrawings({
   chart,
   series,
+  enabled,
   tool,
   onToolDone,
   shapes,
   setShapes,
   paneHeight,
-  paneTop,
   version,
 }: {
   chart: IChartApi | null;
   series: PriceSeries | null;
+  /** 그리기 모드. 꺼져 있으면 그려진 도형은 보이기만 하고 손댈 수 없다
+   *  (차트를 보다가 실수로 선을 끌어 옮기는 사고를 막는다). */
+  enabled: boolean;
   tool: DrawTool;
   onToolDone: () => void;
   shapes: Shape[];
   setShapes: (fn: (prev: Shape[]) => Shape[]) => void;
   paneHeight: number;
-  paneTop: number;
   version: number; // 차트가 다시 그려질 때 올라간다 (좌표 재계산 트리거)
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -72,17 +74,41 @@ export default function ChartDrawings({
   );
   const toY = useCallback((p: number) => series?.priceToCoordinate(p) ?? null, [series]);
 
-  /** 화면 좌표 → (시간, 가격). 데이터 밖을 찍으면 null이 나올 수 있다. */
+  /** 화면 좌표 → (시간, 가격).
+   *
+   *  레이어가 차트 전체를 덮으므로 거래량·RSI 패널 위에서도 눌릴 수 있다. 그 높이는
+   *  가격 시리즈의 좌표계 밖이라 coordinateToPrice가 null을 돌려주고, 그대로 두면
+   *  "눌렀는데 아무 일도 안 일어나는" 상태가 된다. 가격 패널 안으로 끌어와 변환한다.
+   *  시간축도 마찬가지로 데이터 밖(오른쪽 여백)을 누르면 null이라 안쪽으로 당긴다. */
   const fromPointer = useCallback(
     (e: { clientX: number; clientY: number }) => {
       const svg = svgRef.current;
       if (!svg || !chart || !series) return null;
       const r = svg.getBoundingClientRect();
-      const x = e.clientX - r.left;
-      const y = e.clientY - r.top;
-      const t = chart.timeScale().coordinateToTime(x) as Time | null;
-      const p = series.coordinateToPrice(y);
-      if (t == null || p == null) return null;
+      const x0 = e.clientX - r.left;
+      const y0 = e.clientY - r.top;
+
+      let t: Time | null = null;
+      for (const x of [x0, Math.min(x0, r.width - 2), Math.max(x0, 2)]) {
+        t = chart.timeScale().coordinateToTime(x) as Time | null;
+        if (t != null) break;
+      }
+      if (t == null) return null;
+
+      let p = series.coordinateToPrice(y0);
+      if (p == null) {
+        // 유효한 가장 아래 y를 이분 탐색으로 찾아 거기로 붙인다
+        let lo = 0;
+        let hi = y0;
+        if (series.coordinateToPrice(lo) == null) return null;
+        for (let i = 0; i < 12 && hi - lo > 1; i++) {
+          const mid = (lo + hi) / 2;
+          if (series.coordinateToPrice(mid) != null) lo = mid;
+          else hi = mid;
+        }
+        p = series.coordinateToPrice(lo);
+      }
+      if (p == null) return null;
       return { t: Number(t), p: Number(p) };
     },
     [chart, series],
@@ -158,9 +184,13 @@ export default function ChartDrawings({
     };
   }, [drag, fromPointer, setShapes, onToolDone, toX, toY]);
 
+  useEffect(() => {
+    if (!enabled) setSelected(null);
+  }, [enabled]);
+
   // Delete 키로 선택한 도형 삭제
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || !enabled) return;
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       const t = e.target as HTMLElement | null;
@@ -171,20 +201,22 @@ export default function ChartDrawings({
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [selected, setShapes]);
+  }, [selected, enabled, setShapes]);
 
   if (!chart || !series) return null;
 
-  const active = tool !== null || drag !== null;
+  const active = enabled && (tool !== null || drag !== null);
   const all = draft ? [...shapes, draft] : shapes;
 
   return (
     <svg
       ref={svgRef}
-      className={`draw-layer${active ? " active" : ""}${tool ? " pen" : ""}`}
-      style={{ top: paneTop, height: paneHeight }}
+      className={`draw-layer${active ? " active" : ""}${
+        enabled && tool ? " pen" : ""
+      }${enabled ? "" : " locked"}`}
+      style={{ height: paneHeight }}
       onPointerDown={(e) => {
-        if (!tool) return;
+        if (!enabled || !tool) return;
         const c = fromPointer(e);
         if (!c) return;
         e.preventDefault();
@@ -204,7 +236,7 @@ export default function ChartDrawings({
         const isSel = s.id === selected;
         const cls = `draw-shape${isSel ? " sel" : ""}`;
         const onBody = (e: React.PointerEvent) => {
-          if (tool || s.id === "draft") return;
+          if (!enabled || tool || s.id === "draft") return;
           e.stopPropagation();
           const c = fromPointer(e);
           if (!c) return;

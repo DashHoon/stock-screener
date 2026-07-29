@@ -299,22 +299,32 @@ export default function StockChart({ data }: { data: ChartData }) {
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   // 추세선·박스 그리기 — 가격 시리즈가 있어야 가격↔픽셀 변환이 된다
   const priceSeriesRef = useRef<PriceSeries | null>(null);
+  const [drawMode, setDrawMode] = useState(false);
   const [drawTool, setDrawTool] = useState<DrawTool>(null);
   const [shapes, setShapesState] = useState<Shape[]>([]);
   const [paneH, setPaneH] = useState(0);
-  const [paneTop, setPaneTop] = useState(0);
   const [drawVer, setDrawVer] = useState(0);
 
   // 그린 도형은 종목별로 브라우저에 남긴다 (서버 저장 없음)
   const drawKey = `chartDraw:${data.code}`;
   useEffect(() => {
     setDrawTool(null);
+    setDrawMode(false);
     try {
       setShapesState(JSON.parse(localStorage.getItem(drawKey) ?? "[]"));
     } catch {
       setShapesState([]);
     }
   }, [drawKey]);
+
+  useEffect(() => {
+    if (!drawTool) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawTool(null);
+    };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [drawTool]);
 
   const setShapes = useCallback(
     (fn: (prev: Shape[]) => Shape[]) => {
@@ -778,22 +788,15 @@ export default function StockChart({ data }: { data: ChartData }) {
 
     // 폭 0(숨김 탭 등)으로 만들어진 차트는 폭이 생기는 순간 다시 맞춘다
     let fitted = false;
-    // 그리기 레이어는 가격 패널만 덮어야 한다. 아래 패널까지 덮으면 그 영역에서
-    // 가격 변환이 실패해 선이 안 그려진다. panes[0].getHeight()는 실제 렌더 높이를
-    // 돌려주지 않아(894/0/0/0) DOM에서 직접 잰다.
+    // 그리기 레이어는 차트 요소 전체를 덮는다. 가격 패널만 덮으려고 패널 높이를
+    // 재봤지만 panes[0].getHeight()가 실제 렌더 높이를 안 돌려주고(894/0/0/0)
+    // DOM 측정도 시점에 따라 흔들려, 레이어가 엉뚱한 자리에 놓이거나 아예 안 떴다.
+    // 좌표 변환은 왕복(가격→픽셀→가격)이라 어느 패널 위에 그리든 자리가 맞는다.
     const measurePane = () => {
-      try {
-        const pane0 = chart.panes()[0]?.getHTMLElement?.();
-        if (!pane0) return;
-        const a = pane0.getBoundingClientRect();
-        const b = el.getBoundingClientRect();
-        if (a.height < 1) return;
-        setPaneTop(Math.round(a.top - b.top));
-        setPaneH(Math.round(a.height));
-        setDrawVer((v) => v + 1);
-      } catch {
-        /* 못 재면 그리기 레이어를 띄우지 않는다 */
-      }
+      const h = el.clientHeight;
+      if (h < 1) return;
+      setPaneH(h);
+      setDrawVer((v) => v + 1);
     };
 
     const resize = () => {
@@ -925,25 +928,47 @@ export default function StockChart({ data }: { data: ChartData }) {
           ))}
         </div>
         <div className="toolbar-group draw-tools">
-          <span className="toolbar-label">그리기</span>
-          <button
-            type="button"
-            className={drawTool === "line" ? "on" : ""}
-            onClick={() => setDrawTool((t) => (t === "line" ? null : "line"))}
-          >
-            ╱ 추세선
-          </button>
-          <button
-            type="button"
-            className={drawTool === "box" ? "on" : ""}
-            onClick={() => setDrawTool((t) => (t === "box" ? null : "box"))}
-          >
-            ▭ 박스
-          </button>
-          {shapes.length > 0 && (
-            <button type="button" onClick={() => setShapes(() => [])}>
-              전체 지우기
+          {!drawMode ? (
+            <button type="button" onClick={() => setDrawMode(true)}>
+              ✏ 그리기 시작
             </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={drawTool === "line" ? "on" : ""}
+                onClick={() => setDrawTool((t) => (t === "line" ? null : "line"))}
+              >
+                ╱ 추세선
+              </button>
+              <button
+                type="button"
+                className={drawTool === "box" ? "on" : ""}
+                onClick={() => setDrawTool((t) => (t === "box" ? null : "box"))}
+              >
+                ▭ 박스
+              </button>
+              {shapes.length > 0 && (
+                <button type="button" onClick={() => setShapes(() => [])}>
+                  전체 지우기
+                </button>
+              )}
+              <button
+                type="button"
+                className="draw-exit"
+                onClick={() => {
+                  setDrawTool(null);
+                  setDrawMode(false);
+                }}
+              >
+                그리기 종료
+              </button>
+              <span className="draw-hint">
+                {drawTool
+                  ? "차트에서 드래그하세요 · Esc 취소"
+                  : "도형을 눌러 옮기거나 끝점으로 조절 · Delete 삭제"}
+              </span>
+            </>
           )}
         </div>
         <div className="toolbar-group toggles">
@@ -1150,12 +1175,12 @@ export default function StockChart({ data }: { data: ChartData }) {
           <ChartDrawings
             chart={chartRef.current}
             series={priceSeriesRef.current}
+            enabled={drawMode}
             tool={drawTool}
             onToolDone={() => setDrawTool(null)}
             shapes={shapes}
             setShapes={setShapes}
             paneHeight={paneH}
-            paneTop={paneTop}
             version={drawVer}
           />
         )}
