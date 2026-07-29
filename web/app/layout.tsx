@@ -6,7 +6,7 @@ import StickyAd from "@/components/StickyAd";
 import StockSearch from "@/components/StockSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import { loadLatest } from "@/lib/data";
-import { SITE_URL } from "@/lib/site";
+import { BLOG_ENABLED, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL), // OG·canonical의 절대 URL 기준 (도메인 교체 시 env만 변경)
@@ -63,6 +63,8 @@ export default async function RootLayout({
               <Link href="/map">업종맵</Link>
               <Link href="/stats">백테스트</Link>
               <Link href="/guide">지표 가이드</Link>
+              {/* 블로그는 별도 배포(rewrite 프록시)라 Link가 아닌 a 태그로 전체 이동시킨다 */}
+              {BLOG_ENABLED && <a href="/blog/">블로그</a>}
             </nav>
             <StockSearch />
             <ThemeToggle />
@@ -86,6 +88,7 @@ export default async function RootLayout({
               <Link href="/map">업종맵</Link>
               <Link href="/stats">백테스트</Link>
               <Link href="/guide">지표 가이드</Link>
+              {BLOG_ENABLED && <a href="/blog/">블로그</a>}
               <Link href="/disclaimer">면책조항</Link>
               <Link href="/privacy">개인정보처리방침</Link>
             </nav>

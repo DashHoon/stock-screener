@@ -24,3 +24,7 @@ web/out/
 
 # os
 .DS_Store
+
+# 마케팅 워크스페이스 — 별도 private 저장소로 관리한다 (블로그 소스 + 마케팅 전략 문서).
+# 이 저장소는 public이므로 여기에 커밋하지 않는다.
+kscreener-workspace/
