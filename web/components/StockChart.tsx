@@ -632,7 +632,11 @@ export default function StockChart({ data }: { data: ChartData }) {
           position: bull ? "belowBar" : "aboveBar",
           color: bull ? color.up : color.down,
           shape: bull ? "arrowUp" : "arrowDown",
-          text: DIV_LABEL[dv.kind],
+          // 연속으로 이어진 다이버전스는 몇 번째인지 붙여 강도를 드러낸다
+          text:
+            (dv.chain ?? 2) >= 3
+              ? `${DIV_LABEL[dv.kind]} ${dv.chain}연속`
+              : DIV_LABEL[dv.kind],
         });
       }
     }

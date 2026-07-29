@@ -1,6 +1,6 @@
 """시그널별 '마지막 발생이 몇 봉 전인지' 계산 (스크리너 기간 필터용).
 
-- 이벤트형(다이버전스 4종, MACD 크로스/0선): 마지막 발생일 기준
+- 이벤트형(다이버전스 4종 + 연속 4종, MACD 크로스/0선): 마지막 발생일 기준
 - 상태형(RSI 과열/과매도, BB 터치, 스퀴즈): 마지막으로 조건을 만족한 날 기준
 - RECENT_MAX_BARS(63봉 ≈ 3개월)보다 오래된 것은 결과에서 생략
 """
@@ -55,6 +55,15 @@ def compute_recent(
     for kind in ("div_reg_bull", "div_reg_bear", "div_hid_bull", "div_hid_bear"):
         candidates[kind] = _last_index(
             [e.confirmed_at for e in div_events if e.kind == kind], n
+        )
+        # 연속 다이버전스: 같은 종류가 피벗을 공유하며 DIV_CHAIN_MIN개 이상 이어진 것만
+        candidates[kind + "_x3"] = _last_index(
+            [
+                e.confirmed_at
+                for e in div_events
+                if e.kind == kind and getattr(e, "chain", 2) >= config.DIV_CHAIN_MIN
+            ],
+            n,
         )
 
     # 단기 캔들 패턴 (장악형 등)

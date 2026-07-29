@@ -87,6 +87,7 @@ def timeframe_payload(
                 "price_to": e.price_to,
                 "rsi_from": _round(e.rsi_from, 1),
                 "rsi_to": _round(e.rsi_to, 1),
+                "chain": getattr(e, "chain", 2),  # 연속 다이버전스 사슬 길이
             }
         )
 

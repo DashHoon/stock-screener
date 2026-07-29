@@ -34,6 +34,11 @@ class Divergence:
     price_to: float
     rsi_from: float
     rsi_to: float
+    # 연속 다이버전스 사슬 길이(피벗 개수). 2 = 보통의 한 쌍,
+    # 3 이상 = 같은 종류가 피벗을 공유하며 연달아 이어진 상태.
+    # 고점이 계속 높아지는데 RSI 고점은 계속 낮아지는 식으로 여러 번 반복되면
+    # 한 번 어긋난 것보다 추세 소진 신호로 훨씬 강하게 본다.
+    chain: int = 2
 
 
 def find_pivots(
@@ -80,12 +85,17 @@ def detect_divergences(
     rv = rsi.to_numpy(dtype=float)
 
     for pivots, price, is_low in ((rsi_lows, pl, True), (rsi_highs, ph, False)):
+        prev_kind: str | None = None   # 직전 쌍의 종류
+        prev_b: int | None = None      # 직전 쌍의 두 번째 피벗
+        run = 2                        # 현재 사슬의 피벗 개수
         for a, b in zip(pivots[:-1], pivots[1:]):
             if not (min_bars <= b - a <= max_bars):
+                prev_kind, prev_b = None, None  # 건너뛴 구간이 있으면 사슬이 끊긴다
                 continue
             dp = price[b] - price[a]
             dr = rv[b] - rv[a]
             if dp == 0 or dr == 0:
+                prev_kind, prev_b = None, None
                 continue
             if is_low:
                 if min(rv[a], rv[b]) >= bull_zone:  # 존 필터: 과매도권 밖은 잡음
@@ -105,9 +115,17 @@ def detect_divergences(
                     kind = "div_hid_bear"
                 else:
                     continue
+            # 직전 쌍과 피벗을 공유하고 종류가 같으면 사슬이 이어진 것으로 본다.
+            # (a,b)·(b,c)가 모두 하락 다이버전스면 피벗 3개짜리 사슬이 된다.
+            if prev_kind == kind and prev_b == a:
+                run += 1
+            else:
+                run = 2
+            prev_kind, prev_b = kind, int(b)
             events.append(
                 Divergence(
                     kind=kind,
+                    chain=run,
                     idx_from=int(a),
                     idx_to=int(b),
                     confirmed_at=int(b) + right,
@@ -126,13 +144,16 @@ def latest_flags(
     last_idx: int,
     recent_bars: int = config.DIV_RECENT_BARS,
 ) -> dict[str, bool]:
-    """마지막 봉 기준 다이버전스 플래그 4종.
+    """마지막 봉 기준 다이버전스 플래그. 종류별 기본 4종 + 연속(_x3) 4종.
 
     최근 recent_bars 봉 안에서 확정된 이벤트만 인정한다.
     """
-    flags = {k: False for k in
-             ("div_reg_bull", "div_reg_bear", "div_hid_bull", "div_hid_bear")}
+    base = ("div_reg_bull", "div_reg_bear", "div_hid_bull", "div_hid_bear")
+    flags = {k: False for k in base}
+    flags.update({k + "_x3": False for k in base})
     for e in events:
         if last_idx - recent_bars < e.confirmed_at <= last_idx:
             flags[e.kind] = True
+            if e.chain >= config.DIV_CHAIN_MIN:
+                flags[e.kind + "_x3"] = True
     return flags

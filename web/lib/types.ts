@@ -5,6 +5,10 @@ export type FlagKey =
   | "div_reg_bear"
   | "div_hid_bull"
   | "div_hid_bear"
+  | "div_reg_bull_x3"
+  | "div_reg_bear_x3"
+  | "div_hid_bull_x3"
+  | "div_hid_bear_x3"
   | "macd_golden"
   | "macd_dead"
   | "macd_zero_up"
@@ -116,6 +120,8 @@ export interface DivergenceMark {
   price_to: number;
   rsi_from: number;
   rsi_to: number;
+  /** 연속 다이버전스 사슬 길이(피벗 개수). 2=한 쌍, 3 이상=연속 */
+  chain?: number;
 }
 
 export interface PatternMark {
