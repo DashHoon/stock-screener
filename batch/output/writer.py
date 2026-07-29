@@ -146,6 +146,51 @@ def timeframe_payload(
     return out
 
 
+def archive_payload(ind: pd.DataFrame, before: str) -> dict | None:
+    """`before`(YYYY-MM-DD) 이전 일봉 구간. 가격·거래량·RSI만 담는다.
+
+    패턴·다이버전스·캔들 마킹은 최근분에만 싣는다 — 10년 구간에 다 그리면
+    화면이 마커로 덮이고, 용량도 두 배가 된다.
+
+    볼린저밴드(20일)·MACD도 뺀다. 10년을 한 화면에 놓으면 20일 밴드는 선 하나로
+    뭉개져 읽을 수 없는데 용량은 전체의 40%를 차지한다 (415MB → 256MB).
+    """
+    old = ind[ind["date"].astype(str) < before]
+    if len(old) < 30:
+        return None
+
+    def col(name_, nd=0):
+        return [_round(v, nd) for v in old[name_]]
+
+    return {
+        "dates": old["date"].tolist(),
+        "open": old["open"].tolist(),
+        "high": old["high"].tolist(),
+        "low": old["low"].tolist(),
+        "close": old["close"].tolist(),
+        "volume": old["volume"].tolist(),
+        "rsi": col("rsi", 1),
+    }
+
+
+def write_chart_archive(code: str, payload: dict | None) -> bool:
+    """일봉 아카이브 파일. 내용이 그대로면 다시 쓰지 않는다.
+
+    아카이브는 확정된 과거라 대부분의 날에 한 글자도 안 바뀐다. 그대로 덮어써도
+    git은 내용으로 판단해 새로 담지 않지만, 2,566개 파일을 매일 다시 쓰는 디스크·
+    배포 비용은 남는다. 바뀐 종목(수정주가 조정 등)만 쓰도록 걸러낸다.
+    """
+    path = config.CHART_DIR / f"{code}.arc.json"
+    if payload is None:
+        return False
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if path.exists() and path.read_text(encoding="utf-8") == body:
+        return False
+    config.CHART_DIR.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+    return True
+
+
 def write_chart(code: str, name: str, tf: dict[str, dict]) -> None:
     """종목 상세 차트 json v2. tf = {"d": payload, "w": payload, "m": payload}"""
     payload = {"code": code, "name": name, "tf": tf}

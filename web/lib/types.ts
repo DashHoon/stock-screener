@@ -62,6 +62,18 @@ export type FlagKey =
   | "cdl_morning"
   | "cdl_evening";
 
+/** 일봉 10년 아카이브 (chart/{code}.arc.json).
+ *  최근분 이전 구간. 용량 때문에 가격·거래량·RSI만 담고 BB·MACD는 뺐다. */
+export interface ChartArchive {
+  dates: string[];
+  open: number[];
+  high: number[];
+  low: number[];
+  close: number[];
+  volume: number[];
+  rsi: (number | null)[];
+}
+
 export interface StockSignal {
   code: string;
   name: string;

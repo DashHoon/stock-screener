@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -17,7 +17,13 @@ import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import FlagInfoModal from "@/components/FlagInfoModal";
 import { makeBandFill } from "@/components/bandFill";
-import type { ChartData, FlagKey, TimeframeData, TimeframeKey } from "@/lib/types";
+import type {
+  ChartArchive,
+  ChartData,
+  FlagKey,
+  TimeframeData,
+  TimeframeKey,
+} from "@/lib/types";
 
 const DIV_LABEL: Record<string, string> = {
   div_reg_bull: "상승 다이버전스",
@@ -305,7 +311,56 @@ export default function StockChart({ data }: { data: ChartData }) {
   //   차트엔 안 보이는' 불일치가 생긴다). 세션 한정이며 localStorage엔 저장하지 않는다.
   const [highlightPats, setHighlightPats] = useState<Set<string>>(new Set());
 
-  const current: TimeframeData = data.tf[tfKey] ?? data.tf.d;
+  // 일봉 10년 아카이브. 기본 파일에는 최근분만 들어 있어 '전체'를 누를 때 받아온다
+  // (모든 방문자에게 8년치를 항상 딸려 보내면 종목 페이지가 3배 무거워진다).
+  const [archive, setArchive] = useState<ChartArchive | null>(null);
+  const [arcLoading, setArcLoading] = useState(false);
+  const [arcFailed, setArcFailed] = useState(false);
+  // '전체'를 눌러 아카이브를 받아온 경우, 차트가 새 데이터로 다시 그려진 다음에
+  // 화면을 맞춰야 한다 (받자마자 맞추면 아직 최근분만 그려져 있어 소용없다).
+  const fitPendingRef = useRef(false);
+
+  const loadArchive = useCallback(async () => {
+    if (archive || arcLoading || arcFailed) return archive;
+    setArcLoading(true);
+    try {
+      const r = await fetch(`/data/chart/${data.code}.arc.json`);
+      if (!r.ok) throw new Error(String(r.status));
+      const j = (await r.json()) as ChartArchive;
+      setArchive(j);
+      return j;
+    } catch {
+      setArcFailed(true); // 아카이브가 없는 종목(상장 1년 미만 등)도 있다
+      return null;
+    } finally {
+      setArcLoading(false);
+    }
+  }, [archive, arcLoading, arcFailed, data.code]);
+
+  const base: TimeframeData = data.tf[tfKey] ?? data.tf.d;
+  // 아카이브를 앞에 잇는다. BB·MACD는 아카이브에 없으므로 그만큼 null로 채운다
+  // (10년 축척에서 20일 밴드는 읽히지 않아 용량을 아끼려고 뺐다).
+  const current: TimeframeData = useMemo(() => {
+    if (tfKey !== "d" || !archive || !archive.dates.length) return base;
+    const n = archive.dates.length;
+    const pad = new Array<number | null>(n).fill(null);
+    return {
+      ...base,
+      dates: [...archive.dates, ...base.dates],
+      open: [...archive.open, ...base.open],
+      high: [...archive.high, ...base.high],
+      low: [...archive.low, ...base.low],
+      close: [...archive.close, ...base.close],
+      volume: [...archive.volume, ...base.volume],
+      rsi: [...archive.rsi, ...base.rsi],
+      macd: [...pad, ...base.macd],
+      macd_signal: [...pad, ...base.macd_signal],
+      macd_hist: [...pad, ...base.macd_hist],
+      bb_upper: [...pad, ...base.bb_upper],
+      bb_mid: [...pad, ...base.bb_mid],
+      bb_lower: [...pad, ...base.bb_lower],
+    };
+  }, [tfKey, archive, base]);
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
   // 현재 차트에 실제로 그려질 패턴 종류들 (겹침 정리용 개별 토글 대상).
   // C등급을 숨긴 상태면 칩도 함께 감춰야 '켜져 있는데 안 그려지는' 혼란이 없다.
@@ -374,10 +429,17 @@ export default function StockChart({ data }: { data: ChartData }) {
     });
   }
 
-  function setPeriod(days: number | null) {
+  async function setPeriod(days: number | null) {
     const chart = chartRef.current;
     if (!chart) return;
     if (days == null) {
+      // 일봉 '전체'는 아카이브가 있어야 10년이 나온다. 받아온 뒤 차트가 다시
+      // 그려지므로, 여기서는 로딩만 걸고 화면 맞추기는 다음 렌더에 맡긴다.
+      if (tfKey === "d" && !archive && !arcFailed) {
+        fitPendingRef.current = true;
+        await loadArchive();
+        return;
+      }
       chart.timeScale().fitContent();
       return;
     }
@@ -666,7 +728,7 @@ export default function StockChart({ data }: { data: ChartData }) {
 
     // 같은 종목·타임프레임에서 토글/높이만 바뀐 재생성이면 확대 범위를 복원한다.
     // 종목이나 일/주/월이 바뀌면 시간축이 달라지므로 전체 맞춤(fitContent).
-    const viewKey = `${data.code}|${tfKey}`;
+    const viewKey = `${data.code}|${tfKey}|${archive ? "arc" : "hot"}`;
     const sameView = prevViewRef.current === viewKey;
     prevViewRef.current = viewKey;
 
@@ -677,7 +739,12 @@ export default function StockChart({ data }: { data: ChartData }) {
       chart.applyOptions({ width: w });
       if (w > 0 && !fitted) {
         fitted = true;
-        if (sameView && savedRangeRef.current) {
+        if (fitPendingRef.current) {
+          // '전체'를 눌러 아카이브를 받아온 직후 — 10년 전체를 화면에 맞춘다.
+          // 차트가 새 데이터로 다시 만들어진 지금이 맞출 수 있는 시점이다.
+          fitPendingRef.current = false;
+          chart.timeScale().fitContent();
+        } else if (sameView && savedRangeRef.current) {
           chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
         } else if (tfKey === "d" && current.dates.length > INITIAL_DAILY_BARS) {
           // 일봉 첫 진입: 최근 100봉만 (전체는 너무 촘촘해 보기 불편)
@@ -771,8 +838,13 @@ export default function StockChart({ data }: { data: ChartData }) {
         <div className={`toolbar-more${moreOpen ? " open" : ""}`}>
         <div className="toolbar-group">
           {TF_PERIODS[tfKey].map((p) => (
-            <button key={p.label} type="button" onClick={() => setPeriod(p.days)}>
-              {p.label}
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => setPeriod(p.days)}
+              disabled={p.days == null && arcLoading}
+            >
+              {p.days == null && arcLoading ? "불러오는 중…" : p.label}
             </button>
           ))}
         </div>

@@ -107,6 +107,10 @@ def compute_and_write(stocks) -> dict:
     # 착시가 생기므로 시그널을 비운다 (차트 페이지는 유지).
     stale_cutoff = (dt.date.today() - dt.timedelta(days=12)).isoformat()
 
+    # 일봉 최근분의 시작일. 이 날짜 이전은 아카이브 파일로 뺀다 (config 주석 참고).
+    hot_from = config.chart_hot_from()
+    arc_written = 0
+
     tf_specs = [  # (키, 리샘플 주기, 담을 봉 수)
         ("d", None, config.CHART_DAILY_BARS),
         ("w", "w", config.CHART_WEEKLY_BARS),
@@ -154,9 +158,11 @@ def compute_and_write(stocks) -> dict:
             )
 
             tf: dict[str, dict] = {}
+            hot_bars = int((ind["date"].astype(str) >= hot_from).sum())
             for key, freq, bars in tf_specs:
                 if freq is None:
                     tf_ind, tf_events = ind, events
+                    bars = hot_bars or bars
                 else:
                     resampled = resample_ohlcv(ohlcv, freq)
                     if len(resampled) < 30:  # 지표 워밍업(RSI14+BB20)에 못 미치면 생략
@@ -173,6 +179,8 @@ def compute_and_write(stocks) -> dict:
                     candles=detect_candles(ind) if key == "d" else None,
                 )
             writer.write_chart(row.code, row.name, tf)
+            if writer.write_chart_archive(row.code, writer.archive_payload(ind, hot_from)):
+                arc_written += 1
             latest_date = max(latest_date, ind["date"].iloc[-1])
         except Exception:
             log.exception("%s(%s) 계산 실패", row.name, row.code)
@@ -221,6 +229,9 @@ def compute_and_write(stocks) -> dict:
         "skipped_short": skipped,
         "stale_no_sig": stale,
         "failed": failed,
+        # 아카이브는 확정된 과거라 평상시 0에 가까워야 정상. 매일 수천 개가 다시
+        # 쓰이면 경계가 흔들리고 있다는 뜻이라 바로 눈에 띄게 로그에 남긴다.
+        "archive_rewritten": arc_written,
         # 업종 수집이 조용히 실패하면 업종맵이 '기타' 한 칸으로 퇴화한다.
         # 매일 읽는 완료 로그 한 줄에 노출해 눈에 띄게 한다.
         "sector_etc_pct": round(float((stocks["sector"] == ETC).mean()) * 100, 1)
