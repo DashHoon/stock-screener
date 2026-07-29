@@ -4,7 +4,7 @@
 - 구조 후보: 확정 스윙 e에서 끝나는 연속 스윙 윈도우(마지막 m개, m=5~8).
   잔파동은 스윙 층에서 걸러지므로 엉뚱한 고점·저점이 선에 연결되지 않는다.
 - 추세선: fit_swing_trendline — 앵커 2점 + 터치 수 최대화 (회귀·R² 게이트 폐기,
-  품질은 터치 수로 판정).
+  품질은 터치 수로 판정. 확대 쐐기 2종만 곡선 경계 탓에 1.0 ATR 근접 기준).
 - 미래 참조 없음: 돌파 스캔은 마지막 구조 스윙의 confirmed_at부터 시작.
 - 스케일: minor(단기)·major(장기) 둘 다 탐지 — 겹침은 dedupe_patterns가 정리.
 
@@ -38,6 +38,25 @@ BWEDGE_DIVERGE_RATIO = 1.50   # 확대 쐐기: 끝 폭 ≥ 시작 폭 × 이 값
 # 누적 폭 차이가 임계를 넘기 때문. '완만한 쪽 |기울기| ≤ 가파른 쪽 × K'를
 # 함께 요구해 두 선이 실제로 벌어지는 각을 이루는 경우만 남긴다.
 BWEDGE_SLOPE_K = 0.60
+# 추세 잠식 방지: 확대 쐐기는 '벌어지는 것'이 정의라 확대비에 상한이 없고,
+# 부채꼴이 넓을수록 안착률도 저절로 좋아진다. 그 결과 대세 추세 전체에 추세선
+# 두 개를 얹은 201봉짜리 부채꼴이 패턴으로 통과했다 (코스피 2025-08~2026-06 실측:
+# 중심 이동 46%, 끝 폭이 가격의 40%). 형성물은 추세의 일부이지 추세 자체가 아니다 —
+# 구조 중심선의 총 이동과 끝 폭을 가격 대비 비율로 제한한다.
+#
+# 알고 쓸 것 (2026-07-29 리뷰 실측):
+# - 이 상한은 '창' 단위다. 상한을 넘는 거대 부채꼴도 마지막 몇 스윙의 부분창이
+#   상한 안이면 그 부분창(더 작은 구조)으로는 방출된다.
+# - 폭 상한이 실질 게이트고 이동 상한은 백스톱이다 (단독 발화 0.3%).
+# - 35는 자연 골짜기가 아니라 제품 선택이다: 전체 유니버스에서 후보 폭 분포는
+#   상한까지 완만히 이어진다 (해제 시 후보의 48%가 35 초과). 방출량 밴드
+#   (종목당 1~5건)와 코스피 라벨 사례(진짜 구조 27~34 vs 부채꼴 40~46)로 잡았다.
+# - 분모(ref = 마지막 구조 스윙의 종가)가 구조 '끝' 가격이라 하락 확대쐐기는
+#   같은 절대 기하가 더 크게 읽힌다 — 명목상 같은 35%가 fall을 rise보다 세게
+#   조인다 (대칭 분모 대비 fall 방출 -23% 실측). 파일 전반의 ref 관례(slope_pct)와
+#   일관성을 위해 유지하되, fall 방출을 늘리려면 이 비대칭이 첫 번째 손잡이다.
+BWEDGE_TRAVEL_MAX_PCT = 35.0  # 구조 중심선 이동 상한 (기준가 대비 %)
+BWEDGE_WIDTH_MAX_PCT = 35.0   # 구조 끝 폭 상한 (기준가 대비 %)
 BREAK_WINDOW = 25       # 구조 확정(confirmed_at) 후 돌파 대기 봉 수
 
 # 연속 스윙 윈도우 크기. 같은 e에서 여러 m이 같은 종류로 분류되면 터치 최다 1개만.
@@ -46,7 +65,10 @@ WINDOW_SIZES = (5, 6, 7, 8)
 SPAN_LIMITS = {"minor": (20, 120), "major": (40, 250)}
 # 품질 게이트 — R² 대신 추세선 터치 수
 MIN_TOUCH_FAVORED = 4   # 재현율 우선 종류: 위+아래 합계
-MIN_TOUCH_STRICT = 5    # 그 외 종류: 합계 ≥ 5, 그리고 양쪽 각 ≥ 2
+# 그 외 종류: 합계 ≥ 5, 그리고 양쪽 각 ≥ 2. 단 확대 쐐기 2종은 같은 숫자를
+# 0.5 ATR 터치가 아니라 1.0 ATR 근접(near_u/near_l, 지지 판정)에 적용한다 —
+# 이 값을 조이면 확대 쐐기 방출량도 함께 움직인다 (_eval_window 주석 참고).
+MIN_TOUCH_STRICT = 5
 # 앵커 2점은 정의상 터치라 2+2 윈도우에서 터치 게이트가 자동 통과된다.
 # 그래서 '가격이 실제로 두 선 사이에 머물렀는가'를 별도 게이트로 요구한다
 # (안착률 — 종가가 채널 밖으로 자주 나가는 창은 선을 억지로 끼워 맞춘 것).
@@ -160,11 +182,34 @@ def _eval_window(
     if kind is None:
         return None
 
+    # 추세 잠식 게이트 (모듈 상수 BWEDGE_TRAVEL_MAX_PCT 주석 참고)
+    if kind in ("pat_bwedge_rise", "pat_bwedge_fall"):
+        mid_travel = abs(
+            (upper.at(x_last) + lower.at(x_last))
+            - (upper.at(x_first) + lower.at(x_first))
+        ) / 2
+        if mid_travel / ref * 100 > BWEDGE_TRAVEL_MAX_PCT:
+            return None
+        if w_end / ref * 100 > BWEDGE_WIDTH_MAX_PCT:
+            return None
+
     # 품질 게이트: 터치 수 (R² 게이트 대체)
     favored = kind in FAVORED
     touches = t_u + t_l
     if favored:
         if touches < MIN_TOUCH_FAVORED:
+            return None
+    elif kind in ("pat_bwedge_rise", "pat_bwedge_fall"):
+        # 확대 쐐기의 경계는 곡선을 그리는 일이 잦다 — 가속·감속 랠리에서
+        # 고점열이 휘면 한 직선에 0.5 ATR 터치 3개가 정렬될 수 없다 (코스피
+        # 2026-05~07 실측: 세 번째 고점이 선에서 0.6 ATR). 사람이 보는 기준은
+        # '극점들이 선을 받치는가'이므로, 같은 요건(합5·각2)을 지지 판정
+        # (SUPPORT_TOL_ATR=1.0 근접, near_u/near_l) 기준으로 적용한다.
+        # 형태 품질은 확대비·K·추세 잠식·안착률 게이트가 별도로 지킨다.
+        if len(hs) < 3 or len(ls) < 3:
+            return None
+        if (len(near_u) + len(near_l) < MIN_TOUCH_STRICT
+                or len(near_u) < 2 or len(near_l) < 2):
             return None
     else:
         if len(hs) < 3 or len(ls) < 3:

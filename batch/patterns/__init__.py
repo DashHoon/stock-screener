@@ -46,6 +46,12 @@ def dedupe_patterns(pats: list) -> list:
     라운드탑 7개가 모두 2025-09~2026-07 구간의 동일 패턴). 차트가 선으로 뒤덮이고
     시그널도 부풀려지므로, 구간이 DEDUP_OVERLAP 이상 겹치면 하나만 남긴다.
     대표는 '가장 길게 그려진 것'(패턴 형태가 가장 온전) → 동률이면 최근 완성분.
+
+    병합 그룹은 '종류 + 완성 여부'로 나눈다. 완성과 형성 중을 한 그룹에 넣으면,
+    데이터가 하루 늘어 더 긴 '형성 중' 확장 창이 나타났을 때 어제 완성된 돌파
+    시그널을 밀어낸다 — 어제 스크리너에 떴던 시그널이 오늘 사라지는 소급 소멸
+    (리뷰 실측: 186종목×절단4종 대조에서 8건). trend.py의 연쇄 억제가 같은
+    이유로 같은 분리를 한다.
     """
     kept: list = []
     # 긴 것 → 최근 완성 순으로 보며 채택, 이미 채택된 것과 겹치면 버린다
@@ -62,6 +68,8 @@ def dedupe_patterns(pats: list) -> list:
         for q in kept:
             if q.kind != p.kind:
                 continue
+            if (q.completed_at is None) != (p.completed_at is None):
+                continue  # 완성/형성 중은 서로를 가리지 않는다
             s2, e2 = _span(q)
             overlap = min(e1, e2) - max(s1, s2)
             if overlap <= 0:

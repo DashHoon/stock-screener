@@ -37,9 +37,9 @@ SHAPE_B = 50
 # 표에 없어 기본 컷(50,70)으로 떨어지는 바람에 형성 중 삼각수렴이 96.6% A등급이었다.
 # 표본이 29건으로 작아 백분위가 흔들릴 수 있으므로 다음 재측정 때 확인할 것.
 SHAPE_CUTS = {
-    "pat_broadening": (75, 86),
-    "pat_bwedge_fall": (78, 89),
-    "pat_bwedge_rise": (74, 84),
+    "pat_broadening": (76, 87),
+    "pat_bwedge_fall": (79, 90),   # 2026-07-28 추세 잠식 게이트 추가 후 재측정
+    "pat_bwedge_rise": (74, 85),
     "pat_cup_handle": (52, 64),
     "pat_diamond": (34, 55),
     "pat_double_bottom": (67, 77),
