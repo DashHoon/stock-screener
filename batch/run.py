@@ -29,6 +29,7 @@ from batch.indicators.recent import compute_recent
 from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
 from batch.patterns import detect_all_patterns
+from batch.sectors import ETC
 
 log = logging.getLogger("batch")
 
@@ -220,6 +221,11 @@ def compute_and_write(stocks) -> dict:
         "skipped_short": skipped,
         "stale_no_sig": stale,
         "failed": failed,
+        # 업종 수집이 조용히 실패하면 업종맵이 '기타' 한 칸으로 퇴화한다.
+        # 매일 읽는 완료 로그 한 줄에 노출해 눈에 띄게 한다.
+        "sector_etc_pct": round(float((stocks["sector"] == ETC).mean()) * 100, 1)
+        if "sector" in stocks
+        else None,
     }
 
 

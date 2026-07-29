@@ -355,9 +355,15 @@ export default function StockChart({ data }: { data: ChartData }) {
       if (keep.size >= DEFAULT_PATTERN_KINDS && !keep.has(p.kind)) break;
       keep.add(p.kind);
     }
-    setHiddenPat(
-      new Set(pats.map((p) => p.kind).filter((k) => !keep.has(k))),
-    );
+    // 내용이 같으면 이전 Set을 그대로 돌려준다 — hiddenPat은 차트 effect의
+    // 의존성이라 새 Set 인스턴스를 넣을 때마다 차트가 통째로 재생성된다.
+    setHiddenPat((prev) => {
+      const next = new Set(pats.map((p) => p.kind).filter((k) => !keep.has(k)));
+      if (prev.size === next.size && [...next].every((k) => prev.has(k))) {
+        return prev;
+      }
+      return next;
+    });
   }, [data, tfKey, highlightPats]);
 
   function update(patch: Partial<Settings>) {
@@ -702,9 +708,14 @@ export default function StockChart({ data }: { data: ChartData }) {
     observer.observe(el);
 
     return () => {
-      // 재생성 직전의 확대 범위를 저장 (다음 effect에서 복원 여부 판단)
+      // 재생성 직전의 확대 범위를 저장 (다음 effect에서 복원 여부 판단).
+      // 단 폭이 잡히기 전(fitted=false)에 버려진 차트의 범위는 의미가 없다 —
+      // 그걸 저장하면 다음 생성 때 복원돼 몇 봉만 보이는 극단 확대가 된다.
+      // (?pat= 링크 진입에서 재현됐다: 레이아웃 전에 차트가 한 번 버려짐)
       try {
-        savedRangeRef.current = chart.timeScale().getVisibleLogicalRange();
+        if (fitted) {
+          savedRangeRef.current = chart.timeScale().getVisibleLogicalRange();
+        }
       } catch {
         /* 이미 제거된 경우 */
       }

@@ -17,6 +17,19 @@ log = logging.getLogger(__name__)
 MARKETS = {"STK": "KOSPI", "KSQ": "KOSDAQ"}
 
 
+def _cached_industry() -> pd.Series | None:
+    """캐시된 마스터의 code→industry. 업종 수집 실패 시 폴백용."""
+    if not config.STOCKS_CACHE.exists():
+        return None
+    try:
+        prev = pd.read_parquet(config.STOCKS_CACHE, columns=["code", "industry"])
+    except Exception:
+        log.exception("캐시 업종 읽기 실패")
+        return None
+    prev = prev.dropna(subset=["industry"])
+    return prev.set_index("code")["industry"] if len(prev) else None
+
+
 def fetch_stock_master() -> pd.DataFrame:
     """전 종목 마스터를 수집해 필터링한 DataFrame을 돌려준다.
 
@@ -33,8 +46,16 @@ def fetch_stock_master() -> pd.DataFrame:
         d = fdr.StockListing("KRX-DESC")[["Code", "Industry"]]
         df = df.merge(d, on="Code", how="left")
     except Exception:
-        log.exception("업종 수집 실패 — 섹터 없이 진행")
-        df["Industry"] = None
+        # 업종만 실패한 것이므로 시세 마스터까지 버리지는 않는다. 대신 마지막으로
+        # 성공한 캐시의 업종을 그대로 쓴다 — None으로 두면 전 종목이 '기타'가
+        # 되고, 그 결과가 다시 캐시를 덮어써 하루치 실패가 영구화된다
+        # (업종맵이 '기타' 한 칸으로 퇴화하는데 배치는 성공으로 끝난다).
+        prev = _cached_industry()
+        log.exception(
+            "업종 수집 실패 — %s",
+            f"캐시 업종 {len(prev)}종목으로 폴백" if prev is not None else "캐시도 없어 미상 처리",
+        )
+        df["Industry"] = df["Code"].map(prev) if prev is not None else None
     df = df[~df["Name"].str.contains("스팩", na=False)]
     df = df[df["Code"].str.endswith("0")]  # 우선주 제외 (5·7·9 등으로 끝남)
 
@@ -48,12 +69,17 @@ def fetch_stock_master() -> pd.DataFrame:
             "close": df["Close"].astype("int64"),
             "change_pct": df["ChagesRatio"].astype(float).round(2),
             "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
-            "industry": df.get("Industry"),
-            "sector": df.get("Industry").map(sector_of) if "Industry" in df else ETC,
+            "industry": df["Industry"],   # 위 try/except 양쪽에서 항상 채워진다
+            "sector": df["Industry"].map(sector_of),
         }
     )
     out = out.sort_values("marcap", ascending=False).reset_index(drop=True)
-    log.info("종목 마스터 %d개 (원본 %d개)", len(out), len(raw))
+    etc_pct = (out["sector"] == ETC).mean() * 100 if len(out) else 0.0
+    # 업종 미상이 절반을 넘으면 업종맵이 '기타'로 쏠린다 — 조용히 지나가지 않도록
+    # 에러로 남긴다 (배치 자체는 시세·시그널이 정상이므로 계속 진행).
+    (log.error if etc_pct > 50 else log.info)(
+        "종목 마스터 %d개 (원본 %d개, 업종 미상 %.1f%%)", len(out), len(raw), etc_pct
+    )
     return out
 
 
