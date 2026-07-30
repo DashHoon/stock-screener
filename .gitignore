@@ -41,3 +41,7 @@ kscreener-workspace/
 # 스킬·에이전트 작업 폴더 (중간 산출물). 추적 대상이 아닌데 등록이 안 돼 있어
 # git add -A 한 번에 올라갈 수 있었다.
 _workspace/
+
+# 개인 투자 폴더 — 보유 종목·매매 기록·증권사 키가 오간다. 이 저장소는 public이라
+# 커밋되면 그대로 공개된다. 사이트 데이터는 web/public/data/를 로컬에서 읽어 쓴다.
+private_investment/
