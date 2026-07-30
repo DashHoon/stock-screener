@@ -327,6 +327,25 @@ a {
   color: var(--accent);
   font-weight: 600;
 }
+/* 선택한 조건은 방향 색으로 표시한다 — 상승은 빨강, 하락은 파랑(국내 관례).
+   전부 파란색이면 어느 쪽 조건을 걸었는지 목록에서 한눈에 안 보인다.
+   스퀴즈·도지처럼 방향이 없는 조건은 기본 accent를 그대로 쓴다. */
+.filter-chip.on.dir-up {
+  border-color: var(--bull);
+  color: var(--bull);
+  background: color-mix(in srgb, var(--bull) 10%, var(--bg));
+}
+.filter-chip.on.dir-up input {
+  accent-color: var(--bull);
+}
+.filter-chip.on.dir-down {
+  border-color: var(--bear);
+  color: var(--bear);
+  background: color-mix(in srgb, var(--bear) 10%, var(--bg));
+}
+.filter-chip.on.dir-down input {
+  accent-color: var(--bear);
+}
 
 .result-meta {
   display: flex;
