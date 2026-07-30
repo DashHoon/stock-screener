@@ -18,12 +18,10 @@ interface Mini {
   d20?: { o: number[]; h: number[]; l: number[]; c: number[] };
 }
 
-/** 격자에 그릴 방식.
- *  candle — 최근 20영업일 캔들 (기본)
- *  line   — 120봉 종가선 + 그 구간 패턴 전체 모양
- *  둘 다 데이터가 파일에 있어 이 상수 한 줄로 바꿀 수 있다. */
-type MiniKind = "candle" | "line";
-const MINI_KIND: MiniKind = "candle";
+/** 격자에 그릴 방식. 두 방식 다 같은 파일에 담겨 있어 받아 놓은 데이터로 바로 전환된다.
+ *  candle — 최근 20영업일 캔들. 음/양·꼬리·몸통이 보인다
+ *  line   — 120봉 종가선. 패턴 전체 모양이 화면에 들어온다 */
+export type MiniKind = "candle" | "line";
 
 const W = 320;
 const H = 190;
@@ -140,10 +138,12 @@ function LineMini({
 /** 미니 차트 하나. lightweight-charts 인스턴스를 12개 띄우면 무거워 SVG로 직접 그린다. */
 function MiniChart({
   mini,
+  kind,
   highlight,
   up,
 }: {
   mini: Mini | null;
+  kind: MiniKind;
   highlight: Set<string>; // 검색에 쓴 패턴 종류만 그린다
   up: boolean;
 }) {
@@ -151,7 +151,7 @@ function MiniChart({
     return <div className="mini-empty">차트 없음</div>;
   }
   const pats = mini.pats.filter((p) => highlight.has(p.k));
-  if (MINI_KIND === "candle" && mini.d20) {
+  if (kind === "candle" && mini.d20) {
     return <CandleMini d={mini.d20} pats={pats} total={mini.c.length} />;
   }
   return <LineMini closes={mini.c} pats={pats} up={up} />;
@@ -161,12 +161,14 @@ export default function ResultGrid({
   rows,
   page,
   perPage,
+  kind,
   patKinds,
   patParam,
 }: {
   rows: StockSignal[];
   page: number;
   perPage: number;
+  kind: MiniKind;
   /** 검색 조건에 든 패턴 종류 (미니 차트에 이것만 그린다) */
   patKinds: string[];
   patParam: string;
@@ -222,6 +224,7 @@ export default function ResultGrid({
               </div>
               <MiniChart
                 mini={s.code in minis ? minis[s.code] : null}
+                kind={kind}
                 highlight={highlight}
                 up={pct >= 0}
               />

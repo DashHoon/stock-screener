@@ -9,7 +9,7 @@ import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import AdSlot from "@/components/AdSlot";
 import BacktestPanel from "@/components/BacktestPanel";
 import FlagInfoModal from "@/components/FlagInfoModal";
-import ResultGrid from "@/components/ResultGrid";
+import ResultGrid, { type MiniKind } from "@/components/ResultGrid";
 import Sparkline from "@/components/Sparkline";
 import {
   rid,
@@ -91,6 +91,9 @@ function useIsMobile(bp = 640) {
 
 // 격자 한 페이지에 그릴 종목 수 (데스크톱 4열 × 3행)
 const GRID_PER_PAGE = 12;
+
+/** 결과 보기 방식 (list = 표, candle/line = 격자의 두 그리기 방식) */
+type View = "list" | MiniKind;
 
 /** 페이지 컨트롤. 무한 스크롤은 결과가 1,600종목일 때 메모리가 계속 쌓이고
  *  '몇 개를 봤는지' 감각도 없어져 페이지네이션을 쓴다. */
@@ -176,13 +179,19 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   // 결과를 보려면 4화면을 스크롤해야 한다 (375px 실측).
   const [filtersOpen, setFiltersOpen] = useState(false);
   // 결과 보기 방식. 목록이 기본 — 검색 직후에는 몇 개가 걸렸는지 훑는 게 먼저다.
-  // 격자는 형태를 눈으로 걸러낼 때 쓴다. 고른 값은 다음 방문에도 유지한다.
-  const [view, setViewState] = useState<"list" | "grid">("list");
+  // 격자는 형태를 눈으로 걸러낼 때 쓴다.
+  //   candle — 최근 20영업일. 지금 상태(음/양·꼬리)가 보인다
+  //   line   — 120봉 종가선. 패턴 전체 모양이 화면에 들어온다
+  // 고른 값은 다음 방문에도 유지한다.
+  const [view, setViewState] = useState<View>("list");
   const [page, setPage] = useState(0);
   useEffect(() => {
-    if (localStorage.getItem("screenerView") === "grid") setViewState("grid");
+    const v = localStorage.getItem("screenerView");
+    // "grid"는 캔들·라인으로 갈리기 전에 저장된 값이다
+    if (v === "grid" || v === "candle") setViewState("candle");
+    else if (v === "line") setViewState("line");
   }, []);
-  const setView = (v: "list" | "grid") => {
+  const setView = (v: View) => {
     setViewState(v);
     try {
       localStorage.setItem("screenerView", v);
@@ -190,6 +199,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       /* 저장 실패는 무시 */
     }
   };
+  const isGrid = view !== "list";
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -503,27 +513,29 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             ＋ 조건 저장
           </button>
         )}
-        {/* 목록은 훑기용, 격자는 형태를 눈으로 걸러내는 용도 — 둘 다 남긴다 */}
+        {/* 목록은 훑기용, 격자는 형태를 눈으로 걸러내는 용도 */}
         <span className="view-toggle">
-          <button
-            type="button"
-            className={view === "list" ? "on" : ""}
-            onClick={() => setView("list")}
-          >
-            목록
-          </button>
-          <button
-            type="button"
-            className={view === "grid" ? "on" : ""}
-            onClick={() => setView("grid")}
-          >
-            차트
-          </button>
+          {(
+            [
+              ["list", "목록"],
+              ["candle", "차트 캔들"],
+              ["line", "차트 라인"],
+            ] as [View, string][]
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              className={view === v ? "on" : ""}
+              onClick={() => setView(v)}
+            >
+              {label}
+            </button>
+          ))}
         </span>
       </div>
 
 
-      {view === "grid" ? (
+      {isGrid ? (
         <>
           <div className="sort-bar">
             <span className="sort-bar-label">정렬</span>
@@ -550,6 +562,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             rows={rows}
             page={page}
             perPage={GRID_PER_PAGE}
+            kind={view === "line" ? "line" : "candle"}
             patKinds={selectedPats}
             patParam={patParam}
           />
