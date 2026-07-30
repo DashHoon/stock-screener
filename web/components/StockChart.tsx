@@ -680,11 +680,9 @@ export default function StockChart({ data }: { data: ChartData }) {
           position: bull ? "belowBar" : "aboveBar",
           color: bull ? color.up : color.down,
           shape: bull ? "arrowUp" : "arrowDown",
-          // 연속으로 이어진 다이버전스는 몇 번째인지 붙여 강도를 드러낸다
-          text:
-            (dv.chain ?? 2) >= 3
-              ? `${DIV_LABEL[dv.kind]} ${dv.chain}연속`
-              : DIV_LABEL[dv.kind],
+          // 이어진 경우 "연속"만 붙인다. chain은 피벗 개수라 그대로 쓰면
+          // (피벗 3개 = 다이버전스 2쌍) 횟수로 읽혀 과장된다.
+          text: (dv.chain ?? 2) >= 3 ? `${DIV_LABEL[dv.kind]} 연속` : DIV_LABEL[dv.kind],
         });
       }
     }
