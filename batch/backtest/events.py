@@ -7,6 +7,7 @@
 import numpy as np
 import pandas as pd
 
+from batch import config
 from batch.indicators.divergence import detect_divergences
 
 
@@ -51,6 +52,14 @@ def build_events(ind: pd.DataFrame) -> dict[str, list[int]]:
     for kind in ("div_reg_bull", "div_reg_bear", "div_hid_bull", "div_hid_bear"):
         events[kind] = sorted(
             e.confirmed_at for e in divs if e.kind == kind and e.confirmed_at < n
+        )
+        # 연속 다이버전스(피벗 3개 이상). 2연속과 성과를 비교하려고 따로 낸다.
+        events[kind + "_x3"] = sorted(
+            e.confirmed_at
+            for e in divs
+            if e.kind == kind
+            and e.confirmed_at < n
+            and getattr(e, "chain", 2) >= config.DIV_CHAIN_MIN
         )
 
     # 단기 캔들 패턴 이벤트
