@@ -1280,7 +1280,8 @@ a {
 
 /* ── 업종별 시황 맵 (트리맵) ─────────────────────────────────── */
 :root {
-  --tm-flat: #f1f3f6; /* 등락 없음 = 중립 배경. 상승/하락 색을 여기에 섞는다 */
+  --tm-flat: #aeb6c2; /* 등락 없음 = 중립 배경. 상승/하락 색을 여기에 섞는다.
+     흰 글씨가 얹히므로 화이트 모드에서도 너무 밝지 않게 잡는다 */
   --tm-edge: #6b7280; /* 업종 상자 테두리 */
 }
 :root[data-theme="dark"] {
@@ -1303,7 +1304,9 @@ a {
   justify-content: center;
   overflow: hidden;
   border: 1px solid var(--bg);
-  color: var(--fg);
+  /* 타일 배경은 등락률 색(빨강·파랑)이라 화이트 모드에서도 흰 글씨가 낫다.
+     검정 글씨는 진한 타일에서 파묻히고, 테마마다 대비가 뒤바뀐다. */
+  color: #fff;
   text-align: center;
   line-height: 1.15;
 }
@@ -1318,8 +1321,11 @@ a.tm-tile:hover {
   gap: 2px;
   padding: 2px;
   font-weight: 700;
-  /* 배경이 진할 때도 읽히도록 얇은 외곽선 */
-  text-shadow: 0 1px 2px var(--bg);
+  /* 흰 글씨를 옅은 타일에서도 읽히게 하는 어두운 후광.
+     테마 변수(--bg)를 쓰면 화이트 모드에서 흰 글씨가 흰 그림자에 묻힌다. */
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 0 3px rgba(0, 0, 0, 0.4);
 }
 .tm-name {
   overflow: hidden;
@@ -1350,8 +1356,10 @@ a.tm-tile:hover {
   border: 1px solid var(--bg);
   font-size: 11.5px;
   font-weight: 700;
-  color: var(--fg);
-  text-shadow: 0 1px 2px var(--bg);
+  color: #fff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 0 3px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
   overflow: hidden;
 }
