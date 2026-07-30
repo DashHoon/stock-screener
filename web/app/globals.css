@@ -13,6 +13,9 @@
   --bull: #dc2626;
   --bear: #2563eb;
   --neutral: #6b7280;
+  /* 방향 없는 시그널(스퀴즈·도지)용. 상승 빨강·하락 파랑과 헷갈리지 않는 제3색.
+     accent(파랑)를 쓰면 다크모드에서 하락색과 값이 같아 하락 신호로 오독된다. */
+  --mid: #7c3aed;
   --band-fill: rgba(250, 204, 21, 0.13); /* 볼린저 밴드 채움 (차트가 읽어 씀) */
 }
 
@@ -29,6 +32,7 @@
   --bull: #f87171;
   --bear: #60a5fa;
   --neutral: #9ca3af;
+  --mid: #a78bfa;
   --band-fill: rgba(250, 204, 21, 0.10);
 }
 
@@ -346,6 +350,16 @@ a {
 .filter-chip.on.dir-down input {
   accent-color: var(--bear);
 }
+/* 방향 없는 시그널 칩. 회색으로 두면 선택 안 된 것처럼 보여 제3색을 쓴다.
+   기간·시총·시장 같은 설정 칩(window-chip)은 시그널이 아니라 그대로 accent. */
+.filter-chip.on:not(.window-chip):not(.dir-up):not(.dir-down) {
+  border-color: var(--mid);
+  color: var(--mid);
+  background: color-mix(in srgb, var(--mid) 10%, var(--bg));
+}
+.filter-chip.on:not(.window-chip):not(.dir-up):not(.dir-down) input {
+  accent-color: var(--mid);
+}
 
 .result-meta {
   display: flex;
@@ -551,8 +565,8 @@ a {
   font-size: 11.5px;
   font-weight: 600;
   margin-right: 4px;
-  background: color-mix(in srgb, var(--neutral) 12%, transparent);
-  color: var(--neutral);
+  background: color-mix(in srgb, var(--mid) 12%, transparent);
+  color: var(--mid);
 }
 .badge.bull {
   background: color-mix(in srgb, var(--bull) 12%, transparent);
