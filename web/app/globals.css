@@ -1503,3 +1503,143 @@ a.tm-tile:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ── 검색 결과 격자(바둑판) 보기 ─────────────────────────────── */
+.view-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.view-toggle button {
+  padding: 4px 14px;
+  border: none;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.view-toggle button.on {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.result-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+@media (max-width: 1000px) {
+  .result-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.grid-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.grid-card:hover {
+  border-color: var(--accent);
+}
+.gc-link {
+  display: block;
+}
+.gc-head,
+.gc-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 9px;
+}
+.gc-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gc-foot {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding-top: 0;
+}
+.mini-svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+  background: var(--bg);
+}
+.mini-line {
+  fill: none;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+.mini-line.up {
+  stroke: var(--up);
+}
+.mini-line.down {
+  stroke: var(--down);
+}
+/* 검색에 쓴 패턴만 그린다 — 왜 걸렸는지 보여야 걸러낼 수 있다 */
+.mini-pat path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+.mini-empty {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--bg);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 14px 0;
+}
+.pager button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pager-now {
+  min-width: 74px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}

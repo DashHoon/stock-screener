@@ -179,6 +179,7 @@ def compute_and_write(stocks) -> dict:
                     candles=detect_candles(ind) if key == "d" else None,
                 )
             writer.write_chart(row.code, row.name, tf)
+            writer.write_chart_mini(row.code, writer.mini_payload(ind, chart_patterns))
             if writer.write_chart_archive(row.code, writer.archive_payload(ind, hot_from)):
                 arc_written += 1
             latest_date = max(latest_date, ind["date"].iloc[-1])

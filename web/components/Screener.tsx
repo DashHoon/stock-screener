@@ -9,6 +9,7 @@ import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import AdSlot from "@/components/AdSlot";
 import BacktestPanel from "@/components/BacktestPanel";
 import FlagInfoModal from "@/components/FlagInfoModal";
+import ResultGrid from "@/components/ResultGrid";
 import Sparkline from "@/components/Sparkline";
 import {
   rid,
@@ -88,6 +89,53 @@ function useIsMobile(bp = 640) {
   return m;
 }
 
+// 격자 한 페이지에 그릴 종목 수 (데스크톱 4열 × 3행)
+const GRID_PER_PAGE = 12;
+
+/** 페이지 컨트롤. 무한 스크롤은 결과가 1,600종목일 때 메모리가 계속 쌓이고
+ *  '몇 개를 봤는지' 감각도 없어져 페이지네이션을 쓴다. */
+function Pager({
+  page,
+  total,
+  perPage,
+  onChange,
+}: {
+  page: number;
+  total: number;
+  perPage: number;
+  onChange: (p: number) => void;
+}) {
+  const last = Math.max(0, Math.ceil(total / perPage) - 1);
+  if (last === 0) return null;
+  return (
+    <div className="pager">
+      <button type="button" onClick={() => onChange(0)} disabled={page === 0}>
+        ⏮
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, page - 1))}
+        disabled={page === 0}
+      >
+        ◀ 이전
+      </button>
+      <span className="pager-now">
+        {page + 1} / {last + 1}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(last, page + 1))}
+        disabled={page === last}
+      >
+        다음 ▶
+      </button>
+      <button type="button" onClick={() => onChange(last)} disabled={page === last}>
+        ⏭
+      </button>
+    </div>
+  );
+}
+
 function badgesWithin(s: StockSignal, bars: number) {
   return (Object.keys(s.sig) as FlagKey[])
     .filter((k) => (s.sig[k] ?? Infinity) <= bars && FLAG_BY_KEY.has(k))
@@ -127,6 +175,21 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   // 모바일에서는 조건 패널을 접어둔다. 펼쳐두면 필터가 2,400px을 차지해
   // 결과를 보려면 4화면을 스크롤해야 한다 (375px 실측).
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // 결과 보기 방식. 목록이 기본 — 검색 직후에는 몇 개가 걸렸는지 훑는 게 먼저다.
+  // 격자는 형태를 눈으로 걸러낼 때 쓴다. 고른 값은 다음 방문에도 유지한다.
+  const [view, setViewState] = useState<"list" | "grid">("list");
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (localStorage.getItem("screenerView") === "grid") setViewState("grid");
+  }, []);
+  const setView = (v: "list" | "grid") => {
+    setViewState(v);
+    try {
+      localStorage.setItem("screenerView", v);
+    } catch {
+      /* 저장 실패는 무시 */
+    }
+  };
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -247,6 +310,11 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   const selectedPats = [...selected]
     .filter((k) => k.startsWith("pat_"))
     .map((k) => k.replace(/_form$/, ""));
+  // 조건·정렬·기간이 바뀌면 보고 있던 페이지 번호가 의미를 잃는다
+  useEffect(() => {
+    setPage(0);
+  }, [selected, windowBars, minCap, market, dir, sortKey, sortDesc]);
+
   const patParam = selectedPats.length
     ? `?pat=${[...new Set(selectedPats)].join(",")}`
     : "";
@@ -435,10 +503,64 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             ＋ 조건 저장
           </button>
         )}
+        {/* 목록은 훑기용, 격자는 형태를 눈으로 걸러내는 용도 — 둘 다 남긴다 */}
+        <span className="view-toggle">
+          <button
+            type="button"
+            className={view === "list" ? "on" : ""}
+            onClick={() => setView("list")}
+          >
+            목록
+          </button>
+          <button
+            type="button"
+            className={view === "grid" ? "on" : ""}
+            onClick={() => setView("grid")}
+          >
+            차트
+          </button>
+        </span>
       </div>
 
 
-      {isMobile ? (
+      {view === "grid" ? (
+        <>
+          <div className="sort-bar">
+            <span className="sort-bar-label">정렬</span>
+            {(
+              [
+                ["cap", "시총"],
+                ["change_pct", "등락률"],
+                ["rsi", "RSI"],
+                ["name", "종목명"],
+              ] as [SortKey, string][]
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                className={sortKey === k ? "on" : ""}
+                onClick={() => sortBy(k)}
+              >
+                {label}
+                {sortKey === k && (sortDesc ? " ↓" : " ↑")}
+              </button>
+            ))}
+          </div>
+          <ResultGrid
+            rows={rows}
+            page={page}
+            perPage={GRID_PER_PAGE}
+            patKinds={selectedPats}
+            patParam={patParam}
+          />
+          <Pager
+            page={page}
+            total={rows.length}
+            perPage={GRID_PER_PAGE}
+            onChange={setPage}
+          />
+        </>
+      ) : isMobile ? (
         <>
           <div className="sort-bar">
             <span className="sort-bar-label">정렬</span>

@@ -192,6 +192,48 @@ def write_chart_archive(code: str, payload: dict | None) -> bool:
     return True
 
 
+def mini_payload(
+    ind: pd.DataFrame,
+    patterns: list | None = None,
+    bars: int = config.CHART_MINI_BARS,
+) -> dict:
+    """격자용 미니 차트. 종가 + 그 구간 패턴 좌표만.
+
+    좌표는 날짜가 아니라 배열 인덱스로 넣는다 — 미니 차트는 시간축을 안 그리므로
+    날짜 문자열(봉당 13바이트)이 순전히 낭비다.
+    """
+    tail = ind.iloc[-bars:]
+    offset = len(ind) - len(tail)
+    out: dict = {"c": [int(v) for v in tail["close"]], "pats": []}
+    for p in patterns or []:
+        pts = [(int(i) - offset, price) for i, price in p.points]
+        if not pts or pts[0][0] < 0:
+            continue  # 미니 창 밖에서 시작한 패턴은 그릴 수 없다
+        entry: dict = {
+            "k": p.kind,
+            "g": getattr(p, "grade", "B"),
+            "pts": [[i, round(float(v), 2)] for i, v in pts],
+        }
+        pts2 = [
+            (int(i) - offset, price)
+            for i, price in (getattr(p, "points2", []) or [])
+            if int(i) - offset >= 0
+        ]
+        if pts2:
+            entry["pts2"] = [[i, round(float(v), 2)] for i, v in pts2]
+        out["pats"].append(entry)
+    return out
+
+
+def write_chart_mini(code: str, payload: dict) -> None:
+    d = config.CHART_DIR / "mini"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{code}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
 def write_chart(code: str, name: str, tf: dict[str, dict]) -> None:
     """종목 상세 차트 json v2. tf = {"d": payload, "w": payload, "m": payload}"""
     payload = {"code": code, "name": name, "tf": tf}
