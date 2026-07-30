@@ -197,7 +197,11 @@ def mini_payload(
     patterns: list | None = None,
     bars: int = config.CHART_MINI_BARS,
 ) -> dict:
-    """격자용 미니 차트. 종가 + 그 구간 패턴 좌표만.
+    """격자용 미니 차트.
+
+    두 가지를 같이 담는다.
+      c/pats — 라인 120봉 + 그 구간 패턴 좌표
+      d20    — 최근 20영업일 캔들(o/h/l/c)
 
     좌표는 날짜가 아니라 배열 인덱스로 넣는다 — 미니 차트는 시간축을 안 그리므로
     날짜 문자열(봉당 13바이트)이 순전히 낭비다.
@@ -205,6 +209,10 @@ def mini_payload(
     tail = ind.iloc[-bars:]
     offset = len(ind) - len(tail)
     out: dict = {"c": [int(v) for v in tail["close"]], "pats": []}
+
+    cd = ind.iloc[-config.CHART_MINI_CANDLES :]
+    if len(cd) >= 2:
+        out["d20"] = {k[0]: [int(v) for v in cd[k]] for k in ("open", "high", "low", "close")}
     for p in patterns or []:
         pts = [(int(i) - offset, price) for i, price in p.points]
         if not pts or pts[0][0] < 0:
