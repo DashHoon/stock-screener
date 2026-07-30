@@ -2,6 +2,15 @@
 .env
 .env.local
 
+# 계정 복구 코드·인증 백업. 2026-07-30, Vercel 복구 코드 파일이 이 public 저장소에
+# 94커밋에 걸쳐 노출됐다 (코드 재발급 + 이력 제거로 정리). 파일명이 무엇이든
+# 프로젝트 폴더에 두지 말 것 — 비밀번호 관리자에 보관한다.
+*recovery*code*
+*recovery-codes*
+*.p8
+*.pem
+*credentials*.json
+
 # python
 .venv/
 __pycache__/
@@ -28,3 +37,7 @@ web/out/
 # 마케팅 워크스페이스 — 별도 private 저장소로 관리한다 (블로그 소스 + 마케팅 전략 문서).
 # 이 저장소는 public이므로 여기에 커밋하지 않는다.
 kscreener-workspace/
+
+# 스킬·에이전트 작업 폴더 (중간 산출물). 추적 대상이 아닌데 등록이 안 돼 있어
+# git add -A 한 번에 올라갈 수 있었다.
+_workspace/
