@@ -51,6 +51,14 @@ export default async function RootLayout({
               "try{if(localStorage.getItem('theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}",
           }}
         />
+        {/* 애드센스 사이트 연결 코드. 심사 크롤러가 전 페이지에서 이 태그를 찾으므로
+            호스트로 걸러내지 않는다 (AdSlot·Analytics와 달리 조건 없이 넣는다).
+            게시자 ID는 공개값이라 코드에 둬도 된다. ads.txt에도 같은 ID가 들어간다. */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2039230424038768"
+          crossOrigin="anonymous"
+        />
       </head>
       <body>
         <header className="site-header">
