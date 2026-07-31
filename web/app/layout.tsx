@@ -89,6 +89,8 @@ export default async function RootLayout({
               <Link href="/stats">백테스트</Link>
               <Link href="/guide">지표 가이드</Link>
               {BLOG_ENABLED && <a href="/blog/">블로그</a>}
+              <Link href="/about">소개</Link>
+              <Link href="/contact">문의</Link>
               <Link href="/disclaimer">면책조항</Link>
               <Link href="/privacy">개인정보처리방침</Link>
             </nav>
