@@ -94,7 +94,6 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             if flag_ext_i is None and n - 1 > i:
                 seg = lows[i + 1 :] if bull else highs[i + 1 :]
                 flag_ext_i = int(np.argmin(seg) if bull else np.argmax(seg)) + i + 1
-            last_end[tag] = completed_at if completed_at is not None else i
 
             # 깃발(조정) 구간을 고점선·저점선 채널로 그린다. 예전처럼 깃대 시작~깃발
             # 저점을 잇는 꺾은선으로 그리면 대각선이 차트를 가로질러 캔들을 가린다.
@@ -122,6 +121,16 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
 
             pts_u = [(f0, float(up.at(f0))), (f1, float(up.at(f1)))]
             pts_l = [(f0, float(lo.at(f0))), (f1, float(lo.at(f1)))]
+            # 중복 방지 상태는 '완성된' 패턴으로만 갱신한다.
+            #
+            # 형성 중 후보로도 갱신하면 미래 참조가 된다: 형성 중은 데이터 끝에서만
+            # 나오므로, 어디까지 데이터가 있느냐에 따라 dedup 상태가 달라지고 그 뒤에
+            # 완성되는 플래그가 막히거나 통과한다. 즉 완성일 이후의 봉이 그날의 판정을
+            # 바꾼다 (2026-08-03 미래 참조 감사에서 실측: 041020 등 10건).
+            # 검증에서 탈락한 후보로 갱신하던 것도 같이 바로잡는다 — 위 continue들을
+            # 다 통과한 지금 시점에만 기록한다.
+            if completed_at is not None:
+                last_end[tag] = completed_at
             out.append(PatternHit(
                 kind="pat_flag_bull" if bull else "pat_flag_bear",
                 completed_at=completed_at,

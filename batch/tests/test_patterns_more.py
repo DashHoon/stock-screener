@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from batch.patterns import trend
 from batch.patterns.flag import detect_flags
@@ -211,3 +212,30 @@ def test_flag_rejects_deep_pullback():
     seq += [109.0] * 10
     df = _df(seq)
     assert [p for p in detect_flags(df) if p.kind == "pat_flag_bull" and p.completed_at] == []
+
+
+@pytest.mark.parametrize("seed", [0, 3, 25, 59, 61, 90])
+def test_flag_completion_does_not_depend_on_later_bars(seed):
+    """완성일 이후의 봉이 그날의 판정을 바꾸면 안 된다 (미래 참조 방지).
+
+    2026-08-03 감사에서 실제로 발생했던 결함: 중복 방지 상태(last_end)를 형성 중
+    후보와 검증 탈락 후보로도 갱신하는 바람에, 데이터가 어디까지 있느냐에 따라
+    같은 날의 플래그가 잡히기도 하고 안 잡히기도 했다. 백테스트가 "그날 진입"을
+    전제로 성과를 내므로, 실전에서 볼 수 없던 신호로 매매한 셈이 된다.
+
+    교과서 파형으로는 재현되지 않는다 — 두 후보가 중복 방지 간격 안에서 겹쳐야
+    드러나기 때문이다. 그래서 결함을 실제로 잡아낸 임의보행 시드를 고정해 쓴다
+    (수정 전 코드로 돌리면 이 6개 시드 전부 실패한다).
+    """
+    rng = np.random.default_rng(seed)
+    closes = list(100 * np.exp(np.cumsum(rng.normal(0.004, 0.035, 300))))
+
+    def completed(seq):
+        return {p.completed_at for p in detect_flags(_df(seq))
+                if p.kind.startswith("pat_flag") and p.completed_at is not None}
+
+    for t in sorted(completed(closes)):
+        # 완성일 그 자리에서 데이터를 끊고 다시 판정한다
+        assert t in completed(closes[: t + 1]), (
+            f"완성일 {t}의 플래그가 그날까지의 데이터로는 재현되지 않는다"
+        )
