@@ -53,10 +53,11 @@ export default async function RootLayout({
         />
         {/* 애드센스 사이트 연결 코드. 심사 크롤러가 전 페이지에서 이 태그를 찾으므로
             호스트로 걸러내지 않는다 (AdSlot·Analytics와 달리 조건 없이 넣는다).
-            게시자 ID는 공개값이라 코드에 둬도 된다. ads.txt에도 같은 ID가 들어간다. */}
+            게시자 ID는 공개값이라 코드에 둬도 된다. ads.txt에도 같은 ID가 들어간다.
+            2026-08-02 계정 교체: 첫 신청(2039…)이 중복으로 막혀 사업자 계정으로 다시 냈다. */}
         <script
           async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2039230424038768"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1050428593040750"
           crossOrigin="anonymous"
         />
       </head>
