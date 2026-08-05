@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import StockActions from "@/components/StockActions";
 import StockChart from "@/components/StockChart";
+import StockNews from "@/components/StockNews";
 import { listChartCodes, loadChart } from "@/lib/data";
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagKey } from "@/lib/types";
@@ -80,6 +81,8 @@ export default async function StockPage({
             .join(" · ")}
         </p>
       )}
+
+      <StockNews name={data.name} />
 
       <AdSlot id="stock-bottom" variant="banner" />
     </>
