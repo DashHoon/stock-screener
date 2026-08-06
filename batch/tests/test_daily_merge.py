@@ -80,3 +80,53 @@ def test_rebuild_one_preserves_cache_on_empty_fetch(tmp_path, monkeypatch):
 
     assert backfill.rebuild_one("DDD444") == 0
     assert pd.read_parquet(tmp_path / "DDD444.parquet").equals(df)
+
+
+class _FakeResp:
+    def __init__(self, items):
+        self._items = items
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {
+            "response": {
+                "body": {
+                    "totalCount": len(self._items),
+                    "items": {"item": self._items},
+                }
+            }
+        }
+
+
+def _item(code, name, o, h, l, c, vol):
+    return {"srtnCd": code, "itmsNm": name, "basDt": "20260805",
+            "mkp": str(o), "hipr": str(h), "lopr": str(l),
+            "clpr": str(c), "trqu": str(vol)}
+
+
+def test_fetch_day_keeps_no_trade_rows(monkeypatch):
+    """거래 없는 날(시·고·저가 0)도 종가로 채워 수집한다.
+
+    공공 API는 그날 거래가 없으면 시/고/저를 0으로, 종가만 전일값으로 준다.
+    예전에는 이 행을 통째로 버려 해당 종목이 갱신되지 않았다 — 2026-08-05 기준
+    146종목(한화·드림어스컴퍼니 등)이 여기 걸렸고, fdr(네이버)이 뒤에서 메워
+    드러나지 않다가 네이버 경로를 걷어내면서 표면화됐다.
+    """
+    items = [
+        _item("005930", "삼성전자", 254000, 254500, 244000, 246000, 22577128),
+        _item("000880", "한화", 0, 0, 0, 83800, 0),        # 거래 없음
+        _item("999999", "상장폐지", 0, 0, 0, 0, 0),          # 종가까지 0 → 버린다
+    ]
+    monkeypatch.setenv("DATA_GO_KR_API_KEY", "dummy")
+    monkeypatch.setattr(daily.requests, "get", lambda *a, **k: _FakeResp(items))
+
+    df = daily.fetch_day("20260805")
+    got = {r["code"]: r for r in df.to_dict("records")}
+
+    assert set(got) == {"005930", "000880"}, "종가까지 0인 행만 버려야 한다"
+    hanwha = got["000880"]
+    assert hanwha["open"] == hanwha["high"] == hanwha["low"] == 83800
+    assert hanwha["volume"] == 0
+    assert got["005930"]["open"] == 254000  # 정상 거래일은 그대로

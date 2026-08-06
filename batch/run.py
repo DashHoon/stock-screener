@@ -34,67 +34,56 @@ from batch.sectors import ETC
 log = logging.getLogger("batch")
 
 
-def repair_gaps(codes: list[str], target_date: str) -> None:
+def repair_gaps(codes: list[str], target_date: str, empty_only: bool = False) -> None:
     """캐시가 없거나 target_date보다 뒤처진 종목을 fdr로 백필한다.
 
     첫 실행(빈 캐시) 부트스트랩과, 수집 실패로 생긴 공백 보정을 겸한다.
     공공 API는 하루치만 주므로 과거 구간은 여기서 채워야 한다.
+
+    empty_only=True면 '캐시가 아예 없는' 종목만 채운다 (신규 상장·첫 실행).
+    하루 이틀 뒤처진 정도는 건드리지 않는다 — 일별 갱신을 fdr로 메우려 들면
+    전 종목을 네이버에서 받게 되고, 그 경로가 막히면 배치가 통째로 실패한다
+    (2026-08-03 CI 실패). 뒤처진 구간은 다음 공공 API 수집에서 따라잡는다.
     """
     stale = []
     for code in codes:
         cached = backfill.load_cached(code)
-        if cached is None or len(cached) == 0 or cached["date"].iloc[-1] < target_date:
+        if cached is None or len(cached) == 0:
+            stale.append(code)
+        elif not empty_only and cached["date"].iloc[-1] < target_date:
             stale.append(code)
     if stale:
-        log.info("캐시 없음/공백 %d종목 → fdr 백필", len(stale))
+        log.info("캐시 없음%s %d종목 → fdr 백필",
+                 "" if empty_only else "/공백", len(stale))
         backfill.update_all(stale)
 
 
-def market_latest_date() -> str | None:
-    """실제 최신 거래일(코스피 지수 기준). 공공 API가 늦을 때 기준일로 쓴다.
-
-    공공 API는 하루 지연에 더해 갱신이 늦어 전일치가 아직 안 올라올 때가 있다.
-    그 경우에도 지수(fdr)는 최신 거래일을 갖고 있으므로, 이를 기준으로 삼아
-    뒤처진 종목을 fdr로 채운다. 조회 실패 시 None(공공 API 기준 그대로).
-    """
-    try:
-        import FinanceDataReader as fdr
-
-        from batch.collector.backfill import latest_complete_date
-
-        start = (dt.date.today() - dt.timedelta(days=10)).isoformat()
-        df = fdr.DataReader("KS11", start)
-        if df is None or df.empty:
-            return None
-        complete = latest_complete_date()  # 장중이면 어제, 마감 후면 오늘까지
-        dates = [d for d in (str(x)[:10] for x in df.index) if d <= complete]
-        return dates[-1] if dates else None
-    except Exception:
-        log.exception("시장 최신 거래일 조회 실패")
-        return None
-
-
 def collect(codes: list[str]) -> None:
-    """일별 수집. 공공 API 우선, 실패/키 없음이면 fdr 증분 갱신.
+    """일별 수집 — 공공데이터포털 하나만 쓴다.
 
-    공공 API가 최신 거래일을 아직 안 올렸으면(지수보다 뒤처지면) 그 차이만큼
-    fdr 증분으로 보완한다 — repair_gaps 기준일을 지수 최신일까지 끌어올린다.
+    2026-08-06 변경. 예전에는 공공 API가 지수(fdr)보다 뒤처지면 그 차이를 fdr로
+    메웠는데, fdr은 네이버 차트 서버를 긁는다. 해외 IP인 GitHub 러너에서 대량으로
+    막혀 배치가 통째로 실패했다(2026-08-03). 없는 데이터를 무리하게 채우기보다
+    그날 수집을 건너뛰고 다음 슬롯을 기다리는 편이 낫다 — 사이트는 원래
+    '전일 기준'이라 하루 늦어도 표시가 모순되지 않는다.
+
+    fdr은 두 곳에만 남긴다: 캐시가 아예 없는 종목(신규 상장·첫 실행)과
+    주 1회 전체 재백필(--rebuild-all, 수정주가 정합성).
     """
-    if daily.api_key():
-        # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일)
-        for back in range(1, 6):
-            bas_dt = (dt.date.today() - dt.timedelta(days=back)).strftime("%Y%m%d")
-            day = daily.fetch_day(bas_dt)
-            if not day.empty:
-                daily.merge_into_cache(day)
-                # 공공 API가 지수보다 뒤처지면 지수 최신일까지 fdr로 채운다
-                target = max(day["date"].max(), market_latest_date() or "")
-                repair_gaps(codes, target)
-                return
-        log.warning("공공 API 최근 5일 데이터 없음 — fdr 폴백")
-    else:
-        log.info("DATA_GO_KR_API_KEY 없음 — FinanceDataReader 증분 갱신")
-    backfill.update_all(codes)
+    if not daily.api_key():
+        log.warning("DATA_GO_KR_API_KEY 없음 — 일별 수집 건너뜀")
+        return
+
+    # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일)
+    for back in range(1, 6):
+        bas_dt = (dt.date.today() - dt.timedelta(days=back)).strftime("%Y%m%d")
+        day = daily.fetch_day(bas_dt)
+        if not day.empty:
+            daily.merge_into_cache(day)
+            repair_gaps(codes, day["date"].max(), empty_only=True)
+            return
+    # 연휴이거나 포털 갱신이 늦은 경우. 계산은 기존 캐시로 그대로 진행한다.
+    log.warning("공공 API 최근 5일 데이터 없음 — 이번 회차 수집 없음")
 
 
 def compute_and_write(stocks) -> dict:

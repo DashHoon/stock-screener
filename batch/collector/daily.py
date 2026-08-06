@@ -80,6 +80,15 @@ def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
             "volume": pd.to_numeric(df["trqu"]),
         }
     )
+    # 거래가 없던 날은 시/고/저가 0으로 오고 종가만 채워진다 (거래량 0).
+    # 그 행을 버리면 해당 종목이 그날 갱신되지 않는다 — 2026-08-05 기준 146종목이
+    # 이에 해당했고(한화·드림어스컴퍼니 등), 지금까지는 fdr(네이버)이 뒤에서 메워
+    # 드러나지 않았다. 네이버 경로를 걷어내면서 표면화됐다.
+    # 종가로 시/고/저를 채운다 — 거래 없는 날의 표준 표기이며 지표 계산도 이걸 쓴다.
+    no_trade = (out[["open", "high", "low"]] == 0).all(axis=1) & (out["close"] > 0)
+    for c in ("open", "high", "low"):
+        out.loc[no_trade, c] = out.loc[no_trade, "close"]
+    # 종가까지 0인 행만 버린다 (상장폐지·데이터 결손)
     out = out[(out[["open", "high", "low", "close"]] != 0).all(axis=1)]
     for c in ["open", "high", "low", "close", "volume"]:
         out[c] = out[c].astype("int64")
