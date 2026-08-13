@@ -46,8 +46,8 @@ function weightedChange(items: StockSignal[]): number | null {
   return w > 0 ? sum / w : null;
 }
 
-function pctText(p: number | null): string {
-  return p == null ? "-" : `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+function pctText(p: number | null, digits = 2): string {
+  return p == null ? "-" : `${p > 0 ? "+" : ""}${p.toFixed(digits)}%`;
 }
 
 function stockNode(s: StockSignal): Node {
@@ -197,7 +197,9 @@ export default function SectorMap({
                   title={`${g.item.label} ${pctText(g.item.change)}`}
                 >
                   <span className="tm-group-name">{g.item.label}</span>
-                  <span className="tm-group-pct">{pctText(g.item.change)}</span>
+                  {/* 섹터가 36개로 늘며 머리글이 좁아졌다. 소수점 두 자리를 두면
+                      이름이 밀려 잘린다 — 섹터 등락률에 0.01%는 의미도 없다. */}
+                  <span className="tm-group-pct">{pctText(g.item.change, 1)}</span>
                 </Link>
                 <div className="tm-group-body" style={{ top: HEAD_H }}>
                   {inner.map((t) => (

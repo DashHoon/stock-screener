@@ -70,7 +70,12 @@ def fetch_stock_master() -> pd.DataFrame:
             "change_pct": df["ChagesRatio"].astype(float).round(2),
             "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
             "industry": df["Industry"],   # 위 try/except 양쪽에서 항상 채워진다
-            "sector": df["Industry"].map(sector_of),
+            # 종목코드도 넘긴다 — 공식 업종이 실제 사업과 어긋나는 종목은
+            # sectors.OVERRIDE가 코드로 잡아준다 (삼성전자→반도체 등)
+            "sector": [
+                sector_of(ind, code)
+                for ind, code in zip(df["Industry"], df["Code"], strict=True)
+            ],
         }
     )
     out = out.sort_values("marcap", ascending=False).reset_index(drop=True)
