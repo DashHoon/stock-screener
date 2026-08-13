@@ -1,6 +1,7 @@
 """일별 병합의 급변 감지(수정주가 의심) 로직 검증."""
 
 import pandas as pd
+import requests
 import pytest
 
 from batch import config
@@ -130,3 +131,42 @@ def test_fetch_day_keeps_no_trade_rows(monkeypatch):
     assert hanwha["open"] == hanwha["high"] == hanwha["low"] == 83800
     assert hanwha["volume"] == 0
     assert got["005930"]["open"] == 254000  # 정상 거래일은 그대로
+
+
+def test_fetch_day_retries_on_connection_error(monkeypatch):
+    """접속 실패는 물러서며 재시도한다.
+
+    2026-08-13 #63·#64가 여기서 죽었다. 포털이 간헐적으로 접속을 안 받는데
+    재시도가 없어 한 번 끊길 때마다 배치 전체가 exit 1로 끝났다.
+    """
+    calls = {"n": 0}
+    items = [_item("005930", "삼성전자", 100, 110, 90, 105, 1000)]
+
+    def flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] < 3:               # 두 번 끊기고 세 번째에 성공
+            raise requests.ConnectTimeout("timed out")
+        return _FakeResp(items)
+
+    monkeypatch.setenv("DATA_GO_KR_API_KEY", "dummy")
+    monkeypatch.setattr(daily.requests, "get", flaky)
+    monkeypatch.setattr(daily.time, "sleep", lambda s: None)   # 테스트에서 실제로 기다리지 않는다
+
+    df = daily.fetch_day("20260812")
+    assert calls["n"] == 3
+    assert list(df["code"]) == ["005930"]
+
+
+def test_collect_survives_api_outage(monkeypatch):
+    """재시도를 다 써도 실패하면 수집만 포기하고 계산은 이어간다.
+
+    예외가 올라가면 계산·산출까지 죽어 그날 배포가 통째로 없어진다.
+    """
+    from batch import run as run_mod
+
+    monkeypatch.setattr(run_mod.daily, "api_key", lambda: "dummy")
+    def boom(*a, **k):
+        raise requests.ConnectTimeout("timed out")
+    monkeypatch.setattr(run_mod.daily, "fetch_day", boom)
+
+    run_mod.collect(["005930"])   # 예외가 새어 나오면 테스트 실패

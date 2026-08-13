@@ -9,6 +9,7 @@ run.py는 FinanceDataReader 증분 갱신으로 폴백한다.
 
 import logging
 import os
+import time
 
 import pandas as pd
 import requests
@@ -23,10 +24,40 @@ BASE_URL = (
     "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo"
 )
 PAGE_SIZE = 1000
+# 포털이 간헐적으로 접속을 안 받는다. GitHub 러너(해외 IP)에서 특히 잦고,
+# 한 번 끊길 때마다 배치가 통째로 죽었다 (2026-08-13 #63·#64 연속 실패:
+# ConnectTimeout, 51초 만에 exit 1). 페이지 단위로 재시도한다.
+FETCH_RETRIES = 4
+FETCH_BACKOFF = 5  # 초. 5 → 10 → 20 으로 늘려 가며 기다린다
 
 
 def api_key() -> str | None:
     return os.environ.get("DATA_GO_KR_API_KEY") or None
+
+
+def _get_page(params: dict, timeout: int) -> dict:
+    """한 페이지를 받아 body를 돌려준다. 접속 실패는 물러서며 재시도한다.
+
+    끝까지 실패하면 마지막 예외를 그대로 올린다 — 호출부(fetch_day)가 잡아서
+    '그날 수집 없음'으로 넘긴다. 없는 데이터를 억지로 만드는 것보다 낫다.
+    """
+    last: Exception | None = None
+    for attempt in range(FETCH_RETRIES):
+        try:
+            resp = requests.get(BASE_URL, params=params, timeout=timeout)
+            resp.raise_for_status()
+            return resp.json()["response"]["body"]
+        except (requests.RequestException, ValueError, KeyError) as e:
+            last = e
+            if attempt == FETCH_RETRIES - 1:
+                break
+            wait = FETCH_BACKOFF * (2**attempt)
+            log.warning(
+                "공공 API 응답 실패 (%d/%d) — %ds 후 재시도: %s",
+                attempt + 1, FETCH_RETRIES, wait, type(e).__name__,
+            )
+            time.sleep(wait)
+    raise last  # type: ignore[misc]
 
 
 def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
@@ -41,19 +72,16 @@ def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
     rows: list[dict] = []
     page = 1
     while True:
-        resp = requests.get(
-            BASE_URL,
-            params={
+        body = _get_page(
+            {
                 "serviceKey": key,
                 "resultType": "json",
                 "numOfRows": PAGE_SIZE,
                 "pageNo": page,
                 "basDt": bas_dt,
             },
-            timeout=timeout,
+            timeout,
         )
-        resp.raise_for_status()
-        body = resp.json()["response"]["body"]
         total = int(body.get("totalCount", 0))
         items = body.get("items") or {}
         chunk = items.get("item") or []

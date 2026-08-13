@@ -77,7 +77,14 @@ def collect(codes: list[str]) -> None:
     # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일)
     for back in range(1, 6):
         bas_dt = (dt.date.today() - dt.timedelta(days=back)).strftime("%Y%m%d")
-        day = daily.fetch_day(bas_dt)
+        try:
+            day = daily.fetch_day(bas_dt)
+        except Exception:
+            # 포털 접속 실패(재시도 소진). 여기서 예외를 올리면 계산·산출까지
+            # 통째로 죽어 그날 배포가 없어진다 (2026-08-13 #63·#64). 수집만
+            # 포기하고 기존 캐시로 계산을 이어간다 — 다음 슬롯이 따라잡는다.
+            log.exception("공공 API 수집 실패 (basDt=%s) — 이번 회차 수집 없음", bas_dt)
+            return
         if not day.empty:
             daily.merge_into_cache(day)
             repair_gaps(codes, day["date"].max(), empty_only=True)
