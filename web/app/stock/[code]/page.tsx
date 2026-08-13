@@ -3,10 +3,9 @@ import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import StockActions from "@/components/StockActions";
 import StockChart from "@/components/StockChart";
+import StockFacts from "@/components/StockFacts";
 import StockNews from "@/components/StockNews";
 import { listChartCodes, loadChart } from "@/lib/data";
-import { FLAG_BY_KEY } from "@/lib/flags";
-import type { FlagKey } from "@/lib/types";
 
 export const dynamicParams = false;
 
@@ -43,7 +42,6 @@ export default async function StockPage({
   const changePct = prev ? ((close / prev - 1) * 100).toFixed(2) : null;
   const up = close >= prev;
 
-  const recentDivs = daily.divergences.slice(-3).reverse();
   const isIndex = /^[A-Za-z]/.test(data.code); // 지수(KS11/KQ11)는 코드가 문자로 시작
 
   return (
@@ -68,19 +66,12 @@ export default async function StockPage({
 
       <StockChart data={data} />
 
-      <AdSlot id="stock-mid" variant="rect" />
+      {/* 차트는 캔버스라 값이 픽셀로만 남는다. 같은 값을 표로 한 벌 더 둔다 —
+          검색엔진·화면 읽기 프로그램이 읽을 수 있고, 모바일에서 차트를 확대하지
+          않고도 현재 값을 확인할 수 있다. */}
+      <StockFacts data={data} />
 
-      {recentDivs.length > 0 && (
-        <p className="notice">
-          최근 다이버전스:{" "}
-          {recentDivs
-            .map(
-              (d) =>
-                `${FLAG_BY_KEY.get(d.kind as FlagKey)?.label ?? d.kind} (${d.date_from} → ${d.date_to})`,
-            )
-            .join(" · ")}
-        </p>
-      )}
+      <AdSlot id="stock-mid" variant="rect" />
 
       <StockNews name={data.name} />
 
