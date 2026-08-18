@@ -242,6 +242,21 @@ def write_chart_mini(code: str, payload: dict) -> None:
     )
 
 
+def write_sector_chart(slug: str, name: str, tf: dict[str, dict]) -> None:
+    """업종 지수 차트. 종목 차트와 같은 형식이지만 chart/sector/ 아래에 둔다.
+
+    chart/ 바로 아래에 두면 listChartCodes가 종목으로 착각해 /stock/{slug}
+    페이지가 생긴다. 업종 지수는 /map/{slug}에서만 쓴다.
+    """
+    d = config.CHART_DIR / "sector"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{slug}.json").write_text(
+        json.dumps({"code": slug, "name": name, "tf": tf},
+                   ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
 def write_chart(code: str, name: str, tf: dict[str, dict]) -> None:
     """종목 상세 차트 json v2. tf = {"d": payload, "w": payload, "m": payload}"""
     payload = {"code": code, "name": name, "tf": tf}

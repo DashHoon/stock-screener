@@ -34,3 +34,18 @@ export async function listChartCodes(): Promise<string[]> {
     return [];
   }
 }
+
+/** 업종 지수 차트 (chart/sector/{slug}.json).
+ *  종목 차트와 같은 형식이지만 별도 폴더에 둔다 — chart/ 바로 아래 두면
+ *  listChartCodes가 종목으로 착각해 /stock/{slug} 페이지가 생긴다. */
+export async function loadSectorChart(slug: string): Promise<ChartData | null> {
+  try {
+    const buf = await fs.readFile(
+      path.join(DATA_DIR, "chart", "sector", `${slug}.json`),
+      "utf-8",
+    );
+    return JSON.parse(buf) as ChartData;
+  } catch {
+    return null;
+  }
+}

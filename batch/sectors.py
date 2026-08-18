@@ -352,3 +352,26 @@ def sector_of(industry: str | None, code: str | None = None) -> str:
     if not industry:
         return ETC
     return SECTOR_OF.get(industry.strip(), ETC)
+
+
+# URL 슬러그 — web/lib/sectors.ts의 SLUG와 반드시 같은 값을 쓴다.
+# (배치가 chart/sector/{slug}.json을 쓰고, 웹의 /map/{slug}가 그걸 읽는다)
+SLUG: dict[str, str] = {
+    "반도체": "semiconductor", "반도체 장비": "semi-equipment",
+    "전자부품": "electronic-parts", "디스플레이": "display",
+    "통신장비": "telecom-equipment", "전기장비": "electrical",
+    "2차전지": "battery", "자동차·부품": "auto", "기계": "machinery",
+    "조선": "shipbuilding", "방산항공": "defense", "제약": "pharma",
+    "바이오": "bio", "의료기기": "medical-device", "소프트웨어": "software",
+    "인터넷": "internet", "게임": "game", "기타금융·지주": "holding",
+    "보험": "insurance", "증권": "securities", "은행": "bank",
+    "화학": "chemical", "철강·금속": "steel", "시멘트": "cement",
+    "제지": "paper", "건설": "construction", "부동산": "realestate",
+    "유통": "retail", "섬유·의류": "textile", "생활용품": "household",
+    "식음료": "food", "통신서비스": "telecom", "미디어": "media",
+    "에너지": "energy", "운송": "transport", "기타": "etc",
+}
+
+
+def sector_slug(sector: str) -> str:
+    return SLUG.get(sector, "etc")

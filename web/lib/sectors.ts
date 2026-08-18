@@ -48,7 +48,7 @@ export type Sector = (typeof SECTOR_ORDER)[number];
 /** URL용 슬러그. 한글 URL은 인코딩되면 읽기 어려워 영문으로 고정한다. */
 const SLUG: Record<string, string> = {
   반도체: "semiconductor",
-  반도체장비: "semi-equipment",
+  "반도체 장비": "semi-equipment",
   전자부품: "electronic-parts",
   디스플레이: "display",
   통신장비: "telecom-equipment",

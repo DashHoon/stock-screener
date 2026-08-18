@@ -29,7 +29,7 @@ from batch.indicators.recent import compute_recent
 from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
 from batch.patterns import detect_all_patterns
-from batch.sectors import ETC
+from batch.sectors import ETC, sector_slug
 
 log = logging.getLogger("batch")
 
@@ -217,6 +217,52 @@ def compute_and_write(stocks) -> dict:
             writer.write_chart(sym, name, i_tf)
         except Exception:
             log.exception("지수 %s 차트 생성 실패", sym)
+
+    # 업종 지수 — 섹터별 시가총액 가중 지수를 만들어 종목과 같은 파이프라인에 태운다.
+    # 업종맵은 '오늘 얼마나 올랐나'만 보여준다. 몇 달째 오르는 중인지, 지금이
+    # 고점인지 바닥인지는 지수 시계열이 있어야 보인다.
+    from batch.sector_index import build_index
+    sec_written = 0
+    try:
+        members: dict[str, list] = {}
+        for e in entries:
+            cap, close = e.get("cap", -1), e.get("close") or 0
+            if cap <= 0 or close <= 0:
+                continue
+            # 시가총액(억원) ÷ 현재가 = 주식수. 이 값을 과거 종가에 곱해 지수를 만든다
+            members.setdefault(e.get("sec") or ETC, []).append(
+                (e["code"], cap * 1e8 / close)
+            )
+        for sec, mem in members.items():
+            if sec == ETC:
+                continue  # '기타'는 성격이 안 묶여 지수에 의미가 없다
+            rows = []
+            for code, shares in mem:
+                ohlcv = backfill.load_cached(code)
+                if ohlcv is not None and len(ohlcv) >= config.MIN_ROWS_FOR_INDICATORS:
+                    rows.append((code, shares, ohlcv))
+            idx = build_index(rows)
+            if idx is None:
+                continue
+            s_ind = compute_indicators(idx)
+            s_pats = detect_all_patterns(idx)
+            s_tf: dict[str, dict] = {}
+            for key, freq, bars in tf_specs:
+                if freq is None:
+                    ti, tp = s_ind, s_pats
+                else:
+                    rs = resample_ohlcv(idx, freq)
+                    if len(rs) < 30:
+                        continue
+                    ti, tp = compute_indicators(rs), None
+                te = detect_divergences(
+                    ti["high"].astype(float), ti["low"].astype(float), ti["rsi"]
+                )
+                s_tf[key] = writer.timeframe_payload(ti, te, bars, patterns=tp)
+            writer.write_sector_chart(sector_slug(sec), sec, s_tf)
+            sec_written += 1
+    except Exception:
+        log.exception("업종 지수 생성 실패")
 
     # 최신 거래일 데이터가 없는(거래정지 등) 종목은 스크리너에서 제외하지 않고 그대로 둔다.
     writer.write_latest(latest_date, entries, indices)
