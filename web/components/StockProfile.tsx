@@ -66,10 +66,9 @@ export default function StockProfile({ data }: { data: ChartData }) {
 
   return (
     <section className="profile">
-      <h2>
-        {data.name}
-        {eunNeun(data.name)} 어떤 회사인가
-      </h2>
+      {/* 조사를 붙여 쓴다 — JSX에서 줄을 나누면 사이에 공백이 들어가
+          '삼성전자 는'이 된다 (2026-08-18 라이브에서 실측) */}
+      <h2>{`${data.name}${eunNeun(data.name)} 어떤 회사인가`}</h2>
       <table className="profile-table">
         <tbody>
           {rows.map(([k, v]) => (
