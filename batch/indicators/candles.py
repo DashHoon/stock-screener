@@ -10,6 +10,15 @@
 - cdl_doji                          : 도지 (몸통이 극소, 변동폭은 유의미)
 - cdl_pierce / cdl_darkcloud        : 관통형 / 흑운형 (전봉 몸통 절반 회복/침범)
 - cdl_morning / cdl_evening         : 샛별형 / 저녁별형 (3봉 반전)
+- cdl_hanging                       : 교수형 (상승 후, 긴 아래꼬리 — 망치와 같은 모양·다른 위치)
+- cdl_inv_hammer                    : 역망치형 (하락 후, 긴 위꼬리 — 유성과 같은 모양·다른 위치)
+- cdl_harami_bull / cdl_harami_bear : 상승/하락 잉태형 (전봉 몸통 안에 오늘 작은 몸통)
+- cdl_3soldiers / cdl_3crows        : 적삼병 / 흑삼병 (같은 색 큰 봉 3연속, 계단식)
+- cdl_tweezer_bottom / _top         : 족집게 바닥 / 천장 (이틀 저가·고가가 같은 수준)
+- cdl_wick_top                      : 긴 윗꼬리 반복 (고점권에서 매도 압력이 되풀이)
+
+정의는 StockCharts ChartSchool의 캔들 항목을 기준으로 삼았다 (지표 검증 때와 같은
+출처). 위꼬리·아래꼬리 배수, 직전 추세 요구, 몸통 포함 관계가 거기 정의를 따른다.
 """
 
 import numpy as np
@@ -21,6 +30,15 @@ MIN_RANGE_PCT = 1.5    # 꼬리형(망치/유성)의 최소 변동폭
 DOJI_RANGE_PCT = 2.5   # 도지의 최소 변동폭 (더 엄격 — 흔한 잡음 컷)
 DOJI_BODY_FRAC = 0.05  # 도지 몸통 ≤ 변동폭의 5%
 TREND_BARS = 5         # 직전 추세 판정 봉 수
+TWEEZER_TOL = 0.1      # 족집게: 두 저가(고가) 차이 ≤ 변동폭의 10%
+
+# 긴 윗꼬리 반복 (cdl_wick_top)
+WICK_BODY_X = 1.5       # 위꼬리 ≥ 몸통의 1.5배
+WICK_RANGE_FRAC = 0.40  # 위꼬리 ≥ 변동폭의 40%
+WICK_VOL_X = 1.0        # 거래량 ≥ 20일 평균 (없으면 매도 압력이 아니라 그냥 한산한 것)
+WICK_NEAR_HIGH = 0.90   # 최근 60봉 고가의 90% 이상 구간에서만
+WICK_WIN = 10           # 창
+WICK_NEED = 3           # 창 안에 이만큼 나오면 '반복'으로 본다
 
 
 def detect_candles(ind: pd.DataFrame) -> dict[str, list[int]]:
@@ -115,6 +133,79 @@ def detect_candles(ind: pd.DataFrame) -> dict[str, list[int]]:
     res["cdl_evening"] = (
         ut2 & bull2 & big2 & small1 & bear
         & (body_pct >= MIN_BODY_PCT) & (c < mid2)
+    )
+
+    # 교수형: 망치와 같은 모양인데 상승 후에 나온다 (위치가 의미를 바꾼다)
+    res["cdl_hanging"] = (
+        uptrend & (rng_pct >= MIN_RANGE_PCT)
+        & (lower >= 2 * body) & (upper <= body) & (body > 0)
+    )
+    # 역망치형: 유성과 같은 모양인데 하락 후에 나온다
+    res["cdl_inv_hammer"] = (
+        downtrend & (rng_pct >= MIN_RANGE_PCT)
+        & (upper >= 2 * body) & (lower <= body) & (body > 0)
+    )
+
+    # 잉태형(harami): 전봉이 큰 몸통, 오늘 몸통이 그 안에 완전히 들어가고 색이 반대.
+    # 장악형의 반대 구조다 — 장악은 오늘이 어제를 삼키고, 잉태는 어제가 오늘을 품는다.
+    hi1, lo1 = np.maximum(o1, c1), np.minimum(o1, c1)
+    inside = (np.maximum(o, c) <= hi1) & (np.minimum(o, c) >= lo1)
+    harami_core = (sh(body_pct) >= MIN_BODY_PCT) & inside & (body < 0.5 * body1)
+    res["cdl_harami_bull"] = harami_core & bear1 & bull & downtrend
+    res["cdl_harami_bear"] = harami_core & bull1 & bear & uptrend
+
+    # 적삼병/흑삼병: 같은 색 큰 봉 3연속 + 계단식 전진.
+    # 시가가 전봉 몸통 안에서 열리고 종가가 전봉 종가를 넘어야 한다 (candlescanner 정의).
+    o2b, c2b = sh(o, 2), sh(c, 2)
+    big0 = body_pct >= MIN_BODY_PCT
+    big1 = sh(body_pct) >= MIN_BODY_PCT
+    big2b = sh(body_pct, 2) >= MIN_BODY_PCT
+    bull2b = sh(bull.astype(float), 2) == 1
+    bear2b = sh(bear.astype(float), 2) == 1
+    res["cdl_3soldiers"] = (
+        bull & bull1 & bull2b & big0 & big1 & big2b
+        & (c > c1) & (c1 > c2b)
+        & (o <= c1) & (o >= o1) & (o1 <= c2b) & (o1 >= o2b)
+    )
+    res["cdl_3crows"] = (
+        bear & bear1 & bear2b & big0 & big1 & big2b
+        & (c < c1) & (c1 < c2b)
+        & (o >= c1) & (o <= o1) & (o1 >= c2b) & (o1 <= o2b)
+    )
+
+    # 족집게: 이틀 저가(고가)가 사실상 같은 수준. 지지·저항이 확인된 자리다.
+    h1, l1 = sh(h), sh(l)
+    same_low = np.abs(l - l1) <= TWEEZER_TOL * np.maximum(rng, 1e-9)
+    same_high = np.abs(h - h1) <= TWEEZER_TOL * np.maximum(rng, 1e-9)
+    res["cdl_tweezer_bottom"] = (
+        downtrend & same_low & (rng_pct >= MIN_RANGE_PCT) & bear1 & bull
+    )
+    res["cdl_tweezer_top"] = (
+        uptrend & same_high & (rng_pct >= MIN_RANGE_PCT) & bull1 & bear
+    )
+
+    # 긴 윗꼬리 반복 — 오를 때마다 위에서 눌리는 일이 되풀이되는 상태.
+    #
+    # 봉 하나로는 유성형이 이미 잡는다. 여기서 보는 건 '반복'이다. 다이버전스처럼
+    # 되풀이 자체가 신호인 종류라 창(WICK_WIN) 안의 횟수로 판정한다.
+    #
+    # 거래량 조건을 넣는다 — 거래량 없이 생긴 윗꼬리는 매도 압력이 아니라 그냥
+    # 거래가 없어 생긴 매물대다 (2026-08-18 조사).
+    vol = ind["volume"].astype(float).to_numpy()
+    vol_ma = pd.Series(vol).rolling(20, min_periods=10).mean().to_numpy()
+    wick_bar = (
+        (rng > 0)
+        & (upper >= WICK_BODY_X * np.maximum(body, 1e-9))
+        & (upper >= WICK_RANGE_FRAC * rng)
+        & (rng_pct >= MIN_RANGE_PCT)
+        & (vol >= WICK_VOL_X * np.nan_to_num(vol_ma, nan=np.inf))
+    )
+    # 고점권에서만 의미가 있다 — 바닥에서 나오는 윗꼬리는 반등 시도다
+    roll_high = pd.Series(h).rolling(60, min_periods=20).max().to_numpy()
+    near_high = c >= WICK_NEAR_HIGH * np.nan_to_num(roll_high, nan=np.inf)
+    cnt = pd.Series(wick_bar.astype(int)).rolling(WICK_WIN).sum().to_numpy()
+    res["cdl_wick_top"] = (
+        wick_bar & near_high & (np.nan_to_num(cnt) >= WICK_NEED)
     )
 
     return {
