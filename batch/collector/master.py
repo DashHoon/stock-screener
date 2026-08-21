@@ -41,9 +41,14 @@ def fetch_stock_master() -> pd.DataFrame:
 
     raw = fdr.StockListing("KRX")
     df = raw[raw["MarketId"].isin(MARKETS)].copy()
-    # 업종(통계청 산업분류)은 KRX 목록에 없고 KRX-DESC에만 있다 → code로 조인
+    # 업종(통계청 산업분류)은 KRX 목록에 없고 KRX-DESC에만 있다 → code로 조인.
+    # 같은 호출에 회사 개요(주요제품·상장일·대표자·홈페이지·지역)도 들어 있다 —
+    # 종목 페이지의 '어떤 회사인가'는 이 값들로 만든다. 따로 받을 필요가 없다.
     try:
-        d = fdr.StockListing("KRX-DESC")[["Code", "Industry"]]
+        d = fdr.StockListing("KRX-DESC")[
+            ["Code", "Industry", "Products", "ListingDate",
+             "Representative", "HomePage", "Region"]
+        ]
         df = df.merge(d, on="Code", how="left")
     except Exception:
         # 업종만 실패한 것이므로 시세 마스터까지 버리지는 않는다. 대신 마지막으로
@@ -56,6 +61,8 @@ def fetch_stock_master() -> pd.DataFrame:
             f"캐시 업종 {len(prev)}종목으로 폴백" if prev is not None else "캐시도 없어 미상 처리",
         )
         df["Industry"] = df["Code"].map(prev) if prev is not None else None
+        for c in ("Products", "ListingDate", "Representative", "HomePage", "Region"):
+            df[c] = None
     df = df[~df["Name"].str.contains("스팩", na=False)]
     df = df[df["Code"].str.endswith("0")]  # 우선주 제외 (5·7·9 등으로 끝남)
 
@@ -70,6 +77,12 @@ def fetch_stock_master() -> pd.DataFrame:
             "change_pct": df["ChagesRatio"].astype(float).round(2),
             "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
             "industry": df["Industry"],   # 위 try/except 양쪽에서 항상 채워진다
+            # 회사 개요 (종목 페이지) — 전부 KRX 상장법인 공시 정보다
+            "products": df["Products"],
+            "listing_date": df["ListingDate"],
+            "ceo": df["Representative"],
+            "homepage": df["HomePage"],
+            "region": df["Region"],
             # 종목코드도 넘긴다 — 공식 업종이 실제 사업과 어긋나는 종목은
             # sectors.OVERRIDE가 코드로 잡아준다 (삼성전자→반도체 등)
             "sector": [

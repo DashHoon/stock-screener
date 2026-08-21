@@ -5,6 +5,7 @@ import StockActions from "@/components/StockActions";
 import StockChart from "@/components/StockChart";
 import StockFacts from "@/components/StockFacts";
 import StockNews from "@/components/StockNews";
+import StockProfile from "@/components/StockProfile";
 import { listChartCodes, loadChart } from "@/lib/data";
 
 export const dynamicParams = false;
@@ -65,6 +66,9 @@ export default async function StockPage({
       </div>
 
       <StockChart data={data} />
+
+      {/* 어떤 회사인가 — KRX 공시 정보 (주요제품·상장일·대표자 등) */}
+      <StockProfile data={data} />
 
       {/* 차트는 캔버스라 값이 픽셀로만 남는다. 같은 값을 표로 한 벌 더 둔다 —
           검색엔진·화면 읽기 프로그램이 읽을 수 있고, 모바일에서 차트를 확대하지

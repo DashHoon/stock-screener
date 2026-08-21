@@ -174,7 +174,26 @@ def compute_and_write(stocks) -> dict:
                     patterns=chart_patterns if key == "d" else None,
                     candles=detect_candles(ind) if key == "d" else None,
                 )
-            writer.write_chart(row.code, row.name, tf)
+            def _s(v) -> str:
+                t = str(v or "").strip()
+                return "" if t in ("nan", "NaT", "None") else t
+
+            profile = {
+                k: v
+                for k, v in {
+                    "products": _s(getattr(row, "products", "")),
+                    "industry": _s(getattr(row, "industry", "")),
+                    "sector": _s(getattr(row, "sector", "")),
+                    "market": _s(getattr(row, "market", "")),
+                    "listed": _s(getattr(row, "listing_date", ""))[:10],
+                    "ceo": _s(getattr(row, "ceo", "")),
+                    "homepage": _s(getattr(row, "homepage", "")),
+                    "region": _s(getattr(row, "region", "")),
+                    "cap": int(getattr(row, "marcap", -1)),
+                }.items()
+                if v not in ("", -1)
+            }
+            writer.write_chart(row.code, row.name, tf, profile)
             writer.write_chart_mini(row.code, writer.mini_payload(ind, chart_patterns))
             if writer.write_chart_archive(row.code, writer.archive_payload(ind, hot_from)):
                 arc_written += 1

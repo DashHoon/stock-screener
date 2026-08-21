@@ -159,8 +159,22 @@ export interface TimeframeData {
 
 export type TimeframeKey = "d" | "w" | "m";
 
+/** 종목 개요 (KRX 상장법인 공시 정보). 배치가 chart/{code}.json에 함께 싣는다. */
+export interface StockProfileData {
+  products?: string;   // 주요 제품·사업
+  industry?: string;   // 통계청 업종명
+  sector?: string;     // 우리 섹터 대분류
+  market?: string;     // KOSPI | KOSDAQ
+  listed?: string;     // 상장일 YYYY-MM-DD
+  ceo?: string;
+  homepage?: string;
+  region?: string;
+  cap?: number;        // 시가총액(억원)
+}
+
 export interface ChartData {
   code: string;
   name: string;
   tf: Partial<Record<TimeframeKey, TimeframeData>> & { d: TimeframeData };
+  profile?: StockProfileData;
 }
