@@ -70,6 +70,16 @@ def bollinger(
     )
 
 
+def disparity(close: pd.Series, period: int) -> pd.Series:
+    """이격도 = 종가 / N일 단순이동평균 * 100.
+
+    100이 이평선과 같은 자리. 110이면 10% 위, 90이면 10% 아래다.
+    ma120_gap과 계산은 같지만 기준이 다르다(0 vs 100) — 국내 HTS 관행을 따른다.
+    """
+    ma = close.rolling(period).mean()
+    return (close / ma * 100).where(ma > 0)
+
+
 def compute_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     """OHLCV DataFrame(date, open..volume)에 지표 컬럼을 붙여 돌려준다."""
     df = ohlcv.reset_index(drop=True).copy()
@@ -82,4 +92,6 @@ def compute_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     df["vol_ratio20"] = (vol / vol_ma20).where(vol_ma20 > 0)  # 20일 평균 대비 거래량 배수
     ma120 = close.rolling(120).mean()
     df["ma120_gap"] = (close / ma120 - 1) * 100  # 120일선 대비 이격 % (양수=추세 위)
+    for n in config.DISPARITY_MAS:
+        df[f"disp{n}"] = disparity(close, n)
     return df

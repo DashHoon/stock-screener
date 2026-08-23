@@ -42,6 +42,13 @@ def stock_entry(
         "sec": sector,    # 투자자용 섹터 대분류 (업종맵 1단계)
         "sig": sig,
         "rsi": _round(last["rsi"], 1),
+        # 이격도는 범위로 거르는 값이라 플래그가 아니라 숫자 그대로 싣는다.
+        # 상장 초기라 이평선이 안 잡히면 null.
+        "disp": {
+            f"d{n}": _round(last.get(f"disp{n}"), 1)
+            for n in config.DISPARITY_SEARCH_MAS
+            if pd.notna(last.get(f"disp{n}"))
+        },
         "m": [int(x) for x in ind["close"].iloc[-20:]],  # 최근 20봉 스파크라인
     }
 
@@ -142,6 +149,15 @@ def timeframe_payload(
         "bb_lower": col("bb_lower"),
         "divergences": divs,
     }
+    # 이격도 — 차트에 패널로 그린다. 검색에 쓰는 20·60일만 싣는다.
+    # 4개를 다 실으면 종목당 14KB가 늘어난다(95KB → 109KB). 앱이 스와이프마다
+    # 받는 파일이라 선 두 개면 충분하다고 봤다.
+    for n in config.DISPARITY_SEARCH_MAS:
+        key = f"disp{n}"
+        if key in tail:
+            vals = col(key, 1)
+            if any(v is not None for v in vals):
+                out[key] = vals
     if cdl:
         out["candles"] = cdl
     return out

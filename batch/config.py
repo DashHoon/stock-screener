@@ -30,6 +30,11 @@ MACD_SLOW = 26
 MACD_SIGNAL = 9
 
 # --- 볼린저밴드 ---
+# 이격도 = 종가 / N일 이동평균 * 100. 100이면 이평선 위에 딱 붙어 있다는 뜻.
+# 20일(단기)·60일(중기)이 국내에서 가장 많이 쓰인다. 5·120은 차트 표시용.
+DISPARITY_MAS = (5, 20, 60, 120)
+DISPARITY_SEARCH_MAS = (20, 60)   # 검색에 노출하는 것 (latest.json에 싣는다)
+
 BB_PERIOD = 20
 BB_STD = 2
 BB_SQUEEZE_WINDOW = 120     # 밴드폭이 최근 N일 최저 수준이면 스퀴즈
