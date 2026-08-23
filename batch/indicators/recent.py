@@ -52,6 +52,13 @@ def compute_recent(
         "bb_lower_touch": _last_true(ind["low"] <= ind["bb_lower"], n),
         "bb_squeeze": _last_true(squeeze, n),
     }
+    # 이격도 과열/침체 — RSI 과매수/과매도와 같은 상태형 시그널.
+    for ma, (high, low) in config.DISPARITY_BANDS.items():
+        col = ind.get(f"disp{ma}")
+        if col is None:
+            continue
+        candidates[f"disp{ma}_high"] = _last_true(col >= high, n)
+        candidates[f"disp{ma}_low"] = _last_true(col <= low, n)
     for kind in ("div_reg_bull", "div_reg_bear", "div_hid_bull", "div_hid_bear"):
         candidates[kind] = _last_index(
             [e.confirmed_at for e in div_events if e.kind == kind], n
