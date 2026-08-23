@@ -15,6 +15,11 @@ export type FlagKey =
   | "bb_upper_touch"
   | "bb_lower_touch"
   | "bb_squeeze"
+  // 이격도 과열/침체 (배치 config.DISPARITY_BANDS)
+  | "disp20_high"
+  | "disp20_low"
+  | "disp60_high"
+  | "disp60_low"
   | "pat_double_bottom"
   | "pat_double_bottom_form"
   | "pat_double_top"

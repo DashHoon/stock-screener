@@ -12,6 +12,13 @@ cd "$(dirname "$0")/.."
 # [중요] 먼저 main을 origin에 push한다. 크론(daily-batch.yml)은 origin/main으로
 # data 브랜치를 다시 빌드하므로, 로컬 main 커밋을 origin에 안 올리면 밤 크론이
 # 옛 코드로 사이트를 덮어쓴다 (2026-07-25 발생). data만 push하면 이 사고가 난다.
+# [중요] push 전에 타입 검사부터. 2026-08-23에 flags.ts에 시그널을 추가하면서
+# types.ts의 FlagKey 유니온을 안 고쳤더니, data와 main은 올라갔는데 Vercel
+# 빌드가 실패해 사이트는 옛 데이터를 그대로 서빙했다. 겉으로는 배포 성공처럼
+# 보여서 알아채는 데 30분 걸렸다. tsc는 몇 초면 끝난다.
+echo "[0/4] 웹 타입 검사"
+(cd web && npx tsc --noEmit)
+
 echo "[0] main → origin push (크론이 최신 코드로 빌드하도록)"
 git push origin main
 
