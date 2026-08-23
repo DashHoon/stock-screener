@@ -21,6 +21,7 @@ import type { NextRequest } from "next/server";
 const PUBLIC_PREFIXES = [
   "/blog",        // 블로그 (수익·앱 홍보. 별도 서비스로 프록시된다)
   "/data",        // 앱이 읽는 JSON — 이게 막히면 앱이 첫날부터 안 돈다
+  "/api/news",    // 앱의 종목 뉴스. 막으면 앱에서 뉴스가 통째로 빈다
   "/guide",       // 지표 가이드 — 애드센스 심사가 보는 콘텐츠
   "/about",
   "/contact",
