@@ -411,6 +411,83 @@ const DIAGRAMS: Record<string, ReactElement> = {
       <Candle x={166} o={45} c={80} hi={42} lo={84} w={15} />
     </>
   ),
+  cdl_harami_bull: (
+    <>
+      <Trend dir="down" />
+      <Candle x={118} o={44} c={90} hi={40} lo={94} w={16} />
+      <Candle x={152} o={80} c={58} hi={54} lo={84} w={10} />
+      <Label x={104} y={112} t="앞 몸통 안에" />
+    </>
+  ),
+  cdl_harami_bear: (
+    <>
+      <Trend dir="up" />
+      <Candle x={118} o={90} c={44} hi={40} lo={94} w={16} />
+      <Candle x={152} o={58} c={80} hi={54} lo={84} w={10} />
+      <Label x={104} y={112} t="앞 몸통 안에" />
+    </>
+  ),
+  cdl_inv_hammer: (
+    <>
+      <Trend dir="down" />
+      <Candle x={110} o={64} c={72} hi={60} lo={80} faint />
+      <Candle x={150} o={88} c={82} hi={40} lo={92} />
+      <Label x={128} y={32} t="긴 위꼬리" />
+    </>
+  ),
+  cdl_hanging: (
+    <>
+      <Trend dir="up" />
+      <Candle x={110} o={72} c={64} hi={56} lo={76} faint />
+      <Candle x={150} o={44} c={50} hi={40} lo={92} />
+      <Label x={124} y={108} t="긴 아래꼬리" />
+    </>
+  ),
+  cdl_tweezer_bottom: (
+    <>
+      <Trend dir="down" />
+      <Candle x={118} o={52} c={84} hi={48} lo={96} w={15} />
+      <Candle x={152} o={84} c={56} hi={52} lo={96} w={15} />
+      <L d="M100 96 L176 96" c={MUTED} w={1.5} dash="3 3" />
+      <Label x={104} y={114} t="같은 저가" />
+    </>
+  ),
+  cdl_tweezer_top: (
+    <>
+      <Trend dir="up" />
+      <Candle x={118} o={84} c={52} hi={40} lo={88} w={15} />
+      <Candle x={152} o={56} c={86} hi={40} lo={90} w={15} />
+      <L d="M100 40 L176 40" c={MUTED} w={1.5} dash="3 3" />
+      <Label x={104} y={30} t="같은 고가" />
+    </>
+  ),
+  cdl_3soldiers: (
+    <>
+      <Trend dir="down" />
+      <Candle x={96} o={98} c={78} hi={74} lo={102} w={15} />
+      <Candle x={132} o={86} c={62} hi={58} lo={90} w={15} />
+      <Candle x={168} o={70} c={44} hi={40} lo={74} w={15} />
+    </>
+  ),
+  cdl_3crows: (
+    <>
+      <Trend dir="up" />
+      <Candle x={96} o={44} c={64} hi={40} lo={68} w={15} />
+      <Candle x={132} o={58} c={80} hi={54} lo={84} w={15} />
+      <Candle x={168} o={74} c={96} hi={70} lo={100} w={15} />
+    </>
+  ),
+  cdl_wick_top: (
+    <>
+      {/* 고점권에서 긴 위꼬리가 반복 — 오를 때마다 위에서 눌린다 */}
+      <L d="M40 44 L204 44" c={MUTED} w={1.5} dash="3 3" />
+      <Candle x={62} o={86} c={80} hi={50} lo={90} w={12} />
+      <Candle x={98} o={82} c={88} hi={46} lo={92} w={12} />
+      <Candle x={134} o={84} c={78} hi={48} lo={88} w={12} />
+      <Candle x={170} o={80} c={88} hi={46} lo={92} w={12} />
+      <Label x={54} y={114} t="위꼬리 반복 = 매도 압력" />
+    </>
+  ),
   // ── 다이버전스 ─────────────────────────
   div_reg_bull: (
     <Div
@@ -450,8 +527,13 @@ const DIAGRAMS: Record<string, ReactElement> = {
   ),
 };
 
-// 형성 중(_form) 키는 완성 패턴 도해를 재사용 (배치가 쓰는 전 종류 등록)
+// 도해를 공유하는 키. 형성 중(_form)은 완성 패턴 도해를, 연속 다이버전스는
+// 기본형 도해를 그대로 쓴다 — 모양은 같고 반복 횟수만 다르기 때문이다.
 const FORM_BASE: Record<string, string> = {
+  div_reg_bull_x3: "div_reg_bull",
+  div_reg_bear_x3: "div_reg_bear",
+  div_hid_bull_x3: "div_hid_bull",
+  div_hid_bear_x3: "div_hid_bear",
   pat_double_bottom_form: "pat_double_bottom",
   pat_double_top_form: "pat_double_top",
   pat_triple_bottom_form: "pat_triple_bottom",
