@@ -29,7 +29,7 @@
 애드핏은 유지한다. 애드센스는 블로그 쪽에 이미 태그 자리가 있고
 (`kscreener-blog/src/consts.ts`의 ADSENSE), 승인 후 `enabled: true`로 켠다.
 
-## 앱 (2026-08-23 착수, `app/`)
+## 앱 (2026-08-23 착수) — 저장소는 `../kscreener-app`
 
 Flutter. 골격은 섰고 실데이터로 돈다 — 시뮬레이터 iPhone 16e에서 확인.
 
@@ -51,11 +51,15 @@ Flutter. 골격은 섰고 실데이터로 돈다 — 시뮬레이터 iPhone 16e�
 - [ ] 스토어 등록
 
 주의
-- 시그널 정의가 `web/lib/flags.ts`와 `app/lib/models/signal.dart` 두 곳에 있다.
+- 앱은 **별도 저장소**다(`../kscreener-app`). 이 저장소가 공개라서 분리했다.
+- 시그널 정의가 `web/lib/flags.ts`와 앱의 `lib/models/signal.dart` 두 곳에 있다.
   한쪽만 고치면 앱 검색이 **조용히 빈 결과**를 낸다 (에러가 안 난다).
-  고친 뒤 `python3 app/tool/check_flag_parity.py`로 확인할 것
-- `app/`은 아직 로컬 커밋만. 이 저장소는 **공개**다 — 앱 소스를 여기 둘지
-  따로 뺄지 정하고 푸시할 것 👤
+  이 저장소의 flags.ts나 PatternDiagram.tsx를 고쳤으면 앱 저장소에서:
+  ```
+  python3 tool/check_flag_parity.py   # 키 대조
+  python3 tool/gen_diagrams.py        # 도해 다시 뽑기
+  ```
+- 앱 기획문서는 이 저장소에 남겨 뒀다 (APP_SPEC.md · APP_PLAN.md · APP_MONETIZE.md)
 
 ## A. 지금 해도 되는 것 (사이트 안 건드림)
 

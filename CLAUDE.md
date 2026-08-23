@@ -97,6 +97,22 @@ AWS는 이번 프로젝트에서 사용하지 않기로 결정함.
 4. **콘텐츠 페이지**: 지표 설명·시그널 해석 가이드 (애드센스 승인 대비, SEO)
 5. 광고 슬롯 컴포넌트를 레이아웃에 미리 확보 (초기: 카카오 애드핏 + 증권사 계좌개설 CPA 제휴 배너, 이후 애드센스 병행)
 
+## 모바일 앱 (별도 저장소)
+
+앱은 `../kscreener-app`에 있다 (Flutter, iOS/Android). 이 저장소는 **공개**라서
+분리했다. 앱은 이 저장소의 산출물을 받아 쓰는 소비자다:
+
+- 데이터: `kscreener.com/data`의 정적 JSON (배치가 만든 것)
+- 시그널 정의: `web/lib/flags.ts` → 앱의 `lib/models/signal.dart`로 옮겨 둠
+- 패턴 도해: `web/components/PatternDiagram.tsx` → 앱에서 스크립트로 변환
+
+**flags.ts나 PatternDiagram.tsx를 고치면 앱 쪽도 같이 고쳐야 한다.**
+키가 어긋나면 앱 검색이 에러 없이 빈 결과를 낸다. 앱 저장소에서
+`python3 tool/check_flag_parity.py`로 확인한다.
+
+기획·수익화·성능 문서는 이 저장소에 있다 (APP_SPEC.md, APP_PLAN.md,
+APP_MONETIZE.md).
+
 ## 구현 단계
 
 1. **Phase 1 — 배치 파이프라인**: 공공 API 수집 → 지표/플래그 계산 → JSON 산출. 로컬에서 검증 (백테스트: 알려진 다이버전스 사례로 판정 로직 확인)
