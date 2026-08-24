@@ -45,6 +45,17 @@ def build_events(ind: pd.DataFrame) -> dict[str, list[int]]:
         ),
     }
 
+    # 그물망은 며칠씩 이어지는 '상태'라 그대로는 진입 시점이 없다.
+    # 상태로 들어선 날(전환)을 이벤트로 잡는다.
+    for key, name in (("gmma_above", "gmma_up"), ("gmma_below", "gmma_down")):
+        col = ind.get(key)
+        if col is None:
+            events[name] = []
+            continue
+        cur = col.fillna(False).to_numpy().astype(bool)
+        prev = np.concatenate([[False], cur[:-1]])
+        events[name] = list(np.flatnonzero(cur & ~prev))
+
     divs = detect_divergences(
         ind["high"].astype(float), ind["low"].astype(float), ind["rsi"]
     )

@@ -46,6 +46,32 @@ STRATEGIES: list[dict] = [
         "universe": "large300",
         "desc": "대형주 쌍바닥 돌파를 거래량·추세로 확인.",
     },
+    # --- 그물망(GMMA) 2026-08-24 추가 ---
+    # 상태가 아니라 '상태로 들어선 날'을 진입점으로 본다. 정배열은 전 종목의
+    # 18.5%가 늘 해당하는 상태라, 그대로 두면 진입 시점이 정의되지 않는다.
+    {
+        "id": "gmma-up",
+        "name": "그물망 정배열 진입",
+        "trigger": "gmma_up",
+        "confirm": None,
+        "desc": "종가가 12개 이동평균선(단기 6·장기 6) 위로 모두 올라선 날 진입. 짧게 보든 길게 보든 평균보다 비싸진 첫날이다.",
+    },
+    {
+        "id": "gmma-up-large",
+        "name": "[대형주] 그물망 정배열 진입",
+        "trigger": "gmma_up",
+        "confirm": None,
+        "universe": "large300",
+        "desc": "같은 조건을 시총 상위 300 종목으로 한정. 다른 패턴 전략에서 대형주 한정이 결과를 갈랐던 적이 있어 같이 잰다.",
+    },
+    {
+        "id": "double-bottom-gmma",
+        "name": "쌍바닥 돌파 (그물망 위에서)",
+        "trigger": "pat_double_bottom",
+        "when": [["gmma_above", ">=", 1]],
+        "confirm": None,
+        "desc": "쌍바닥 돌파 중 이미 그물망 위(정배열)인 것만. 추세를 거스르지 않는 돌파만 남기면 달라지는지 본다.",
+    },
     {
         "id": "engulf-bull",
         "name": "상승 장악형 (하락 후)",
