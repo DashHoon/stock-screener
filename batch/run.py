@@ -26,7 +26,6 @@ from batch.indicators.core import compute_indicators
 from batch.indicators.divergence import detect_divergences
 from batch.indicators.flags import compute_flags
 from batch.indicators.recent import compute_recent
-from batch.indicators.resample import resample_ohlcv
 from batch.output import writer
 from batch.patterns import detect_all_patterns
 from batch.sectors import ETC, sector_slug
@@ -107,11 +106,7 @@ def compute_and_write(stocks) -> dict:
     hot_from = config.chart_hot_from()
     arc_written = 0
 
-    tf_specs = [  # (키, 리샘플 주기, 담을 봉 수)
-        ("d", None, config.CHART_DAILY_BARS),
-        ("w", "w", config.CHART_WEEKLY_BARS),
-        ("m", "m", config.CHART_MONTHLY_BARS),
-    ]
+    # 일봉만 만든다. 주봉·월봉은 앱이 쓰지 않으면서 파일의 58%를 차지했다.
 
     for row in stocks.itertuples():
         ohlcv = backfill.load_cached(row.code)
@@ -153,27 +148,20 @@ def compute_and_write(stocks) -> dict:
                 )
             )
 
-            tf: dict[str, dict] = {}
-            hot_bars = int((ind["date"].astype(str) >= hot_from).sum())
-            for key, freq, bars in tf_specs:
-                if freq is None:
-                    tf_ind, tf_events = ind, events
-                    bars = hot_bars or bars
-                else:
-                    resampled = resample_ohlcv(ohlcv, freq)
-                    if len(resampled) < 30:  # 지표 워밍업(RSI14+BB20)에 못 미치면 생략
-                        continue
-                    tf_ind = compute_indicators(resampled)
-                    tf_events = detect_divergences(
-                        tf_ind["high"].astype(float),
-                        tf_ind["low"].astype(float),
-                        tf_ind["rsi"],
-                    )
-                tf[key] = writer.timeframe_payload(
-                    tf_ind, tf_events, bars,
-                    patterns=chart_patterns if key == "d" else None,
-                    candles=detect_candles(ind) if key == "d" else None,
+            # 무료(1년)와 구독(2년) 두 벌. 같은 계산에서 자르는 길이만 다르다.
+            cdl = detect_candles(ind)
+            tf = {
+                "d": writer.timeframe_payload(
+                    ind, events, config.CHART_DAILY_BARS,
+                    patterns=chart_patterns, candles=cdl,
                 )
+            }
+            tf_pro = {
+                "d": writer.timeframe_payload(
+                    ind, events, config.CHART_DAILY_BARS_PRO,
+                    patterns=chart_patterns, candles=cdl,
+                )
+            }
             def _s(v) -> str:
                 t = str(v or "").strip()
                 return "" if t in ("nan", "NaT", "None") else t
@@ -194,6 +182,7 @@ def compute_and_write(stocks) -> dict:
                 if v not in ("", -1)
             }
             writer.write_chart(row.code, row.name, tf, profile)
+            writer.write_chart(row.code, row.name, tf_pro, profile, pro=True)
             writer.write_chart_mini(row.code, writer.mini_payload(ind, chart_patterns))
             if writer.write_chart_archive(row.code, writer.archive_payload(ind, hot_from)):
                 arc_written += 1
@@ -217,23 +206,22 @@ def compute_and_write(stocks) -> dict:
             i_ind = compute_indicators(iohlcv)
             _f, i_events = compute_flags(i_ind)
             i_pats = detect_all_patterns(iohlcv)  # 지수도 창 내 전체 이력
-            i_tf: dict[str, dict] = {}
-            for key, freq, bars in tf_specs:
-                if freq is None:
-                    ti, te, tp = i_ind, i_events, i_pats
-                else:
-                    rs = resample_ohlcv(iohlcv, freq)
-                    if len(rs) < 30:
-                        continue
-                    ti = compute_indicators(rs)
-                    te = detect_divergences(ti["high"].astype(float), ti["low"].astype(float), ti["rsi"])
-                    tp = None
-                i_tf[key] = writer.timeframe_payload(
-                    ti, te, bars,
-                    patterns=tp if freq is None else None,
-                    candles=detect_candles(i_ind) if freq is None else None,
+            i_cdl = detect_candles(i_ind)
+            for bars, pro in (
+                (config.CHART_DAILY_BARS, False),
+                (config.CHART_DAILY_BARS_PRO, True),
+            ):
+                writer.write_chart(
+                    sym,
+                    name,
+                    {
+                        "d": writer.timeframe_payload(
+                            i_ind, i_events, bars,
+                            patterns=i_pats, candles=i_cdl,
+                        )
+                    },
+                    pro=pro,
                 )
-            writer.write_chart(sym, name, i_tf)
         except Exception:
             log.exception("지수 %s 차트 생성 실패", sym)
 
@@ -265,20 +253,20 @@ def compute_and_write(stocks) -> dict:
                 continue
             s_ind = compute_indicators(idx)
             s_pats = detect_all_patterns(idx)
-            s_tf: dict[str, dict] = {}
-            for key, freq, bars in tf_specs:
-                if freq is None:
-                    ti, tp = s_ind, s_pats
-                else:
-                    rs = resample_ohlcv(idx, freq)
-                    if len(rs) < 30:
-                        continue
-                    ti, tp = compute_indicators(rs), None
-                te = detect_divergences(
-                    ti["high"].astype(float), ti["low"].astype(float), ti["rsi"]
-                )
-                s_tf[key] = writer.timeframe_payload(ti, te, bars, patterns=tp)
-            writer.write_sector_chart(sector_slug(sec), sec, s_tf)
+            s_div = detect_divergences(
+                s_ind["high"].astype(float), s_ind["low"].astype(float), s_ind["rsi"]
+            )
+            # 업종 지수는 한 벌만 만든다 — 목록에서 스치듯 보는 화면이고,
+            # 구독 여부로 나눌 만큼 무겁지 않다.
+            writer.write_sector_chart(
+                sector_slug(sec),
+                sec,
+                {
+                    "d": writer.timeframe_payload(
+                        s_ind, s_div, config.CHART_DAILY_BARS_PRO, patterns=s_pats
+                    )
+                },
+            )
             sec_written += 1
     except Exception:
         log.exception("업종 지수 생성 실패")

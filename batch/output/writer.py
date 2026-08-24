@@ -280,9 +280,17 @@ def write_sector_chart(slug: str, name: str, tf: dict[str, dict]) -> None:
 
 
 def write_chart(
-    code: str, name: str, tf: dict[str, dict], profile: dict | None = None
+    code: str,
+    name: str,
+    tf: dict[str, dict],
+    profile: dict | None = None,
+    pro: bool = False,
 ) -> None:
-    """종목 상세 차트 json v2. tf = {"d": payload, "w": payload, "m": payload}
+    """종목 상세 차트 json. tf = {"d": payload} — 일봉만.
+
+    무료는 chart/{code}.json(1년), 구독은 chart2y/{code}.json(2년).
+    한 파일에 2년을 담고 앱이 잘라 쓰게 하면, 무료 사용자도 2년치를 받게 돼
+    아끼는 뜻이 없어진다.
 
     profile은 '어떤 회사인가'를 보여주는 공시 정보(주요제품·상장일·대표자 등).
     별도 파일로 빼지 않는다 — 200바이트라 차트 파일에 얹는 편이 요청 하나를 던다.
@@ -290,8 +298,9 @@ def write_chart(
     payload = {"code": code, "name": name, "tf": tf}
     if profile:
         payload["profile"] = profile
-    config.CHART_DIR.mkdir(parents=True, exist_ok=True)
-    (config.CHART_DIR / f"{code}.json").write_text(
+    out = config.CHART_PRO_DIR if pro else config.CHART_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{code}.json").write_text(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
