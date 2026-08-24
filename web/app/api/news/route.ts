@@ -17,6 +17,16 @@ export const dynamic = "force-dynamic";
 const MAX_ITEMS = 8;
 const NAME_MAX = 40;
 
+/** 매크로 주제별 검색어. **질의문을 서버에 박아 둔다** — 앱이 임의 검색어를
+ *  넘기게 하면 이 함수가 아무 검색이나 대신 해 주는 통로가 된다.
+ *  주제 키는 batch/macro.py의 TOPICS와 같다. */
+const TOPIC_QUERY: Record<string, string> = {
+  rate: "(기준금리 OR 국채금리 OR 연준 OR 한국은행) (인상 OR 인하 OR 동결 OR 금리)",
+  inflation: "(소비자물가 OR 인플레이션 OR 물가상승률) (발표 OR 전망 OR 둔화 OR 상승)",
+  economy: "(경기침체 OR 경기둔화 OR 고용지표 OR 성장률) (미국 OR 한국 OR 전망)",
+  dollar: "(원달러 환율 OR 달러인덱스 OR 외국인 수급) (급등 OR 급락 OR 환율)",
+};
+
 interface NewsItem {
   title: string;
   source: string;
@@ -61,15 +71,26 @@ function parseItems(xml: string): NewsItem[] {
 }
 
 export async function GET(req: Request) {
-  const name = (new URL(req.url).searchParams.get("name") || "").trim();
-  if (!name || name.length > NAME_MAX) {
-    return NextResponse.json({ items: [] }, { status: 400 });
-  }
+  const params = new URL(req.url).searchParams;
+  const topic = (params.get("topic") || "").trim();
+  const name = (params.get("name") || "").trim();
 
   // 종목명만으로 찾으면 '대상'·'동원'처럼 흔한 낱말인 이름에서 엉뚱한 기사가 섞인다.
   // 증권 맥락 낱말을 함께 걸어 잡음을 줄인다 (완전히 없애지는 못한다 — 화면에
   // '직접 검색' 링크를 같이 두는 이유).
-  const q = `"${name}" (주가 OR 실적 OR 공시 OR 증권)`;
+  let q: string;
+  if (topic) {
+    const preset = TOPIC_QUERY[topic];
+    if (!preset) {
+      return NextResponse.json({ items: [] }, { status: 400 });
+    }
+    q = preset;
+  } else {
+    if (!name || name.length > NAME_MAX) {
+      return NextResponse.json({ items: [] }, { status: 400 });
+    }
+    q = `"${name}" (주가 OR 실적 OR 공시 OR 증권)`;
+  }
   const url =
     "https://news.google.com/rss/search?q=" +
     encodeURIComponent(q) +

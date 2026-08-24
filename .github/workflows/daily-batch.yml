@@ -85,6 +85,10 @@ jobs:
           else
             uv run python -m batch.run
           fi
+          # 매크로 지표(금리·물가·경기·달러). FRED는 미 연준 공개 데이터라
+          # 키가 필요 없다. 여기서 실패해도 나머지 산출물은 그대로 나가야 하므로
+          # 실패를 삼킨다 — 그 화면만 옛 값을 보여준다.
+          uv run python -m batch.macro || echo "매크로 수집 실패 — 이전 값 유지"
           # 백테스트 통계(공개 /stats) + 사용자 정의 백테스트용 클라이언트 데이터셋
           uv run python -m batch.backtest.run
           uv run python -m batch.backtest.dataset
