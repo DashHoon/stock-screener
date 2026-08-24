@@ -78,7 +78,15 @@ def _no_trade_days() -> set[str]:
         return set()
 
 
+# 포털이 잠깐 흔들려 빈 응답을 준 날을 휴장일로 굳혀 버리면 그 날은 영영
+# 비어 있게 된다. 충분히 지난 뒤에도 비어 있을 때만 휴장일로 적는다.
+NO_TRADE_CONFIRM_DAYS = 3
+
+
 def _remember_no_trade(day: str) -> None:
+    age = (dt.date.today() - dt.date.fromisoformat(day)).days
+    if age < NO_TRADE_CONFIRM_DAYS:
+        return   # 아직 갱신 중일 수 있다 — 다음 회차에 다시 물어본다
     days = _no_trade_days()
     days.add(day)
     NO_TRADE_PATH.parent.mkdir(parents=True, exist_ok=True)
