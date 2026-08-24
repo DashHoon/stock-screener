@@ -20,6 +20,9 @@ export type FlagKey =
   | "disp20_low"
   | "disp60_high"
   | "disp60_low"
+  // 그물망(GMMA) 정배열·역배열
+  | "gmma_above"
+  | "gmma_below"
   | "pat_double_bottom"
   | "pat_double_bottom_form"
   | "pat_double_top"

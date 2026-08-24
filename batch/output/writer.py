@@ -49,6 +49,12 @@ def stock_entry(
             for n in config.DISPARITY_SEARCH_MAS
             if pd.notna(last.get(f"disp{n}"))
         },
+        # 거래량과 전일 대비 배수. '거래량 급증순' 정렬에 쓴다.
+        # 20일 평균 대비가 아니라 전일 대비다 — 오늘 갑자기 늘었는지를 본다.
+        "vol": int(last["volume"]),
+        "vr": _round(
+            float(last["volume"]) / float(ind["volume"].iloc[-2]), 2
+        ) if len(ind) >= 2 and float(ind["volume"].iloc[-2]) > 0 else None,
         "m": [int(x) for x in ind["close"].iloc[-20:]],  # 최근 20봉 스파크라인
     }
 

@@ -80,6 +80,29 @@ def disparity(close: pd.Series, period: int) -> pd.Series:
     return (close / ma * 100).where(ma > 0)
 
 
+def gmma(close: pd.Series) -> pd.DataFrame:
+    """그물망 판정. columns: gmma_above, gmma_below
+
+    종가가 12개 지수이동평균 위에 전부 있으면 정배열, 전부 아래면 역배열.
+    둘 다 아니면 엇갈리는 구간이라 어느 쪽도 아니다.
+    """
+    periods = list(config.GMMA_SHORT) + list(config.GMMA_LONG)
+    lines = pd.DataFrame(
+        {p: close.ewm(span=p, adjust=False).mean() for p in periods}
+    )
+    # 가장 긴 선이 자리를 잡기 전 구간은 판정하지 않는다.
+    warm = pd.Series(close.index >= config.GMMA_MIN_BARS, index=close.index)
+    arr = lines.to_numpy()
+    c = close.to_numpy()[:, None]
+    return pd.DataFrame(
+        {
+            "gmma_above": (c > arr).all(axis=1) & warm.to_numpy(),
+            "gmma_below": (c < arr).all(axis=1) & warm.to_numpy(),
+        },
+        index=close.index,
+    )
+
+
 def compute_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     """OHLCV DataFrame(date, open..volume)에 지표 컬럼을 붙여 돌려준다."""
     df = ohlcv.reset_index(drop=True).copy()
@@ -94,4 +117,5 @@ def compute_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     df["ma120_gap"] = (close / ma120 - 1) * 100  # 120일선 대비 이격 % (양수=추세 위)
     for n in config.DISPARITY_MAS:
         df[f"disp{n}"] = disparity(close, n)
+    df = pd.concat([df, gmma(close)], axis=1)
     return df

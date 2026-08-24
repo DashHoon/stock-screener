@@ -52,6 +52,12 @@ def compute_recent(
         "bb_lower_touch": _last_true(ind["low"] <= ind["bb_lower"], n),
         "bb_squeeze": _last_true(squeeze, n),
     }
+    # 그물망 정배열/역배열 — 이벤트가 아니라 추세 상태다.
+    for key in ("gmma_above", "gmma_below"):
+        col = ind.get(key)
+        if col is not None:
+            candidates[key] = _last_true(col.astype(bool), n)
+
     # 이격도 과열/침체 — RSI 과매수/과매도와 같은 상태형 시그널.
     for ma, (high, low) in config.DISPARITY_BANDS.items():
         col = ind.get(f"disp{ma}")

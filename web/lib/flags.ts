@@ -63,6 +63,16 @@ export const FLAG_GROUPS: FlagGroup[] = [
     ],
   },
   {
+    // 그물망(GMMA) — 단기 6개·장기 6개 지수이동평균. 종가가 12개 선 위에
+    // 전부 있으면 정배열, 전부 아래면 역배열. 다른 시그널과 달리 '오늘 터진
+    // 사건'이 아니라 며칠씩 이어지는 상태다 (실측 정배열 24%, 역배열 33%).
+    name: "그물망",
+    flags: [
+      { key: "gmma_above", label: "그물망 위 (정배열)", short: "그물망 위", bullish: true, desc: "종가가 단기 6개·장기 6개 이동평균선 위에 모두 있는 상태입니다. 짧게 보든 길게 보든 평균보다 비싸다는 뜻이라 상승 추세로 봅니다. 한 번 나오면 며칠씩 이어지는 상태이고, 전체 종목의 4분의 1 정도가 여기 해당합니다." },
+      { key: "gmma_below", label: "그물망 아래 (역배열)", short: "그물망 아래", bullish: false, desc: "종가가 단기 6개·장기 6개 이동평균선 아래에 모두 있는 상태입니다. 짧게 보든 길게 보든 평균보다 싸다는 뜻이라 하락 추세로 봅니다. 한 번 나오면 며칠씩 이어지는 상태이고, 전체 종목의 3분의 1 정도가 여기 해당합니다." },
+    ],
+  },
+  {
     // 이격도 = 종가 / N일 이동평균 × 100. 교과서에 흔한 105/95는 국내 개별주에서
     // 20% 넘게 걸려 스크리닝이 안 된다. RSI 70/30이 약 5% 걸리는 것에 맞춰 잡았다
     // (600종목 22만 봉 실측: 20일 ≥115 4.9%·≤85 4.0%, 60일 ≥130 4.6%·≤75 5.2%).
@@ -135,30 +145,30 @@ export const FLAG_GROUPS: FlagGroup[] = [
   {
     name: "상승 패턴 형성 중",
     flags: [
-      { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_triple_bottom_form", label: "3중바닥 형성 중", short: "3중바닥形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_hs_inv_form", label: "역H&S 형성 중", short: "역H&S形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_cup_handle_form", label: "컵앤핸들 형성 중", short: "컵핸들形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_round_bottom_form", label: "라운드바텀 형성 중", short: "라운드바텀形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_wedge_fall_form", label: "하락쐐기 형성 중", short: "하락쐐기形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_bwedge_fall_form", label: "하락 확대쐐기 형성 중", short: "하락확대쐐기形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_tri_asc_form", label: "상승삼각형 형성 중", short: "상승삼각形", bullish: true, desc: FORMING_DESC },
-      { key: "pat_flag_bull_form", label: "상승 플래그 형성 중", short: "상승플래그形", bullish: true, desc: FORMING_DESC },
+      { key: "pat_double_bottom_form", label: "쌍바닥 형성 중", short: "쌍바닥 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_triple_bottom_form", label: "3중바닥 형성 중", short: "3중바닥 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_hs_inv_form", label: "역H&S 형성 중", short: "역H&S 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_cup_handle_form", label: "컵앤핸들 형성 중", short: "컵핸들 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_round_bottom_form", label: "라운드바텀 형성 중", short: "라운드바텀 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_wedge_fall_form", label: "하락쐐기 형성 중", short: "하락쐐기 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_bwedge_fall_form", label: "하락 확대쐐기 형성 중", short: "하락확대쐐기 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_tri_asc_form", label: "상승삼각형 형성 중", short: "상승삼각 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_flag_bull_form", label: "상승 플래그 형성 중", short: "상승플래그 형성중", bullish: true, desc: FORMING_DESC },
     ],
   },
   {
     name: "하락 패턴 형성 중",
     flags: [
-      { key: "pat_double_top_form", label: "더블탑 형성 중", short: "더블탑形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_triple_top_form", label: "트리플탑 형성 중", short: "트리플탑形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_hs_top_form", label: "H&S 형성 중", short: "H&S形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_round_top_form", label: "라운드탑 형성 중", short: "라운드탑形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_wedge_rise_form", label: "상승쐐기 형성 중", short: "상승쐐기形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_bwedge_rise_form", label: "상승 확대쐐기 형성 중", short: "상승확대쐐기形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_tri_desc_form", label: "하락삼각형 형성 중", short: "하락삼각形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_flag_bear_form", label: "하락 플래그 형성 중", short: "하락플래그形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_broadening_form", label: "브로드닝 형성 중", short: "브로드닝形", bullish: false, desc: FORMING_DESC },
-      { key: "pat_diamond_form", label: "다이아몬드 형성 중", short: "다이아몬드形", bullish: false, desc: FORMING_DESC },
+      { key: "pat_double_top_form", label: "더블탑 형성 중", short: "더블탑 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_triple_top_form", label: "트리플탑 형성 중", short: "트리플탑 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_hs_top_form", label: "H&S 형성 중", short: "H&S 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_round_top_form", label: "라운드탑 형성 중", short: "라운드탑 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_wedge_rise_form", label: "상승쐐기 형성 중", short: "상승쐐기 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_bwedge_rise_form", label: "상승 확대쐐기 형성 중", short: "상승확대쐐기 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_tri_desc_form", label: "하락삼각형 형성 중", short: "하락삼각 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_flag_bear_form", label: "하락 플래그 형성 중", short: "하락플래그 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_broadening_form", label: "브로드닝 형성 중", short: "브로드닝 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_diamond_form", label: "다이아몬드 형성 중", short: "다이아몬드 형성중", bullish: false, desc: FORMING_DESC },
     ],
   },
   {
@@ -166,7 +176,7 @@ export const FLAG_GROUPS: FlagGroup[] = [
     // 형성 중에는 어느 쪽도 아니므로 상승·하락 어디에도 넣지 않는다.
     name: "형성 중 (방향 미정)",
     flags: [
-      { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴形", bullish: null, desc: "대칭삼각형이 수렴 중인 상태입니다. 위로 뚫릴지 아래로 이탈할지는 아직 정해지지 않았습니다." },
+      { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴 형성중", bullish: null, desc: "대칭삼각형이 수렴 중인 상태입니다. 위로 뚫릴지 아래로 이탈할지는 아직 정해지지 않았습니다." },
     ],
   },
 ];
