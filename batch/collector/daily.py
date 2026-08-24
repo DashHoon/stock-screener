@@ -135,11 +135,18 @@ def is_discontinuous(prev_close: float, new_close: float) -> bool:
     return abs(new_close / prev_close - 1) * 100 >= config.REBUILD_JUMP_PCT
 
 
-def merge_into_cache(day: pd.DataFrame) -> int:
+def merge_into_cache(day: pd.DataFrame, historical: bool = False) -> int:
     """하루치 수집분을 종목별 parquet 캐시에 병합. 갱신한 종목 수를 돌려준다.
 
     전일 대비 비정상 급변 종목은 병합하지 않고 캐시를 통째로 재수집한다
     (기업행위로 과거 가격이 소급 수정됐을 가능성 — 섞어 붙이면 가짜 시그널 발생).
+
+    historical=True는 **이미 지난 날의 구멍을 메울 때** 쓴다. 두 가지가 달라진다:
+    - '캐시 마지막 날보다 새로운 것만' 규칙을 풀어 준다. 이 규칙 때문에 지난
+      날짜는 아무리 받아 와도 조용히 버려졌다 (2026-08-10·11·13·17·18·19가
+      그렇게 비어 있었다)
+    - 급변 검사를 건너뛴다. 지난 날의 종가를 '캐시의 마지막 종가'와 견주는 것은
+      비교 대상이 애초에 틀렸다 — 몇 주 차이가 나면 멀쩡한 값도 급변으로 잡힌다
     """
     updated = 0
     suspects: list[str] = []
@@ -147,11 +154,15 @@ def merge_into_cache(day: pd.DataFrame) -> int:
         cached = load_cached(code)
         if cached is None:
             continue  # 백필된 적 없는 종목(신규상장 등)은 다음 백필에서 처리
-        if g["date"].iloc[-1] <= cached["date"].iloc[-1]:
-            continue
-        if is_discontinuous(cached["close"].iloc[-1], g["close"].iloc[-1]):
-            suspects.append(code)
-            continue
+        if historical:
+            if g["date"].iloc[-1] in set(cached["date"]):
+                continue
+        else:
+            if g["date"].iloc[-1] <= cached["date"].iloc[-1]:
+                continue
+            if is_discontinuous(cached["close"].iloc[-1], g["close"].iloc[-1]):
+                suspects.append(code)
+                continue
         merged = (
             pd.concat([cached, g[cached.columns]])
             .drop_duplicates("date")

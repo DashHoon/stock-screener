@@ -13,6 +13,7 @@
 """
 
 import argparse
+import json
 import datetime as dt
 import logging
 import time
@@ -57,6 +58,92 @@ def repair_gaps(codes: list[str], target_date: str, empty_only: bool = False) ->
         backfill.update_all(stale)
 
 
+# 구멍 메우기 한도. 포털은 하루 1만 건 수준이고 하루치가 3페이지쯤 되니
+# 10일이면 30건 남짓 — 넉넉하다. 그래도 상한을 두는 건 긴 장애 뒤에
+# 한 회차가 과거를 끝없이 파고들지 않게 하기 위해서다.
+GAP_MAX_DAYS = 10
+GAP_LOOKBACK = 30       # 이보다 오래된 구멍은 주 1회 전체 재백필에 맡긴다
+GAP_REF_CODES = 25      # '가진 날짜'를 알아내는 데 쓸 표본 종목 수
+
+
+# 받아 봤더니 비어 있던 날(휴장일). 매 회차 다시 묻지 않으려고 적어 둔다 —
+# 없으면 대체공휴일 하나를 30일 내내 다시 물어보게 된다.
+NO_TRADE_PATH = config.DATA_DIR / "no_trade_days.json"
+
+
+def _no_trade_days() -> set[str]:
+    try:
+        return set(json.loads(NO_TRADE_PATH.read_text()))
+    except Exception:
+        return set()
+
+
+def _remember_no_trade(day: str) -> None:
+    days = _no_trade_days()
+    days.add(day)
+    NO_TRADE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    NO_TRADE_PATH.write_text(json.dumps(sorted(days)))
+
+
+def _cached_dates(codes: list[str]) -> set[str]:
+    """캐시가 어느 날짜를 갖고 있는지. 표본 몇 종목의 합집합으로 본다 —
+    하루치는 전 종목이 한꺼번에 들어오므로 표본으로 충분하다."""
+    have: set[str] = set()
+    seen = 0
+    for code in codes:
+        df = backfill.load_cached(code)
+        if df is None or df.empty:
+            continue
+        have |= set(df["date"].astype(str).tail(GAP_LOOKBACK * 2))
+        seen += 1
+        if seen >= GAP_REF_CODES:
+            break
+    return have
+
+
+def fill_gaps(codes: list[str], target_date: str) -> int:
+    """빠진 영업일을 공공 API로 메운다. 메운 날 수를 돌려준다.
+
+    collect()는 가장 최근 하루만 받는다. 배치가 며칠 돌지 못하면 그 사이
+    날짜는 영영 비어 있게 된다 — 실제로 2026-08-10·11·13·17·18·19 여섯 날이
+    그렇게 비었다. 차트에 이가 빠지고 지표도 그만큼 어긋난다.
+
+    휴장일인지 미수집인지는 받아 봐야 안다. 빈 응답이 오면 휴장일로 보고
+    넘어간다 (한 달 안에 몇 번 없어서 헛호출 부담이 작다).
+    """
+    have = _cached_dates(codes)
+    if not have:
+        return 0
+    have |= _no_trade_days()   # 휴장일로 확인된 날은 다시 묻지 않는다
+
+    target = dt.date.fromisoformat(target_date)
+    missing = [
+        d
+        for i in range(1, GAP_LOOKBACK + 1)
+        if (d := target - dt.timedelta(days=i)).weekday() < 5
+        and d.isoformat() not in have
+    ]
+    if not missing:
+        return 0
+
+    filled = 0
+    # 오래된 것부터 — 중간이 비면 지표 계산이 어긋나므로 앞쪽을 먼저 막는다.
+    for d in sorted(missing)[-GAP_MAX_DAYS:]:
+        try:
+            day = daily.fetch_day(d.strftime("%Y%m%d"))
+        except Exception:
+            log.warning("구멍 메우기 실패 %s — 다음 회차에 다시 시도", d)
+            break       # 포털이 흔들리는 중이면 더 두드리지 않는다
+        if day.empty:
+            _remember_no_trade(d.isoformat())   # 휴장일
+            continue
+        daily.merge_into_cache(day, historical=True)
+        filled += 1
+    if filled:
+        log.info("빠진 영업일 %d일 메움 (후보 %d일)", filled, len(missing))
+    return filled
+
+
 def collect(codes: list[str]) -> None:
     """일별 수집 — 공공데이터포털 하나만 쓴다.
 
@@ -87,6 +174,8 @@ def collect(codes: list[str]) -> None:
         if not day.empty:
             daily.merge_into_cache(day)
             repair_gaps(codes, day["date"].max(), empty_only=True)
+            # 최근 하루만 받고 끝내면 못 받은 날이 영영 남는다.
+            fill_gaps(codes, day["date"].max())
             return
     # 연휴이거나 포털 갱신이 늦은 경우. 계산은 기존 캐시로 그대로 진행한다.
     log.warning("공공 API 최근 5일 데이터 없음 — 이번 회차 수집 없음")
