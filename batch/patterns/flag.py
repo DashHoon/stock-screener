@@ -8,6 +8,8 @@
 import numpy as np
 import pandas as pd
 
+from batch import config
+
 from batch.patterns.util import PatternHit, fit_envelope_line
 
 POLE_BARS = 15
@@ -120,7 +122,12 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             # 깃발이 아니다. 선은 이탈 지점까지 연장해 '채널을 벗어나는 모습'을 보인다.
             fit_end = int(flag_ext_i) if flag_ext_i is not None else (
                 f1 - 1 if completed_at is not None else f1)
-            if fit_end - f0 < 2:
+            # 최소 기간은 '측정이 이루어진 구간'으로 잰다. 그리는 구간(f0~f1)은
+            # 이탈 지점까지 연장한 것이라, 그걸로 재면 실제로는 7봉만 맞춰 놓고
+            # 12봉짜리인 척하게 된다 (2026-08-25 코스닥 하락플래그가 그랬다 —
+            # 반등 7봉에 맞춘 가파른 선을 이탈까지 늘려, 실제 고점 971인 구간에
+            # 1188을 가리키는 선이 그려졌다).
+            if fit_end - f0 + 1 < config.PATTERN_MIN_BARS:
                 continue
             xs = list(range(f0, fit_end + 1))
             up = fit_envelope_line(xs, [float(highs[k]) for k in xs], upper=True)
@@ -134,8 +141,13 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             if not bull and mid_slope < -FLAG_COUNTER_EPS:
                 continue  # 하락플래그의 깃발이 계속 흘러내리면 반등이 아님
 
-            pts_u = [(f0, float(up.at(f0))), (f1, float(up.at(f1)))]
-            pts_l = [(f0, float(lo.at(f0))), (f1, float(lo.at(f1)))]
+            # 선은 맞춘 구간까지만 그린다. 예전에는 이탈 지점까지 늘려
+            # '채널을 벗어나는 모습'을 보이려 했는데, 반등 정점에 맞춰 잡힌
+            # 가파른 기울기를 늘리면 가격이 무너진 자리에 훨씬 위를 가리키는
+            # 선이 남는다 (실측: 고가 954인 봉에 1188을 가리켰다). 이탈은
+            # 넥라인 점선과 완성 표식이 이미 보여 준다.
+            pts_u = [(f0, float(up.at(f0))), (fit_end, float(up.at(fit_end)))]
+            pts_l = [(f0, float(lo.at(f0))), (fit_end, float(lo.at(fit_end)))]
             # 중복 방지 상태는 '완성된' 패턴으로만 갱신한다.
             #
             # 형성 중 후보로도 갱신하면 미래 참조가 된다: 형성 중은 데이터 끝에서만

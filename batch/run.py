@@ -109,6 +109,36 @@ def _cached_dates(codes: list[str]) -> set[str]:
     return have
 
 
+# 지수·업종 지수는 종목 목록에 없지만 정상 산출물이다.
+_KEEP_CHART_PREFIXES = ("KS11", "KQ11", "sector")
+
+
+def drop_orphan_charts(codes: set[str]) -> int:
+    """이번 회차에 쓰지 않은 차트 파일을 지운다.
+
+    데이터가 모자라 건너뛴 종목(skipped_short)이나 상장폐지 종목의 차트가
+    그대로 남아, 옛 규칙으로 만든 산출물이 계속 서빙됐다. 실측(2026-08-25):
+    시스웍 한 종목의 2021년 차트가 남아 있어, 폐지한 A/B/C 등급과 최소 기간을
+    못 지키는 패턴이 그 페이지에만 살아 있었다. 사이트도 이 디렉터리를 훑어
+    종목 페이지를 만들기 때문에 5년 묵은 페이지가 검색에 노출된다.
+
+    지우는 것은 배치가 매일 다시 만드는 산출물뿐이다 — 종목이 조건을 되찾으면
+    다음 회차에 그대로 생긴다.
+    """
+    dropped = 0
+    for d in (config.OUTPUT_DIR / "chart", config.CHART_PRO_DIR):
+        if not d.exists():
+            continue
+        for f in d.glob("*.json"):
+            code = f.name.split(".")[0]
+            if code in codes or code.startswith(_KEEP_CHART_PREFIXES):
+                continue
+            f.unlink()
+            dropped += 1
+            log.info("고아 차트 삭제: %s", f.relative_to(config.OUTPUT_DIR))
+    return dropped
+
+
 def fill_gaps(codes: list[str], target_date: str) -> int:
     """빠진 영업일을 공공 API로 메운다. 메운 날 수를 돌려준다.
 
@@ -371,10 +401,14 @@ def compute_and_write(stocks) -> dict:
 
     # 최신 거래일 데이터가 없는(거래정지 등) 종목은 스크리너에서 제외하지 않고 그대로 둔다.
     writer.write_latest(latest_date, entries, indices)
+    orphans = drop_orphan_charts({e["code"] for e in entries})
     return {
         "date": latest_date,
         "written": len(entries),
         "skipped_short": skipped,
+        # 이번에 안 쓴 옛 차트 파일. 0이 정상이고, 계속 잡히면 종목 마스터가
+        # 흔들리고 있다는 뜻이다.
+        "orphans_dropped": orphans,
         "stale_no_sig": stale,
         "failed": failed,
         # 아카이브는 확정된 과거라 평상시 0에 가까워야 정상. 매일 수천 개가 다시

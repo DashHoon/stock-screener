@@ -277,3 +277,29 @@ def test_no_pattern_shorter_than_minimum(seed):
     for p in pats:
         span = p.points[-1][0] - p.points[0][0] + 1
         assert span >= config.PATTERN_MIN_BARS, f"{p.kind}가 {span}봉으로 잡혔다"
+
+
+def test_flag_channel_line_stays_near_price():
+    """그려지는 채널선이 실제 가격에서 통째로 떨어져 나가면 안 된다.
+
+    2026-08-25 코스닥 하락플래그: 반등 7봉에만 선을 맞추고 그 가파른 기울기를
+    이탈 지점까지 늘려서, 실제 고점이 971인 구간에 1188을 가리키는 선이
+    그려졌다. 사용자에게는 '12봉 동안 30% 오른 깃발'로 보인다.
+    """
+    rng = np.random.default_rng(3)
+    for seed in range(40):
+        rng = np.random.default_rng(seed)
+        closes = list(1000 * np.exp(np.cumsum(rng.normal(-0.002, 0.03, 300))))
+        df = _df(closes)
+        hi = df["high"].to_numpy()
+        lo = df["low"].to_numpy()
+        for p in detect_flags(df):
+            for pts in (p.points, p.points2):
+                for i, v in pts:
+                    band = hi[: i + 1].max() - lo[: i + 1].min()
+                    # 선의 끝점이 그 시점까지의 고가·저가 범위를 크게 벗어나면
+                    # 채널이 아니라 허공을 가리키는 선이다.
+                    assert lo[i] - band * 0.5 <= v <= hi[i] + band * 0.5, (
+                        f"seed {seed}: {p.kind} 선이 가격에서 벗어났다 "
+                        f"(값 {v:.0f}, 그날 고 {hi[i]:.0f} 저 {lo[i]:.0f})"
+                    )
