@@ -2,6 +2,7 @@
 #
 # 사전 준비 (GitHub Secrets):
 #   DATA_GO_KR_API_KEY     — 공공데이터포털 인증키 (없으면 fdr 폴백으로도 동작)
+#   ECOS_API_KEY           — 한국은행 ECOS 인증키 (없으면 국내 매크로 계열만 빠짐)
 #   VERCEL_DEPLOY_HOOK_URL — Vercel 프로젝트의 Deploy Hook (Phase 3에서 등록)
 #
 # 데이터 커밋 전략: 산출 JSON(web/public/data)은 매일 덮어쓰며 data 브랜치에
@@ -74,6 +75,7 @@ jobs:
       - name: Run batch
         env:
           DATA_GO_KR_API_KEY: ${{ secrets.DATA_GO_KR_API_KEY }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
         run: |
           if [[ "$IS_WARMUP" == "true" ]]; then
             echo "워밍업 슬롯: 시세 수집만 (계산·배포 없음)"
@@ -86,8 +88,9 @@ jobs:
             uv run python -m batch.run
           fi
           # 매크로 지표(금리·물가·경기·달러). FRED는 미 연준 공개 데이터라
-          # 키가 필요 없다. 여기서 실패해도 나머지 산출물은 그대로 나가야 하므로
-          # 실패를 삼킨다 — 그 화면만 옛 값을 보여준다.
+          # 키가 필요 없고, 국내 계열만 ECOS_API_KEY를 쓴다. 여기서 실패해도
+          # 나머지 산출물은 그대로 나가야 하므로 실패를 삼킨다 — 그 화면만 옛 값을
+          # 보여준다.
           uv run python -m batch.macro || echo "매크로 수집 실패 — 이전 값 유지"
           # 백테스트 통계(공개 /stats) + 사용자 정의 백테스트용 클라이언트 데이터셋
           uv run python -m batch.backtest.run
