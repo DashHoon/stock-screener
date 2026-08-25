@@ -42,6 +42,14 @@ Flutter. 골격은 섰고 실데이터로 돈다 — 시뮬레이터 iPhone 16e�
 - [x] 이격도 — 배치 계산 + 범위 검색 + 차트 패널
 
 남은 것
+- [ ] 👤 **ECOS 키를 GitHub Secret으로 등록** — 로컬 `.env`에는 넣었고 워크플로
+      배선(`ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}`)도 돼 있지만, 저장소
+      시크릿이 비어 있으면 **밤 크론이 국내 매크로 5계열을 뺀 채로 사이트를
+      덮어쓴다** (수동 배포로 올린 국내 지표가 사라진다).
+      `gh` CLI가 안 깔려 있으므로 웹에서:
+      Settings → Secrets and variables → Actions → New repository secret,
+      이름 `ECOS_API_KEY`.
+      https://github.com/DashHoon/stock-screener/settings/secrets/actions
 - [ ] 👤 **이격도 배포** — 코드는 됐고 데이터만 남았다. `scripts/deploy_data.sh`를
       돌려야 앱이 이격도를 받는다 (그전까지 이격도 조건은 결과가 0건)
 - [ ] **실기기 성능 측정** — 지금 수치는 전부 시뮬레이터다. 시뮬레이터는
