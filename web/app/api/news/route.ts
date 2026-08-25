@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 
-/** 종목 뉴스 — 구글 뉴스 RSS를 서버에서 받아 JSON으로 돌려준다.
+/** 매크로 주제 뉴스 — 구글 뉴스 RSS를 서버에서 받아 JSON으로 돌려준다.
+ *
+ *  **종목 뉴스는 2026-08-25에 뺐다.** 앱이 네이버 금융 종목 페이지로 바로
+ *  나가게 했는데, 거기가 공시까지 함께 보여주고 국내 매체 위주라 우리보다
+ *  낫다. 우리 화면에는 '이름이 흔한 낱말이면 관련 없는 기사가 섞인다'는
+ *  안내까지 달려 있었다 — 같은 일을 더 못하는 방식으로 중복한 셈이다.
+ *  덤으로 임의 검색어를 받는 경로가 사라져, 이 함수가 아무 검색이나 대신
+ *  해 주는 통로가 될 걱정도 없어졌다.
+ *
+ *  주제 뉴스는 남긴다. 네이버 종목 페이지는 '금리 관련 기사'를 주지 않고,
+ *  매크로 지표 화면과 짝을 이룬다 (기준금리 값만 보여주고 왜 그런지 안
+ *  알려주면 반쪽이다). 검색어가 4개로 고정이라 CDN 적중률도 높다.
  *
  *  왜 서버를 거치나: 구글 뉴스 RSS에 CORS 헤더가 없어 브라우저에서 직접 못 받는다.
  *  Vercel 서버리스 함수는 호출될 때만 도는 방식이라 상시 가동 서버가 아니고
@@ -15,7 +26,10 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 const MAX_ITEMS = 8;
-const NAME_MAX = 40;
+// 구글은 관련도순으로 준다. 최신순으로 보여 주려면 넉넉히 받아 놓고
+// 날짜로 다시 세워야 한다 — 8건만 받아 정렬하면 '관련도 8건 중 최신'이라
+// 사흘 전 기사가 맨 위에 남는다.
+const FETCH_ITEMS = 30;
 
 /** 매크로 주제별 검색어. **질의문을 서버에 박아 둔다** — 앱이 임의 검색어를
  *  넘기게 하면 이 함수가 아무 검색이나 대신 해 주는 통로가 된다.
@@ -39,7 +53,7 @@ interface NewsItem {
 function parseItems(xml: string): NewsItem[] {
   const out: NewsItem[] = [];
   const blocks = xml.split("<item>").slice(1);
-  for (const b of blocks.slice(0, MAX_ITEMS)) {
+  for (const b of blocks.slice(0, FETCH_ITEMS)) {
     const pick = (tag: string) => {
       const m = b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
       if (!m) return "";
@@ -71,25 +85,10 @@ function parseItems(xml: string): NewsItem[] {
 }
 
 export async function GET(req: Request) {
-  const params = new URL(req.url).searchParams;
-  const topic = (params.get("topic") || "").trim();
-  const name = (params.get("name") || "").trim();
-
-  // 종목명만으로 찾으면 '대상'·'동원'처럼 흔한 낱말인 이름에서 엉뚱한 기사가 섞인다.
-  // 증권 맥락 낱말을 함께 걸어 잡음을 줄인다 (완전히 없애지는 못한다 — 화면에
-  // '직접 검색' 링크를 같이 두는 이유).
-  let q: string;
-  if (topic) {
-    const preset = TOPIC_QUERY[topic];
-    if (!preset) {
-      return NextResponse.json({ items: [] }, { status: 400 });
-    }
-    q = preset;
-  } else {
-    if (!name || name.length > NAME_MAX) {
-      return NextResponse.json({ items: [] }, { status: 400 });
-    }
-    q = `"${name}" (주가 OR 실적 OR 공시 OR 증권)`;
+  const topic = (new URL(req.url).searchParams.get("topic") || "").trim();
+  const q = TOPIC_QUERY[topic];
+  if (!q) {
+    return NextResponse.json({ items: [] }, { status: 400 });
   }
   async function search(query: string): Promise<NewsItem[]> {
     const url =
@@ -106,14 +105,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    let items = await search(q);
-    // 증권 맥락 낱말을 함께 걸면 거래가 뜸한 종목에서 아무것도 안 걸릴 수 있다.
-    // 그때는 이름만으로 한 번 더 찾는다 — 잡음이 섞이더라도 빈 화면보다 낫다.
-    if (items.length === 0 && !topic && name) {
-      items = await search(`"${name}"`);
-    }
+    const items = await search(q);
+    // 최신순. 날짜를 못 읽은 항목은 뒤로 보낸다.
+    items.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     return NextResponse.json(
-      { items },
+      { items: items.slice(0, MAX_ITEMS) },
       {
         headers: {
           // CDN에 30분 보관, 이후 1시간은 갱신하는 동안 옛 응답을 계속 내보낸다
