@@ -81,14 +81,16 @@ def disparity(close: pd.Series, period: int) -> pd.Series:
 
 
 def gmma(close: pd.Series) -> pd.DataFrame:
-    """그물망 판정. columns: gmma_above, gmma_below
+    """그물차트 판정. columns: gmma_above, gmma_below
 
-    종가가 12개 지수이동평균 위에 전부 있으면 정배열, 전부 아래면 역배열.
+    종가가 스무 개 이동평균선 위에 전부 있으면 정배열, 전부 아래면 역배열.
     둘 다 아니면 엇갈리는 구간이라 어느 쪽도 아니다.
+
+    국내 관행대로 **단순**이동평균을 쓴다. 화면에 그리는 선과 검색 판정이
+    다른 계산이면, 눈으로 정배열인데 검색에 안 걸리는 일이 생긴다.
     """
-    periods = list(config.GMMA_SHORT) + list(config.GMMA_LONG)
     lines = pd.DataFrame(
-        {p: close.ewm(span=p, adjust=False).mean() for p in periods}
+        {p: close.rolling(p).mean() for p in config.GMMA_PERIODS}
     )
     # 가장 긴 선이 자리를 잡기 전 구간은 판정하지 않는다.
     warm = pd.Series(close.index >= config.GMMA_MIN_BARS, index=close.index)
