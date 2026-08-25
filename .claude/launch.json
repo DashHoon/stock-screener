@@ -7,6 +7,13 @@
       "runtimeArgs": ["-c", "cd web && npm run dev -- --port 4700"],
       "port": 4700,
       "autoPort": false
+    },
+    {
+      "name": "blog",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", ". \"$HOME/.nvm/nvm.sh\" && nvm use 22 >/dev/null && cd kscreener-workspace/kscreener-blog && npm run dev -- --port 4321"],
+      "port": 4321,
+      "autoPort": false
     }
   ]
 }
