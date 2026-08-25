@@ -62,7 +62,7 @@ def render(code: str) -> None:
     for i, p in enumerate(sel):
         col = colors[i % 10]
         ax.plot([pt[0] for pt in p.points], [pt[1] for pt in p.points], color=col, lw=1.8,
-                label=f"{p.kind} [{p.grade}{p.shape}] "
+                label=f"{p.kind} [{p.shape}] "
                       f"{'done@' + str(p.completed_at) if p.completed_at is not None else 'forming'}")
         p2 = getattr(p, "points2", None)
         if p2:

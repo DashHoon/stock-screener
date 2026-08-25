@@ -52,7 +52,7 @@ def main() -> None:
         for p in pats:
             d = per_kind.setdefault(
                 p.kind, {"n": 0, "n_completed": 0, "n_forming": 0,
-                         "spans": [], "shapes": [], "grades": {"A": 0, "B": 0, "C": 0}},
+                         "spans": [], "shapes": []},
             )
             d["n"] += 1
             if p.completed_at is not None:
@@ -62,7 +62,6 @@ def main() -> None:
             if p.points:
                 d["spans"].append(int(p.points[-1][0]) - int(p.points[0][0]))
             d["shapes"].append(int(p.shape))
-            d["grades"][p.grade] = d["grades"].get(p.grade, 0) + 1
 
     def q(xs, pct):
         if not xs:
@@ -78,7 +77,6 @@ def main() -> None:
             "span_p90": q(d["spans"], 0.90),
             "shape_med": q(d["shapes"], 0.50),
             "shape_p35": q(d["shapes"], 0.35), "shape_p70": q(d["shapes"], 0.70),
-            "grades": d["grades"],
         }
     out = {
         "stocks": n_done,

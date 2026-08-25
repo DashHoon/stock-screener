@@ -43,8 +43,7 @@ class DoublePattern:
     completed_at: int | None  # 넥라인 돌파일 (None = 미완성)
     forming: bool        # 오늘 기준 '형성 중' 상태인가
     points: list         # [(idx, price), ...] 차트 마킹용 꺾은선 좌표
-    shape: int = 0       # 형태 신뢰도 (shape.grade_shapes가 채움)
-    grade: str = "C"
+    shape: int = 0       # 형태 신뢰도 (shape.score_shapes가 채움)
 
 
 def _detect_one_side(ctx: SwingCtx, *, bottom: bool) -> list[DoublePattern]:

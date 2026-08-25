@@ -113,7 +113,6 @@ def timeframe_payload(
             "kind": p.kind,
             "points": [[dates[i], round(float(v), 2)] for i, v in pts],
             "neckline": p.neckline,
-            "grade": getattr(p, "grade", "B"),   # 형태 신뢰도 A/B/C
             "shape": int(getattr(p, "shape", 0)),
             "completed_date": (
                 dates[p.completed_at - offset]
@@ -241,7 +240,6 @@ def mini_payload(
             continue  # 미니 창 밖에서 시작한 패턴은 그릴 수 없다
         entry: dict = {
             "k": p.kind,
-            "g": getattr(p, "grade", "B"),
             "pts": [[i, round(float(v), 2)] for i, v in pts],
         }
         pts2 = [

@@ -160,7 +160,7 @@ export default function StockFacts({ data }: { data: ChartData }) {
               <td>{pats.length}건</td>
               <td className="facts-note">
                 {pats
-                  .map((p) => `${label(p.kind)} ${p.completed_date} 완성 (${p.grade}등급)`)
+                  .map((p) => `${label(p.kind)} ${p.completed_date} 완성`)
                   .join(" · ")}
               </td>
             </tr>

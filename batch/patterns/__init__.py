@@ -6,13 +6,14 @@ kind, completed_at(None=미완성), forming, neckline, points[(idx, price)...]
 
 import pandas as pd
 
+from batch import config
 from batch.patterns.cup import detect_cup_handle
 from batch.patterns.diamond import detect_diamond
 from batch.patterns.double import detect_double_patterns
 from batch.patterns.flag import detect_flags
 from batch.patterns.multi import detect_head_shoulders, detect_triple
 from batch.patterns.round import detect_round
-from batch.patterns.shape import grade_shapes
+from batch.patterns.shape import score_shapes
 from batch.patterns.swing import build_ctx
 from batch.patterns.trend import detect_trendline_patterns
 
@@ -95,7 +96,10 @@ def detect_all_patterns(ohlcv: pd.DataFrame) -> list:
         + list(detect_flags(ohlcv))
         + list(detect_diamond(ohlcv, ctx))
     )
+    # 걸러내기는 병합보다 먼저 — 병합은 겹치는 후보 중 대표 1개를 고르므로,
+    # 탈락할 후보가 대표로 뽑히면 그 자리의 멀쩡한 형제까지 같이 사라진다.
+    pats = [p for p in pats if _span(p)[1] - _span(p)[0] + 1 >= config.PATTERN_MIN_BARS]
+    pats = score_shapes(ohlcv, pats)   # 형태 통과선 (차트·스크리너 공통 집합)
     pats = dedupe_patterns(pats)
-    grade_shapes(ohlcv, pats)  # 형태 신뢰도 등급 (차트·스크리너 공통)
     pats.sort(key=lambda p: p.completed_at if p.completed_at is not None else len(ohlcv))
     return pats

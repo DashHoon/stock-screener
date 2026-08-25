@@ -24,8 +24,7 @@ class PatternHit:
     points: list = field(default_factory=list)   # 시간 오름차순 꺾은선
     points2: list = field(default_factory=list)  # 보조선 (추세선 계열의 아래선 등)
     confirmed_at: int = 0
-    shape: int = 0          # 형태 신뢰도 0~100 (shape.grade_shapes가 채움)
-    grade: str = "C"        # A(뚜렷)/B(보통)/C(모호)
+    shape: int = 0          # 형태 신뢰도 0~100 (shape.score_shapes가 채움)
     # 형태 채점에 쓸 구조 구간 (시작, 끝). 추세선 계열은 선을 돌파 지점까지
     # 연장해 그리므로 points 범위로 채점하면 '돌파 대기 드리프트'가 점수를
     # 오염시킨다 — 채점은 이 구간으로 한정한다. None이면 points 범위 그대로.

@@ -18,47 +18,49 @@
 3. 돌출도 (prominence, 25점)
    넥라인 대비 패턴의 진폭이 충분한가. 진폭이 미미하면 잡음에 가깝다.
 
-등급: A(뚜렷) ≥ 70, B(보통) ≥ 50, C(모호) 미만.
+이 점수는 '통과선'으로만 쓴다 (SHAPE_MIN / SHAPE_CUTS).
+예전에는 A/B/C 3등급으로 나눠 C만 차트에서 숨겼는데, 스크리너는 C도 시그널로
+내보내 '검색에는 잡히는데 차트에는 안 그려지는' 불일치가 있었다. 2026-08-25에
+등급을 없애고 컷을 탐지 단계로 옮겼다 — 통과한 것만 패턴이고, 통과한 것끼리는
+동급이다. 차트와 스크리너가 같은 집합을 본다.
 """
 
 import numpy as np
 import pandas as pd
 
-SHAPE_A = 70   # 기준선이 없는 패턴의 기본 컷
-SHAPE_B = 50
+SHAPE_MIN = 50   # 종류별 기준선이 없는 패턴의 기본 통과선
 
-# 종류별 등급 기준선 (B컷, A컷). 계열마다 점수 스케일이 달라 절대값으로 비교하면
-# 쐐기는 늘 A, 플래그는 늘 C가 된다. 그래서 "같은 패턴 종류 안에서 얼마나 뚜렷한가"로
-# 정규화한다 — 323종목 34,035건 표본의 35/70 백분위
+# 종류별 통과선. 계열마다 점수 스케일이 달라 절대값으로 비교하면 쐐기는 늘 통과하고
+# 플래그는 늘 탈락한다. 그래서 "같은 패턴 종류 안에서 얼마나 뚜렷한가"로 정규화한다
+# — 323종목 34,035건 표본의 35 백분위 (하위 35%를 떨군다)
 # (2026-07-28, 확대 쐐기 2종 추가 후 재측정. 신규 2종이 1,161건이고 나머지 증가분은
 #  그 사이 캐시에 쌓인 봉 때문이다. 기존 종류의 백분위는 한 종류도 빠짐없이 이전과
 #  동일하게 나와 값을 그대로 두었고, 신규 2종과 누락돼 있던 pat_tri_sym만 추가했다.)
 # pat_tri_sym은 '형성 중' 전용 kind다 — 완성되면 out_kind가 _up/_down으로 갈린다.
-# 표에 없어 기본 컷(50,70)으로 떨어지는 바람에 형성 중 삼각수렴이 96.6% A등급이었다.
 # 표본이 29건으로 작아 백분위가 흔들릴 수 있으므로 다음 재측정 때 확인할 것.
 SHAPE_CUTS = {
-    "pat_broadening": (76, 87),
-    "pat_bwedge_fall": (79, 90),   # 2026-07-28 추세 잠식 게이트 추가 후 재측정
-    "pat_bwedge_rise": (74, 85),
-    "pat_cup_handle": (52, 64),
-    "pat_diamond": (34, 55),
-    "pat_double_bottom": (67, 77),
-    "pat_double_top": (65, 76),
-    "pat_flag_bear": (52, 67),
-    "pat_flag_bull": (54, 73),
-    "pat_hs_inv": (60, 69),
-    "pat_hs_top": (57, 68),
-    "pat_round_bottom": (62, 71),
-    "pat_round_top": (68, 77),
-    "pat_tri_asc": (56, 68),
-    "pat_tri_desc": (74, 86),
-    "pat_tri_sym": (75, 88),          # 형성 중 전용 (완성 시 _up/_down으로 분리)
-    "pat_tri_sym_down": (70, 82),
-    "pat_tri_sym_up": (74, 86),
-    "pat_triple_bottom": (71, 78),
-    "pat_triple_top": (70, 77),
-    "pat_wedge_fall": (77, 88),
-    "pat_wedge_rise": (73, 84),
+    "pat_broadening": 76,
+    "pat_bwedge_fall": 79,   # 2026-07-28 추세 잠식 게이트 추가 후 재측정
+    "pat_bwedge_rise": 74,
+    "pat_cup_handle": 52,
+    "pat_diamond": 34,
+    "pat_double_bottom": 67,
+    "pat_double_top": 65,
+    "pat_flag_bear": 52,
+    "pat_flag_bull": 54,
+    "pat_hs_inv": 60,
+    "pat_hs_top": 57,
+    "pat_round_bottom": 62,
+    "pat_round_top": 68,
+    "pat_tri_asc": 56,
+    "pat_tri_desc": 74,
+    "pat_tri_sym": 75,          # 형성 중 전용 (완성 시 _up/_down으로 분리)
+    "pat_tri_sym_down": 70,
+    "pat_tri_sym_up": 74,
+    "pat_triple_bottom": 71,
+    "pat_triple_top": 70,
+    "pat_wedge_fall": 77,
+    "pat_wedge_rise": 73,
 }
 
 # 같은 역할의 극점이 반복되어 '수평 대칭'을 따질 수 있는 패턴들.
@@ -192,18 +194,22 @@ def score_shape(
     return int(round(fit * 45 + sym * 30 + pro * 25))
 
 
-def grade_shapes(ohlcv: pd.DataFrame, pats: list) -> list:
-    """각 패턴에 shape(점수)·grade(A/B/C)를 채운다. 제자리 수정 후 반환."""
+def score_shapes(ohlcv: pd.DataFrame, pats: list) -> list:
+    """각 패턴에 shape(점수)를 채우고, 통과선 미만은 떨군 목록을 반환한다.
+
+    등급을 매기지 않고 여기서 걸러낸다 — 통과한 것만 패턴이다. 차트에 그려지는
+    것과 스크리너가 내보내는 시그널이 같은 집합이 된다 (모듈 docstring 참고).
+    """
     if not pats:
         return pats
     closes = ohlcv["close"].astype(float).to_numpy()
+    kept = []
     for p in pats:
-        s = score_shape(
+        p.shape = score_shape(
             closes, p.points, float(p.neckline),
             getattr(p, "points2", None), p.kind,
             getattr(p, "score_span", None),
         )
-        p.shape = s
-        b_cut, a_cut = SHAPE_CUTS.get(p.kind, (SHAPE_B, SHAPE_A))
-        p.grade = "A" if s >= a_cut else ("B" if s >= b_cut else "C")
-    return pats
+        if p.shape >= SHAPE_CUTS.get(p.kind, SHAPE_MIN):
+            kept.append(p)
+    return kept

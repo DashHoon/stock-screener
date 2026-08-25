@@ -675,7 +675,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
             <tr key={s.code}>
               <td className="name">
                 {/* 패턴 조건으로 걸러 들어가는 경우 차트가 그 패턴을 강제 표시하도록 전달
-                    (차트는 기본이 패턴 OFF·C등급 숨김이라, 안 넘기면 '검색엔 나오는데
+                    (차트는 기본이 패턴 OFF·최근 3종 제한이라, 안 넘기면 '검색엔 나오는데
                      차트엔 안 보이는' 불일치가 생긴다) */}
                 <Link href={`/stock/${s.code}${patParam}`}>{s.name}</Link>
                 <span className="code">{s.code}</span>

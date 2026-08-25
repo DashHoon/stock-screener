@@ -1,6 +1,6 @@
 """플래그/페넌트 (급등락 깃대 + 짧은 조정 후 재돌파). 페넌트(수렴형)도 포함해 판정.
 
-- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 5~60봉 얕은 조정(깃대의
+- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 9~60봉 얕은 조정(깃대의
   상위 FLAG_MAX_RETRACE 이내, 고점 갱신 없음) → 조정 구간 고점 상향 돌파 = 완성
 - 하락 플래그: 대칭 (급락 → 짧은 반등/횡보 → 저점 하향 이탈)
 """
@@ -13,10 +13,14 @@ from batch.patterns.util import PatternHit, fit_envelope_line
 POLE_BARS = 15
 POLE_MIN_PCT = 20.0
 # 상승플래그는 사용자가 가장 신뢰하는 패턴 — 재현율 우선으로 폴대 기준을 완화한다
-# (2026-07-26 결정, 느슨한 후보는 형태 등급이 구분). 하락플래그는 기존 유지.
+# (2026-07-26 결정). 하락플래그는 기존 유지.
 POLE_MIN_PCT_BULL = 15.0
-FLAG_MIN_LEN = 5
-FLAG_MIN_LEN_BULL = 3    # 짧은 눌림(3~4봉) 뒤 재돌파도 플래그로 인정
+# 깃발(조정) 최소 길이. 그려지는 구조는 깃대를 뺀 이 구간뿐이라 config.PATTERN_MIN_BARS
+# (10봉)에 맞춘다 — 돌파봉을 포함해 span = FLAG_MIN_LEN + 1.
+# 예전에는 상승플래그만 3봉으로 완화해 두었는데, 3~4봉 채널은 어떤 종가 배열에도
+# 선 두 개가 맞아 들어가 형태 측정이 성립하지 않았다 (2026-08-25 실측: 상승플래그
+# 5,015건 중 67%가 10봉 미만). 방향별 완화를 철회하고 하나로 되돌린다.
+FLAG_MIN_LEN = 9
 # 같은 방향 플래그 중복 방지 간격. FLAG_MAX_LEN(60)과 묶여 있으면 강한 추세에서
 # 연속으로 나오는 플래그를 3개월씩 놓친다 — 별도 상수로 분리.
 FLAG_DEDUP_GAP = 15
@@ -63,7 +67,12 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             if pole_h <= 0:
                 continue
 
-            # 조정 구간 스캔: FLAG_MIN_LEN봉 이상 조정 후 깃대 고점(저점) 종가 돌파
+            # 조정 구간 스캔: FLAG_MIN_LEN봉 이상 조정 후 깃대 고점(저점) 종가 돌파.
+            #
+            # 최소 길이를 채우기 전에 돌파선을 넘으면 '기다렸다가 나중에 완성'이
+            # 아니라 후보 자체를 버린다. 기다리면 실제로는 6봉 쉬고 오른 것을
+            # 9봉 조정으로 기록하게 되고, 돌파일도 실제보다 뒤로 밀린다.
+            # 깃발 없이 곧장 이어간 것은 플래그가 아니라 깃대의 연장이다.
             completed_at = None
             flag_ext_i = None
             deadline = min(e + FLAG_MAX_LEN, n - 1)
@@ -73,7 +82,10 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
                     if closes[j] < pole_top - pole_h * FLAG_MAX_RETRACE:
                         ok = False  # 조정이 너무 깊음
                         break
-                    if j - e >= FLAG_MIN_LEN_BULL and closes[j] > pole_top:
+                    if closes[j] > pole_top:
+                        if j - e < FLAG_MIN_LEN:
+                            ok = False  # 쉬는 구간이 너무 짧다 — 플래그가 아님
+                            break
                         completed_at = j
                         flag_ext_i = int(np.argmin(lows[e + 1 : j])) + e + 1 if j > e + 1 else None
                         break
@@ -81,7 +93,10 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
                     if closes[j] > pole_top + pole_h * FLAG_MAX_RETRACE:
                         ok = False
                         break
-                    if j - e >= FLAG_MIN_LEN and closes[j] < pole_top:
+                    if closes[j] < pole_top:
+                        if j - e < FLAG_MIN_LEN:
+                            ok = False
+                            break
                         completed_at = j
                         flag_ext_i = int(np.argmax(highs[e + 1 : j])) + e + 1 if j > e + 1 else None
                         break

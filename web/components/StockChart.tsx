@@ -351,12 +351,11 @@ export default function StockChart({ data }: { data: ChartData }) {
   const [infoFlag, setInfoFlag] = useState<FlagMeta | null>(null); // ⓘ 설명 팝오버
   const [infoInd, setInfoInd] = useState<{ title: string; desc: string } | null>(null); // 지표 설명
   const [ready, setReady] = useState(false);
-  const [showAmbiguous, setShowAmbiguous] = useState(false); // C등급(모호한 형태)까지 표시
   const [moreOpen, setMoreOpen] = useState(false); // 모바일 차트 설정 펼침 (데스크톱은 항상 펼침)
   const [themeTick, setThemeTick] = useState(0); // 테마 전환 시 차트 재생성용
   // 스크리너에서 패턴 조건으로 걸러 들어온 경우(?pat=...) 그 패턴은 무조건 보여준다
-  // — 기본 패턴 OFF·C등급 숨김·최근 3종 제한을 모두 무시 (아니면 '검색엔 나오는데
-  //   차트엔 안 보이는' 불일치가 생긴다). 세션 한정이며 localStorage엔 저장하지 않는다.
+  // — 기본 패턴 OFF·최근 3종 제한을 무시 (아니면 '검색엔 나오는데 차트엔 안 보이는'
+  //   불일치가 생긴다). 세션 한정이며 localStorage엔 저장하지 않는다.
   const [highlightPats, setHighlightPats] = useState<Set<string>>(new Set());
 
   // 일봉 10년 아카이브. 기본 파일에는 최근분만 들어 있어 '전체'를 누를 때 받아온다
@@ -411,14 +410,7 @@ export default function StockChart({ data }: { data: ChartData }) {
   }, [tfKey, archive, base]);
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
   // 현재 차트에 실제로 그려질 패턴 종류들 (겹침 정리용 개별 토글 대상).
-  // C등급을 숨긴 상태면 칩도 함께 감춰야 '켜져 있는데 안 그려지는' 혼란이 없다.
-  const patternKinds = [
-    ...new Set(
-      (current.patterns ?? [])
-        .filter((p) => showAmbiguous || p.grade !== "C" || highlightPats.has(p.kind))
-        .map((p) => p.kind),
-    ),
-  ];
+  const patternKinds = [...new Set((current.patterns ?? []).map((p) => p.kind))];
   // 캔들 패턴 종류 (발생 있는 것만, 상승→하락→중립 순)
   const candleKinds = CDL_ORDER.filter((k) => current.candles?.[k]?.length);
 
@@ -619,8 +611,6 @@ export default function StockChart({ data }: { data: ChartData }) {
       const lastDate = current.dates[current.dates.length - 1];
       for (const pat of current.patterns) {
         if (hiddenPat.has(pat.kind)) continue;
-        // C등급 = 형태가 모호한 것. 기본은 숨기고 '모호한 형태도 보기'로 노출
-        if (!showAmbiguous && pat.grade === "C" && !highlightPats.has(pat.kind)) continue;
         const bottom = BULL_KINDS.has(pat.kind);
         const c = bottom ? color.up : color.down;
         const zig = chart.addSeries(LineSeries, {
@@ -653,7 +643,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: c,
               shape: bottom ? "arrowUp" : "arrowDown",
-              text: `${PATTERN_LABEL[pat.kind]?.[0] ?? pat.kind}${pat.grade ? ` [${pat.grade}]` : ""}`,
+              text: PATTERN_LABEL[pat.kind]?.[0] ?? pat.kind,
             },
           ]);
         } else if (pat.forming) {
@@ -663,7 +653,7 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: color.muted,
               shape: "circle",
-              text: `${PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind}${pat.grade ? ` [${pat.grade}]` : ""}`,
+              text: PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind,
             },
           ]);
         }
@@ -855,7 +845,7 @@ export default function StockChart({ data }: { data: ChartData }) {
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, showAmbiguous, themeTick]);
+  }, [data, settings, ready, tfKey, hiddenPat, hiddenCdl, themeTick]);
 
   return (
     <div>
@@ -1018,14 +1008,7 @@ export default function StockChart({ data }: { data: ChartData }) {
           <div className="pattern-hint">
             {patternKinds.some((k) => hiddenPat.has(k)) &&
               "겹침을 줄이려고 최근 패턴 위주로 표시 중입니다 — 흐린 칩을 누르면 함께 볼 수 있어요. "}
-            패턴 이름 옆 <b>[A/B/C]</b>는 형태가 얼마나 뚜렷한지를 나타냅니다.
-            <button
-              type="button"
-              className="ambiguous-toggle"
-              onClick={() => setShowAmbiguous((v) => !v)}
-            >
-              {showAmbiguous ? "모호한 형태(C) 숨기기" : "모호한 형태(C)도 보기"}
-            </button>
+            그려지는 패턴은 형태가 뚜렷하고 최소 2주 이상에 걸쳐 만들어진 것만 남긴 것입니다.
           </div>
           {(
             [

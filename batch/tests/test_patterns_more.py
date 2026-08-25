@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from batch.patterns import trend
+from batch import config
+from batch.patterns import detect_all_patterns, trend
 from batch.patterns.flag import detect_flags
 from batch.patterns.multi import detect_head_shoulders, detect_triple
 from batch.patterns.round import detect_round
@@ -196,9 +197,9 @@ def test_parallel_channel_is_not_broadening_wedge(monkeypatch):
 
 
 def test_bull_flag():
-    # 깃대 +30% (10봉) → 8봉 얕은 조정 → 재돌파
-    seq = [100.0] * 3 + _leg(100, 130, 10)
-    seq += [130 - 3 * (i % 4) / 3 - i * 0.3 for i in range(1, 9)]  # 얕은 눌림
+    # 깃대 +30% (15봉) → 11봉 얕은 조정 → 재돌파
+    seq = [100.0] * 5 + _leg(100, 130, 15)
+    seq += [130 - 3 * (i % 4) / 3 - i * 0.3 for i in range(1, 12)]  # 얕은 눌림
     seq += _leg(seq[-1], 133, 3) + [133.0] * 8
     df = _df(seq)
     hits = [p for p in detect_flags(df) if p.kind == "pat_flag_bull"]
@@ -239,3 +240,40 @@ def test_flag_completion_does_not_depend_on_later_bars(seed):
         assert t in completed(closes[: t + 1]), (
             f"완성일 {t}의 플래그가 그날까지의 데이터로는 재현되지 않는다"
         )
+
+
+def test_flag_rejects_short_pullback():
+    """3~4봉짜리 눌림은 플래그가 아니다 (2026-08-25 최소 기간 도입).
+
+    예전엔 상승플래그만 FLAG_MIN_LEN_BULL=3으로 완화돼 있어, 급등 후 사흘 쉬고
+    다시 오른 것까지 '상승플래그 돌파'로 잡혔다. 실측에서 상승플래그 5,015건 중
+    67%가 10봉 미만이었고 최소는 3봉이었다. 선 두 개를 3점에 끼워 맞추는 건
+    형태 측정이 아니다.
+    """
+    # 깃대 +30% (15봉) → 6봉만 얕게 쉬고 → 재돌파
+    seq = [100.0] * 5 + _leg(100, 130, 15)
+    seq += [129.0, 128.0, 127.5, 128.5]
+    seq += _leg(128.5, 133, 3) + [133.0] * 10
+    hits = [p for p in detect_flags(_df(seq))
+            if p.kind == "pat_flag_bull" and p.completed_at is not None]
+    assert hits == []
+
+
+@pytest.mark.parametrize("seed", [5, 15, 26, 33, 44])
+def test_no_pattern_shorter_than_minimum(seed):
+    """탐지 결과에 config.PATTERN_MIN_BARS 미만짜리 패턴이 섞이면 안 된다.
+
+    패턴별 최소 길이를 따로 두면 새 탐지기를 붙일 때마다 빠뜨린다. 공통 바닥선을
+    detect_all_patterns에서 한 번 강제하고, 그 불변식을 여기서 지킨다.
+
+    시드는 임의로 고른 것이 아니다 — 공통 필터를 빼면 이 5개에서 실제로 10봉 미만
+    패턴이 남는다 (형성 중 플래그와 짧은 H&S. 완성 플래그는 FLAG_MIN_LEN이 막지만
+    형성 중은 데이터 끝에서 잘려 나와 그 경로를 타지 않는다).
+    """
+    rng = np.random.default_rng(seed)
+    closes = list(100 * np.exp(np.cumsum(rng.normal(0.002, 0.03, 400))))
+    pats = detect_all_patterns(_df(closes))
+    assert pats, "표본이 비면 불변식을 검증하지 못한다"
+    for p in pats:
+        span = p.points[-1][0] - p.points[0][0] + 1
+        assert span >= config.PATTERN_MIN_BARS, f"{p.kind}가 {span}봉으로 잡혔다"
