@@ -25,7 +25,7 @@ git push origin main
 echo "[1/4] 최신 시세 수집 + 전체 재산출"
 .venv/bin/python -m batch.run
 
-echo "[1.5/4] 매크로 지표 (FRED·환율)"
+echo "[1.5/4] 매크로 지표 (ECOS·FRED·환율)"
 .venv/bin/python -m batch.macro
 
 echo "[2/4] 백테스트 통계 + 클라이언트 데이터셋"
