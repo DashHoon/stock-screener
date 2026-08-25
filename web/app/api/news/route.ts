@@ -91,19 +91,27 @@ export async function GET(req: Request) {
     }
     q = `"${name}" (주가 OR 실적 OR 공시 OR 증권)`;
   }
-  const url =
-    "https://news.google.com/rss/search?q=" +
-    encodeURIComponent(q) +
-    "&hl=ko&gl=KR&ceid=KR:ko";
-
-  try {
+  async function search(query: string): Promise<NewsItem[]> {
+    const url =
+      "https://news.google.com/rss/search?q=" +
+      encodeURIComponent(query) +
+      "&hl=ko&gl=KR&ceid=KR:ko";
     const r = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; kscreener/1.0)" },
+      headers: { "user-agent": "Mozilla/5.0 (compatible; chartcatch/1.0)" },
       // 같은 종목을 여러 사람이 봐도 30분에 한 번만 받아온다 (함수 호출·구글 부하 절감)
       next: { revalidate: 1800 },
     });
     if (!r.ok) throw new Error(`upstream ${r.status}`);
-    const items = parseItems(await r.text());
+    return parseItems(await r.text());
+  }
+
+  try {
+    let items = await search(q);
+    // 증권 맥락 낱말을 함께 걸면 거래가 뜸한 종목에서 아무것도 안 걸릴 수 있다.
+    // 그때는 이름만으로 한 번 더 찾는다 — 잡음이 섞이더라도 빈 화면보다 낫다.
+    if (items.length === 0 && !topic && name) {
+      items = await search(`"${name}"`);
+    }
     return NextResponse.json(
       { items },
       {
@@ -114,7 +122,11 @@ export async function GET(req: Request) {
       },
     );
   } catch {
-    // 뉴스는 보조 정보다. 실패해도 종목 페이지가 깨지지 않도록 빈 목록을 돌려준다.
-    return NextResponse.json({ items: [] }, { status: 200 });
+    // '기사가 없다'와 '못 받았다'는 화면에서 다르게 말해야 한다. 예전에는 둘 다
+    // 빈 목록으로 돌려줘서, 구글이 잠깐 막았을 때도 '관련 기사 없음'으로 보였다.
+    return NextResponse.json(
+      { items: [], error: "upstream" },
+      { status: 502, headers: { "cache-control": "no-store" } },
+    );
   }
 }
