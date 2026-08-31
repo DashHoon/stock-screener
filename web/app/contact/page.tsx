@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "문의 — 오류 제보와 기능 제안",
   description:
-    "kscreener 이용 중 발견한 오류, 기능 제안, 제휴·광고 문의를 받는 곳입니다. 이메일로 연락 주시면 확인 후 답신드립니다.",
+    "차트캐치 이용 중 발견한 오류, 기능 제안, 제휴·광고 문의를 받는 곳입니다. 이메일로 연락 주시면 확인 후 답신드립니다.",
 };
 
 export default function ContactPage() {

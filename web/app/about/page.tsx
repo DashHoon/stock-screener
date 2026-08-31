@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "소개 — 지표를 말이 아니라 데이터로 확인하는 스크리너",
+  title: "차트캐치 소개 — 차트 모양으로 종목을 찾는 도구",
   description:
     "국내 상장 주식 2,500여 종목의 RSI·MACD·볼린저밴드·차트 패턴을 매일 자동 계산하고, 과거 10년 성과까지 함께 보여주는 무료 기술적 지표 스크리너입니다.",
 };
@@ -10,10 +10,11 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="prose">
-      <h1>kscreener 소개</h1>
+      <h1>차트캐치 소개</h1>
       <p>
-        kscreener는 국내 상장 주식 <strong>약 2,500종목</strong>의 기술적 지표를
-        매일 자동으로 계산해, 조건에 맞는 종목을 찾아주는 무료 스크리너입니다.
+        차트캐치는 국내 상장 주식 <strong>약 2,500종목</strong>의 차트 모양을
+        매일 자동으로 판정해, 조건에 맞는 종목을 찾아주는 무료 도구입니다.
+        쌍바닥·플래그·RSI 다이버전스 등 81가지 시그널을 조합해 검색합니다.
       </p>
 
       <h2>왜 만들었나</h2>
@@ -27,7 +28,7 @@ export default function AboutPage() {
         <li>그 신호대로 샀으면 과거에 실제로 몇 번 맞았는가</li>
       </ul>
       <p>
-        kscreener는 이 두 질문에서 출발했습니다. 조건을 고르면 해당 종목이 바로
+        차트캐치는 이 두 질문에서 출발했습니다. 조건을 고르면 해당 종목이 바로
         나오고, 그 시그널이 지난 10년간 어떤 성과를 냈는지{" "}
         <Link href="/stats">백테스트 페이지</Link>에서 확인할 수 있습니다.
       </p>

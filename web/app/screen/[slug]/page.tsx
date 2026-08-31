@@ -49,7 +49,7 @@ export async function generateMetadata({
   const md = date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}` : "";
 
   // 제목은 짧게. 한국어 검색결과는 30자 근처에서 잘리므로 사이트명 접미사
-  // (`| 주식 시그널 스크리너`)를 붙이지 않는다 — 종목 수가 잘리면 넣은 의미가 없다.
+  // (`| 차트캐치`)를 붙이지 않는다 — 종목 수가 잘리면 넣은 의미가 없다.
   const title =
     count !== null
       ? `${preset.title} 종목 ${count.toLocaleString("ko-KR")}개 · ${md} 기준`
