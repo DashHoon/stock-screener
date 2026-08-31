@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { loadLatest } from "@/lib/data";
 import { SITE_URL } from "@/lib/site";
 
 /** ⚠️ 2026-08-22: 스크리너 본체를 비밀번호로 잠갔다(middleware.ts). 잠긴 페이지를
@@ -19,10 +20,29 @@ import { SITE_URL } from "@/lib/site";
  *  '이건 꼭 봐라'라고 내미는 목록에서 빠질 뿐이다. 종목 페이지에 실질 텍스트를
  *  넣고 나면(TODO B-3 지표 표) 다시 늘린다. */
 
+/** 종목 요약(/s) 중 사이트맵에 실을 개수.
+ *
+ *  전부 내밀지 않는다. 2026-08-08에 5,017개를 냈다가 1,654개가 '발견됨 ·
+ *  색인 안 됨'으로 쌓인 전례가 있다 — 크롤 예산은 유한하고, 다 내밀면 정작
+ *  블로그·가이드가 뒤로 밀린다. 시총 상위부터 300개만 내밀고, 색인률을 보고
+ *  늘린다. 나머지는 같은 업종 링크로 이어져 있어 크롤러가 따라갈 수 있다. */
+const SUMMARY_IN_SITEMAP = 300;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const latest = await loadLatest();
+  const summaries = [...latest.stocks]
+    .sort((a, b) => (b.cap ?? 0) - (a.cap ?? 0))
+    .slice(0, SUMMARY_IN_SITEMAP)
+    .map((s) => ({
+      url: `${SITE_URL}/s/${s.code}`,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    }));
+
   // 공개된 것만 — 콘텐츠와 정책 페이지. 블로그는 자체 사이트맵을 따로 낸다
   // (blog/sitemap-index.xml, 서치콘솔에 별도 제출).
   return [
+    ...summaries,
     { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/guide/chart-patterns`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/guide/candlestick`, changeFrequency: "monthly", priority: 0.8 },

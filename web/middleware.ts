@@ -26,6 +26,7 @@ import type { NextRequest } from "next/server";
 // 누구나 볼 수 있는 경로. 접두어로 판정한다.
 const PUBLIC_PREFIXES = [
   "/blog",        // 블로그 (수익·앱 홍보. 별도 서비스로 프록시된다)
+  "/s",           // 종목 요약 (검색 유입용). 값과 문장만 있고 차트·조건검색은 앱에
   "/guide",       // 지표 가이드 — 애드센스 심사가 보는 콘텐츠
   "/about",
   "/contact",

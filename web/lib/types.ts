@@ -111,6 +111,12 @@ export interface StockSignal {
   /** 시그널별 마지막 발생이 몇 봉 전인지 (0=오늘). 63봉(~3개월) 초과는 생략 */
   sig: Partial<Record<FlagKey, number>>;
   rsi: number | null;
+  /** 이격도 — 종가가 이동평균의 몇 %인지. 100이면 이평선과 같다 */
+  disp?: { d20?: number; d60?: number };
+  /** 거래량 (주) */
+  vol?: number;
+  /** 거래량 비율 — 20일 평균 대비 몇 배인지 */
+  vr?: number;
   /** 최근 20봉 종가 (스파크라인) */
   m?: number[];
 }
