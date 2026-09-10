@@ -55,7 +55,9 @@ export default async function SectorMapPage({
         칸 크기는 시가총액(제곱근 압축), 색은 등락률입니다. 전일({data.date}) 기준.
       </p>
 
-      <SectorMap data={data} sector={name} />
+      {/* 이 페이지에는 해당 업종 종목만 직렬화한다. 전 종목 latest.json을 37개
+          정적 페이지마다 복제하면 배포 저장량이 불필요하게 커진다. */}
+      <SectorMap data={{ ...data, stocks: items }} sector={name} />
 
       {index?.tf?.d && (
         <section className="sector-index">

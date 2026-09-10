@@ -92,9 +92,9 @@ jobs:
           # 나머지 산출물은 그대로 나가야 하므로 실패를 삼킨다 — 그 화면만 옛 값을
           # 보여준다.
           uv run python -m batch.macro || echo "매크로 수집 실패 — 이전 값 유지"
-          # 백테스트 통계(공개 /stats) + 사용자 정의 백테스트용 클라이언트 데이터셋
+          # 공개 /stats 요약 통계만 생성한다. 사용자 정의 클라이언트 데이터셋은
+          # 배포 저장소를 크게 차지해 중단했다.
           uv run python -m batch.backtest.run
-          uv run python -m batch.backtest.dataset
 
       # 이후 단계가 실패해도 백필 결과는 보존한다 (기본 cache 액션은 잡 실패 시 저장 안 함)
       - name: Save OHLCV cache

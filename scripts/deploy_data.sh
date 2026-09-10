@@ -1,5 +1,5 @@
 #!/bin/bash
-# 수동 배포 스크립트 — 항상 "최신 수집 → 전체 재산출 → 백테스트 → data 브랜치 push" 순서로 실행한다.
+# 수동 배포 스크립트 — 항상 "최신 수집 → 전체 재산출 → 요약 백테스트 → data 브랜치 push" 순서로 실행한다.
 #
 # 왜 필요한가: 산출물만 손으로 push하면 로컬의 묵은 데이터가 크론이 배포한 최신
 # 데이터를 덮어쓰는 사고가 난다 (2026-07-22/23 두 차례 발생). 수동 배포는 반드시
@@ -28,9 +28,8 @@ echo "[1/4] 최신 시세 수집 + 전체 재산출"
 echo "[1.5/4] 매크로 지표 (ECOS·FRED·환율)"
 .venv/bin/python -m batch.macro
 
-echo "[2/4] 백테스트 통계 + 클라이언트 데이터셋"
+echo "[2/4] 공개 백테스트 요약 통계"
 .venv/bin/python -m batch.backtest.run
-.venv/bin/python -m batch.backtest.dataset
 
 echo "[3/4] data 브랜치 구성"
 WT=$(mktemp -d)/data-wt

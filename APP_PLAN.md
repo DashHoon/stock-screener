@@ -19,8 +19,7 @@
 
 ```
 https://kscreener.com/data/signals/latest.json    1.5MB  전 종목 스크리닝
-https://kscreener.com/data/chart/{code}.json      93KB   종목별 (일·주·월)
-https://kscreener.com/data/chart/{code}.arc.json         과거 일봉
+https://kscreener.com/data/chart/{code}.json             종목별 최근 1년 일봉
 https://kscreener.com/data/chart/mini/{code}.json 2KB    격자용
 https://kscreener.com/data/chart/sector/{slug}.json      업종 지수 34개
 https://kscreener.com/data/stats/backtest.json           전략 통계
@@ -58,7 +57,7 @@ CustomPainter로 수렴할 가능성이 높다.
 
 ```
 latest.json (검색용 전 종목)   1.8MB   2,565종목
-chart/{code}.json (종목 1개)   95KB    일 392 · 주 520 · 월 120봉
+chart/{code}.json (종목 1개)            최근 1년 일봉
 mini/{code}.json               2.1KB
 ```
 

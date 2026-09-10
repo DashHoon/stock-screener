@@ -16,6 +16,7 @@ import argparse
 import json
 import datetime as dt
 import logging
+import shutil
 import time
 
 from dotenv import load_dotenv
@@ -126,16 +127,39 @@ def drop_orphan_charts(codes: set[str]) -> int:
     다음 회차에 그대로 생긴다.
     """
     dropped = 0
-    for d in (config.OUTPUT_DIR / "chart", config.CHART_PRO_DIR):
-        if not d.exists():
+    d = config.CHART_DIR
+    if not d.exists():
+        return dropped
+    for f in d.glob("*.json"):
+        code = f.stem
+        if code in codes or code.startswith(_KEEP_CHART_PREFIXES):
             continue
-        for f in d.glob("*.json"):
-            code = f.name.split(".")[0]
-            if code in codes or code.startswith(_KEEP_CHART_PREFIXES):
-                continue
-            f.unlink()
+        f.unlink()
+        dropped += 1
+        log.info("고아 차트 삭제: %s", f.relative_to(config.OUTPUT_DIR))
+    return dropped
+
+
+def drop_retired_outputs() -> int:
+    """더 이상 배포하지 않는 대용량 산출물을 매 회차 정리한다.
+
+    생성 코드만 끄면 data 브랜치 작업 디렉터리에 남은 옛 파일이 rsync로 다시
+    배포된다. 2년 차트, 10년 아카이브, 사용자 정의 백테스트 데이터셋을 명시적으로
+    지워 산출물 크기가 다시 늘지 않게 한다.
+    """
+    dropped = 0
+    chart2y = config.OUTPUT_DIR / "chart2y"
+    if chart2y.exists():
+        dropped += sum(1 for p in chart2y.rglob("*") if p.is_file())
+        shutil.rmtree(chart2y)
+    if config.CHART_DIR.exists():
+        for path in config.CHART_DIR.glob("*.arc.json"):
+            path.unlink()
             dropped += 1
-            log.info("고아 차트 삭제: %s", f.relative_to(config.OUTPUT_DIR))
+    dataset = config.OUTPUT_DIR / "bt" / "dataset.json"
+    if dataset.exists():
+        dataset.unlink()
+        dropped += 1
     return dropped
 
 
@@ -229,10 +253,6 @@ def compute_and_write(stocks) -> dict:
     # 착시가 생기므로 시그널을 비운다 (차트 페이지는 유지).
     stale_cutoff = (dt.date.today() - dt.timedelta(days=12)).isoformat()
 
-    # 일봉 최근분의 시작일. 이 날짜 이전은 아카이브 파일로 뺀다 (config 주석 참고).
-    hot_from = config.chart_hot_from()
-    arc_written = 0
-
     # 일봉만 만든다. 주봉·월봉은 앱이 쓰지 않으면서 파일의 58%를 차지했다.
 
     for row in stocks.itertuples():
@@ -249,7 +269,7 @@ def compute_and_write(stocks) -> dict:
                 stale += 1
 
             # 차트 패턴 (일봉): 완성=돌파일 기준, 형성 중=오늘 상태.
-            # 차트에는 창(CHART_DAILY_BARS≈2년) 안의 전체 이력을 싣는다 — 과거
+            # 차트에는 최근 1년 창 안의 전체 이력을 싣는다 — 과거
             # 구간을 줌인해도 그 시절 패턴이 보이도록 (2026-07-26 사용자 결정).
             # 과밀은 최소 기간·형태 통과선·중복 병합으로 배치에서 걸러내고,
             # 남은 것은 종류별 칩으로 프론트에서 통제한다.
@@ -276,17 +296,11 @@ def compute_and_write(stocks) -> dict:
                 )
             )
 
-            # 무료(1년)와 구독(2년) 두 벌. 같은 계산에서 자르는 길이만 다르다.
+            # 배포 차트는 최근 1년 한 벌만 만든다.
             cdl = detect_candles(ind)
             tf = {
                 "d": writer.timeframe_payload(
                     ind, events, config.CHART_DAILY_BARS,
-                    patterns=chart_patterns, candles=cdl,
-                )
-            }
-            tf_pro = {
-                "d": writer.timeframe_payload(
-                    ind, events, config.CHART_DAILY_BARS_PRO,
                     patterns=chart_patterns, candles=cdl,
                 )
             }
@@ -310,10 +324,7 @@ def compute_and_write(stocks) -> dict:
                 if v not in ("", -1)
             }
             writer.write_chart(row.code, row.name, tf, profile)
-            writer.write_chart(row.code, row.name, tf_pro, profile, pro=True)
             writer.write_chart_mini(row.code, writer.mini_payload(ind, chart_patterns))
-            if writer.write_chart_archive(row.code, writer.archive_payload(ind, hot_from)):
-                arc_written += 1
             latest_date = max(latest_date, ind["date"].iloc[-1])
         except Exception:
             log.exception("%s(%s) 계산 실패", row.name, row.code)
@@ -335,21 +346,16 @@ def compute_and_write(stocks) -> dict:
             _f, i_events = compute_flags(i_ind)
             i_pats = detect_all_patterns(iohlcv)  # 지수도 창 내 전체 이력
             i_cdl = detect_candles(i_ind)
-            for bars, pro in (
-                (config.CHART_DAILY_BARS, False),
-                (config.CHART_DAILY_BARS_PRO, True),
-            ):
-                writer.write_chart(
-                    sym,
-                    name,
-                    {
-                        "d": writer.timeframe_payload(
-                            i_ind, i_events, bars,
-                            patterns=i_pats, candles=i_cdl,
-                        )
-                    },
-                    pro=pro,
-                )
+            writer.write_chart(
+                sym,
+                name,
+                {
+                    "d": writer.timeframe_payload(
+                        i_ind, i_events, config.CHART_DAILY_BARS,
+                        patterns=i_pats, candles=i_cdl,
+                    )
+                },
+            )
         except Exception:
             log.exception("지수 %s 차트 생성 실패", sym)
 
@@ -391,7 +397,7 @@ def compute_and_write(stocks) -> dict:
                 sec,
                 {
                     "d": writer.timeframe_payload(
-                        s_ind, s_div, config.CHART_DAILY_BARS_PRO, patterns=s_pats
+                        s_ind, s_div, config.CHART_DAILY_BARS, patterns=s_pats
                     )
                 },
             )
@@ -402,6 +408,7 @@ def compute_and_write(stocks) -> dict:
     # 최신 거래일 데이터가 없는(거래정지 등) 종목은 스크리너에서 제외하지 않고 그대로 둔다.
     writer.write_latest(latest_date, entries, indices)
     orphans = drop_orphan_charts({e["code"] for e in entries})
+    retired = drop_retired_outputs()
     return {
         "date": latest_date,
         "written": len(entries),
@@ -409,11 +416,9 @@ def compute_and_write(stocks) -> dict:
         # 이번에 안 쓴 옛 차트 파일. 0이 정상이고, 계속 잡히면 종목 마스터가
         # 흔들리고 있다는 뜻이다.
         "orphans_dropped": orphans,
+        "retired_outputs_dropped": retired,
         "stale_no_sig": stale,
         "failed": failed,
-        # 아카이브는 확정된 과거라 평상시 0에 가까워야 정상. 매일 수천 개가 다시
-        # 쓰이면 경계가 흔들리고 있다는 뜻이라 바로 눈에 띄게 로그에 남긴다.
-        "archive_rewritten": arc_written,
         # 업종 수집이 조용히 실패하면 업종맵이 '기타' 한 칸으로 퇴화한다.
         # 매일 읽는 완료 로그 한 줄에 노출해 눈에 띄게 한다.
         "sector_etc_pct": round(float((stocks["sector"] == ETC).mean()) * 100, 1)

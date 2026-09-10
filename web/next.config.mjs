@@ -5,6 +5,13 @@ const BLOG_ORIGIN = process.env.BLOG_ORIGIN;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 정적 데이터는 빌드 시 읽고 public 자산으로 별도 배포된다. 서버 함수 추적에
+  // 같은 디렉터리를 또 넣으면 각 함수가 전 종목 JSON을 품어 수백 MB가 된다.
+  experimental: {
+    outputFileTracingExcludes: {
+      "/*": ["./public/data/**/*"],
+    },
+  },
   // 블로그는 trailingSlash: 'always' 로 빌드된다. Next 기본값(후행 슬래시 제거 308)이
   // rewrite보다 먼저 적용되면 블로그 정규 URL이 전부 깨지므로 자동 정규화를 끈다.
   // 대신 본 서비스 경로의 슬래시 제거는 아래 redirects()에서 직접 처리한다.
@@ -16,9 +23,13 @@ const nextConfig = {
   // '/blog/:path(.*)' 는 '/blog/' 자체를 놓친다. 슬래시까지 파라미터에 포함시켜
   // 경로를 통째로 넘긴다. '(?:/.*)?' 로 제한해 '/blogfoo' 같은 경로는 매칭하지 않는다.
   async rewrites() {
-    if (!BLOG_ORIGIN) return [];
     return [
-      { source: "/blog:path((?:/.*)?)", destination: `${BLOG_ORIGIN}/blog:path` },
+      // 구버전 앱의 Pro 차트 요청을 최근 1년 파일로 투명하게 연결한다. 앱 업데이트
+      // 전 사용자도 404 없이 동작하면서 chart2y 사본을 저장할 필요가 없다.
+      { source: "/data/chart2y/:path*", destination: "/data/chart/:path*" },
+      ...(BLOG_ORIGIN
+        ? [{ source: "/blog:path((?:/.*)?)", destination: `${BLOG_ORIGIN}/blog:path` }]
+        : []),
     ];
   },
 

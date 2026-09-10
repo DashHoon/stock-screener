@@ -23,7 +23,7 @@ web/public/data/  배치 산출물 (gitignore, 배치 실행으로 재생성)
 # 배치 (Python 3.12 + uv)
 uv sync && uv pip install 'setuptools<81'   # setuptools<81: pykrx의 pkg_resources 의존
 uv run pytest                                # 단위 테스트
-uv run python -m batch.run --backfill        # 최초 1회: 전 종목 2년 백필 (~8분)
+uv run python -m batch.run --backfill        # 최초 1회: 계산용 장기 원본 캐시 생성
 uv run python -m batch.run                   # 일별: 수집 갱신 + 계산 + JSON 산출
 uv run python -m batch.run --no-collect      # 캐시 그대로 계산·산출만
 

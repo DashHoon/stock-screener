@@ -28,7 +28,9 @@ export async function listChartCodes(): Promise<string[]> {
   try {
     const files = await fs.readdir(path.join(DATA_DIR, "chart"));
     return files
-      .filter((f) => f.endsWith(".json"))
+      // 과거의 `{code}.arc.json`이 작업 디렉터리에 남아 있어도 종목 코드로
+      // 오인해 `/stock/{code}.arc` 페이지를 만들지 않는다.
+      .filter((f) => f.endsWith(".json") && !f.endsWith(".arc.json"))
       .map((f) => f.replace(/\.json$/, ""));
   } catch {
     return [];

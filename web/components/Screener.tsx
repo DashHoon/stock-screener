@@ -7,7 +7,6 @@ import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import AdSlot from "@/components/AdSlot";
-import BacktestPanel from "@/components/BacktestPanel";
 import FlagInfoModal from "@/components/FlagInfoModal";
 import ResultGrid, { type MiniKind } from "@/components/ResultGrid";
 import Sparkline from "@/components/Sparkline";
@@ -486,12 +485,6 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
       </div>
 
       {infoFlag && <FlagInfoModal flag={infoFlag} onClose={() => setInfoFlag(null)} />}
-
-      <BacktestPanel
-        selected={[...selected]}
-        windowBars={windowBars}
-        minCap={minCap}
-      />
 
       <div className="result-meta">
         <span className="count">
