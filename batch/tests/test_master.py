@@ -21,16 +21,18 @@ def test_master_keeps_rows_with_dash_prices(monkeypatch):
             },
         ]
     )
-    desc = pd.DataFrame(
-        [
-            {
-                "Code": code, "Industry": "전자부품 제조업", "Products": "제품",
-                "ListingDate": "2020-01-01", "Representative": "대표",
-                "HomePage": "", "Region": "서울",
-            }
-            for code in listing["Code"]
-        ]
-    )
+    desc = pd.DataFrame([
+        {
+            "Code": "005930", "Industry": "전자부품 제조업", "Products": "제품",
+            "ListingDate": "2020-01-01", "Representative": "대표",
+            "HomePage": "", "Region": "서울",
+        },
+        {
+            "Code": "123450", "Industry": None, "Products": "제품",
+            "ListingDate": "2020-01-01", "Representative": "대표",
+            "HomePage": "", "Region": "서울",
+        },
+    ])
     monkeypatch.setattr(
         fdr,
         "StockListing",
@@ -44,3 +46,4 @@ def test_master_keeps_rows_with_dash_prices(monkeypatch):
     assert got.loc["123450", "close"] == 0
     assert got.loc["123450", "change_pct"] == 0
     assert got.loc["123450", "marcap"] == -1
+    assert got.loc["123450", "sector"]  # NaN 업종도 예외 없이 '기타'로 분류

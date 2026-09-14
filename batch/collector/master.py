@@ -66,6 +66,18 @@ def fetch_stock_master() -> pd.DataFrame:
     df = df[~df["Name"].str.contains("스팩", na=False)]
     df = df[df["Code"].str.endswith("0")]  # 우선주 제외 (5·7·9 등으로 끝남)
 
+    # KRX-DESC 응답 자체는 성공해도 일부 신규·정리매매 종목의 Industry가 NaN일
+    # 수 있다. sector_of()에는 문자열만 넘기고, 가능한 경우 마지막 캐시 업종으로
+    # 개별 결측만 보충한다. 한 종목 결측으로 전체 마스터가 캐시로 되돌아가서는 안 된다.
+    industry = df["Industry"].fillna("").astype(str).str.strip()
+    missing_industry = industry.eq("")
+    if missing_industry.any():
+        prev = _cached_industry()
+        if prev is not None:
+            fallback = df.loc[missing_industry, "Code"].map(prev).fillna("").astype(str)
+            industry.loc[missing_industry] = fallback
+    df["Industry"] = industry
+
     # 거래정지·신규상장 종목은 Close/ChagesRatio가 숫자 대신 '-'로 올 수 있다.
     # 한 종목의 '-' 때문에 전체 마스터 갱신을 버리지 않도록 0으로 정규화한다.
     close = pd.to_numeric(df.get("Close"), errors="coerce").fillna(0)
