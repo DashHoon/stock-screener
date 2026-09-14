@@ -222,17 +222,21 @@ def collect(codes: list[str]) -> None:
         log.warning("DATA_GO_KR_API_KEY 없음 — 일별 수집 건너뜀")
         return
 
-    # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일)
+    # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일).
+    # 특정 날짜 요청이 접속 시간초과로 끝나도 더 오래된 날짜를 계속 확인한다.
+    # 주말 날짜 조회가 실패했다고 금요일 자료까지 보지 않고 끝내면, 공급처에는
+    # 금요일 자료가 이미 있어도 다음 예약 실행까지 갱신하지 못한다.
+    failed_days = 0
     for back in range(1, 6):
         bas_dt = (dt.date.today() - dt.timedelta(days=back)).strftime("%Y%m%d")
         try:
             day = daily.fetch_day(bas_dt)
         except Exception:
-            # 포털 접속 실패(재시도 소진). 여기서 예외를 올리면 계산·산출까지
-            # 통째로 죽어 그날 배포가 없어진다 (2026-08-13 #63·#64). 수집만
-            # 포기하고 기존 캐시로 계산을 이어간다 — 다음 슬롯이 따라잡는다.
-            log.exception("공공 API 수집 실패 (basDt=%s) — 이번 회차 수집 없음", bas_dt)
-            return
+            # 포털 접속 실패(날짜 내부 재시도 소진). 계산·산출을 죽이지 않되,
+            # 이 날짜 하나 때문에 과거 후보 확인까지 중단하지는 않는다.
+            failed_days += 1
+            log.exception("공공 API 수집 실패 (basDt=%s) — 이전 날짜 계속 확인", bas_dt)
+            continue
         if not day.empty:
             daily.merge_into_cache(day)
             repair_gaps(codes, day["date"].max(), empty_only=True)
@@ -240,7 +244,10 @@ def collect(codes: list[str]) -> None:
             fill_gaps(codes, day["date"].max())
             return
     # 연휴이거나 포털 갱신이 늦은 경우. 계산은 기존 캐시로 그대로 진행한다.
-    log.warning("공공 API 최근 5일 데이터 없음 — 이번 회차 수집 없음")
+    log.warning(
+        "공공 API 최근 5일 데이터 없음 — 이번 회차 수집 없음 (요청 실패 %d일)",
+        failed_days,
+    )
 
 
 def compute_and_write(stocks) -> dict:

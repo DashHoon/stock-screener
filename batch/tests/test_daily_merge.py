@@ -165,8 +165,42 @@ def test_collect_survives_api_outage(monkeypatch):
     from batch import run as run_mod
 
     monkeypatch.setattr(run_mod.daily, "api_key", lambda: "dummy")
-    def boom(*a, **k):
+    calls = []
+    def boom(bas_dt, *a, **k):
+        calls.append(bas_dt)
         raise requests.ConnectTimeout("timed out")
     monkeypatch.setattr(run_mod.daily, "fetch_day", boom)
 
     run_mod.collect(["005930"])   # 예외가 새어 나오면 테스트 실패
+    assert len(calls) == 5         # 한 날짜 실패가 과거 후보 확인을 막지 않는다
+
+
+def test_collect_continues_after_one_date_times_out(monkeypatch):
+    """주말 날짜 요청 실패 뒤에도 이전 거래일 자료를 회수한다."""
+    from batch import run as run_mod
+
+    monkeypatch.setattr(run_mod.daily, "api_key", lambda: "dummy")
+    requested = []
+    recovered = pd.DataFrame([
+        {
+            "code": "005930", "date": "2026-09-11",
+            "open": 100, "high": 110, "low": 90, "close": 105, "volume": 1000,
+        }
+    ])
+
+    def fetch(bas_dt):
+        requested.append(bas_dt)
+        if len(requested) == 1:
+            raise requests.ConnectTimeout("weekend lookup timed out")
+        return recovered
+
+    merged = []
+    monkeypatch.setattr(run_mod.daily, "fetch_day", fetch)
+    monkeypatch.setattr(run_mod.daily, "merge_into_cache", lambda day: merged.append(day))
+    monkeypatch.setattr(run_mod, "repair_gaps", lambda *a, **k: None)
+    monkeypatch.setattr(run_mod, "fill_gaps", lambda *a, **k: 0)
+
+    run_mod.collect(["005930"])
+
+    assert len(requested) == 2
+    assert merged[0]["date"].iloc[0] == "2026-09-11"

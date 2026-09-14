@@ -66,6 +66,10 @@ def fetch_stock_master() -> pd.DataFrame:
     df = df[~df["Name"].str.contains("스팩", na=False)]
     df = df[df["Code"].str.endswith("0")]  # 우선주 제외 (5·7·9 등으로 끝남)
 
+    # 거래정지·신규상장 종목은 Close/ChagesRatio가 숫자 대신 '-'로 올 수 있다.
+    # 한 종목의 '-' 때문에 전체 마스터 갱신을 버리지 않도록 0으로 정규화한다.
+    close = pd.to_numeric(df.get("Close"), errors="coerce").fillna(0)
+    change_pct = pd.to_numeric(df.get("ChagesRatio"), errors="coerce").fillna(0)
     # Marcap(원) → 억원. 결측·0은 -1로 두어 필터에서 '알 수 없음'으로 취급
     marcap_won = pd.to_numeric(df.get("Marcap"), errors="coerce").fillna(0)
     out = pd.DataFrame(
@@ -73,8 +77,8 @@ def fetch_stock_master() -> pd.DataFrame:
             "code": df["Code"],
             "name": df["Name"],
             "market": df["MarketId"].map(MARKETS),
-            "close": df["Close"].astype("int64"),
-            "change_pct": df["ChagesRatio"].astype(float).round(2),
+            "close": close.astype("int64"),
+            "change_pct": change_pct.round(2),
             "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
             "industry": df["Industry"],   # 위 try/except 양쪽에서 항상 채워진다
             # 회사 개요 (종목 페이지) — 전부 KRX 상장법인 공시 정보다
