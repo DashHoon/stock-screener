@@ -142,8 +142,8 @@ def test_trend_engulfing_fan_is_not_broadening_wedge(monkeypatch):
     # 몇 스윙의 부분창이 상한 안이면 그 부분창으로는 방출될 수 있다 — 이 파형은
     # 모든 부분창이 함께 걸리도록 급하게 벌어진다.
     seq = [105.0] * 3
-    tops = [110, 135, 160, 185]
-    bots = [100, 107, 114, 121]
+    tops = [125, 155, 185, 215]
+    bots = [90, 97, 104, 111]
     for t, b in zip(tops, bots):
         seq += _leg(seq[-1], t, 6) + _leg(t, b, 6)
     seq += _leg(seq[-1], 100, 10) + [100.0] * 8   # 하단 이탈

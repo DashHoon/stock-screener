@@ -25,6 +25,7 @@ BWEDGE_TRAVEL_MAX_PCT = 35.0
 BWEDGE_WIDTH_MAX_PCT = 35.0
 BREAK_WINDOW = 25
 BREAK_WINDOW_LOOSE = 40
+BWEDGES = ("pat_bwedge_rise", "pat_bwedge_fall")
 FAVORED = ("pat_tri_asc", "pat_tri_sym")
 WINDOW_SIZES = (5, 6, 7, 8, 9, 10, 12)
 SPAN_LIMITS = {"minor": (20, 120), "major": (40, 200)}  # inclusive bar counts
@@ -45,7 +46,7 @@ def _touches(line: Line, swings: list[Swing], atr: np.ndarray) -> list[int]:
     return result
 
 
-def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait):
+def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *, broadening=False):
     """Replay fixed lines, retaining termination even when no hit is published."""
     n = len(ctx.closes)
     atr = _tolerance(ctx)
@@ -88,7 +89,7 @@ def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait):
             line = upper if swing.is_high else lower
             touches = abs(swing.price - line.at(swing.idx)) <= config.SWING_TOUCH_ATR * atr[swing.idx]
             misses[swing.is_high] = 0 if touches else misses[swing.is_high] + 1
-            if misses[swing.is_high] >= 2:
+            if not broadening and misses[swing.is_high] >= 2:
                 return "invalidated", j, None, "lost_support"
     if n - 1 > deadline:
         return "expired", deadline + 1, None, "max_age"
@@ -108,7 +109,7 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     # by trimming while continuing to count the discarded points as support.
     x_first, x_last = win[0].idx, win[-1].idx
     span_w = x_last - x_first
-    if not max(config.PATTERN_MIN_BARS, span_lim[0]) <= span_w + 1 <= min(config.PATTERN_MAX_BARS, span_lim[1]):
+    if not config.PATTERN_MIN_BARS <= span_w + 1 <= config.PATTERN_MAX_BARS:
         return None
     recognized = max(int(s.confirmed_at) for s in win)
     if recognized >= n or recognized - x_first + 1 > config.PATTERN_MAX_BARS:
@@ -165,6 +166,10 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     if kind is None:
         return None
 
+    is_bwedge = kind in BWEDGES
+    if not is_bwedge and not span_lim[0] <= span_w + 1 <= span_lim[1]:
+        return None
+
     # 추세 잠식 게이트 (모듈 상수 BWEDGE_TRAVEL_MAX_PCT 주석 참고)
     if kind in ("pat_bwedge_rise", "pat_bwedge_fall"):
         mid_travel = abs(
@@ -176,13 +181,15 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         if w_end / ref * 100 > BWEDGE_WIDTH_MAX_PCT:
             return None
 
-    if kind not in FAVORED and (len(hs) < 3 or len(ls) < 3):
+    if kind not in FAVORED + BWEDGES and (len(hs) < 3 or len(ls) < 3):
         return None
     # Revalidate final horizontal/diagonal lines, not the discarded original fit.
     touch_u, touch_l = _touches(upper, hs, atr), _touches(lower, ls, atr)
     if min(len(touch_u), len(touch_l)) < 2 or len(touch_u) + len(touch_l) < 5:
         return None
-    for touches in (touch_u, touch_l):
+    # Contact distribution ranks broadening candidates; 3+2 contacts can be valid.
+    coverage = min((touch_u[-1] - touch_u[0]), (touch_l[-1] - touch_l[0])) / span_w
+    for touches in (() if is_bwedge else (touch_u, touch_l)):
         if touches[-1] - touches[0] < 0.50 * span_w:
             return None
         if touches[0] > x_first + 0.40 * span_w or touches[-1] < x_last - 0.40 * span_w:
@@ -213,9 +220,11 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         return None
     residual = float(np.mean([abs(s.price - (upper if s.is_high else lower).at(s.idx)) / atr[s.idx] for s in win]))
     quality = len(touch_u) + len(touch_l) + inside - residual
+    if is_bwedge:
+        quality += coverage
     status, terminal, direction, reason = _scan_structure(
         ctx, upper, lower, x_first, x_last, recognized, break_up,
-        BREAK_WINDOW_LOOSE if kind in FAVORED else BREAK_WINDOW)
+        BREAK_WINDOW_LOOSE if kind in FAVORED else BREAK_WINDOW, broadening=is_bwedge)
     if terminal < recognized:
         return None  # Never admitted: cannot act as a tombstone for a valid structure.
     completed = terminal if status == "completed" else None
@@ -240,6 +249,9 @@ def _register_candidates(cands: list[dict]) -> list[dict]:
         duplicate = False
         for previous in reversed(registered):
             if previous["kind"] != c["kind"]:
+                continue
+            # Distinct broadening hypotheses may coexist; never move an old boundary.
+            if c["kind"] in BWEDGES and c["anchors"] != previous["anchors"]:
                 continue
             s2, structure_end = previous["span"]
             # Existing fixed boundaries remain active beyond their last anchor.
