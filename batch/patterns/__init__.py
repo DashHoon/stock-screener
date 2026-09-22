@@ -16,6 +16,7 @@ from batch.patterns.round import detect_round
 from batch.patterns.shape import score_shapes
 from batch.patterns.swing import build_ctx
 from batch.patterns.trend import detect_trendline_patterns
+from batch.patterns.util import structure_span, within_pattern_limits
 
 # 완성(sig) 키 목록 — 백테스트 이벤트 등록에도 사용
 PATTERN_KINDS = (
@@ -37,30 +38,22 @@ DEDUP_OVERLAP = 0.6
 
 
 def _span(p) -> tuple[int, int]:
-    return p.points[0][0], p.points[-1][0]
+    return structure_span(p)
 
 
 def dedupe_patterns(pats: list) -> list:
-    """같은 종류가 같은 구간에 중복 검출된 것을 대표 1개로 병합한다.
+    """Keep earlier events stable; rank simultaneous/active alternatives by shape.
 
-    피벗 조합이 조금씩 다르면 사실상 같은 그림이 여러 번 잡힌다 (실측: 코스닥
-    라운드탑 7개가 모두 2025-09~2026-07 구간의 동일 패턴). 차트가 선으로 뒤덮이고
-    시그널도 부풀려지므로, 구간이 DEDUP_OVERLAP 이상 겹치면 하나만 남긴다.
-    대표는 '가장 길게 그려진 것'(패턴 형태가 가장 온전) → 동률이면 최근 완성분.
-
-    병합 그룹은 '종류 + 완성 여부'로 나눈다. 완성과 형성 중을 한 그룹에 넣으면,
-    데이터가 하루 늘어 더 긴 '형성 중' 확장 창이 나타났을 때 어제 완성된 돌파
-    시그널을 밀어낸다 — 어제 스크리너에 떴던 시그널이 오늘 사라지는 소급 소멸
-    (리뷰 실측: 186종목×절단4종 대조에서 8건). trend.py의 연쇄 억제가 같은
-    이유로 같은 분리를 한다.
+    A later, longer candidate must never erase a completed historical event.
     """
     kept: list = []
-    # 긴 것 → 최근 완성 순으로 보며 채택, 이미 채택된 것과 겹치면 버린다
     order = sorted(
         pats,
         key=lambda p: (
-            -(_span(p)[1] - _span(p)[0]),
-            -(p.completed_at if p.completed_at is not None else 1 << 30),
+            p.completed_at if p.completed_at is not None else 1 << 30,
+            -p.shape,
+            -getattr(p, "quality", 0.0),
+            _span(p), p.kind,
         ),
     )
     for p in order:
@@ -85,6 +78,8 @@ def dedupe_patterns(pats: list) -> list:
 
 
 def detect_all_patterns(ohlcv: pd.DataFrame) -> list:
+    if len(ohlcv) < config.PATTERN_MIN_BARS:
+        return []
     ctx = build_ctx(ohlcv)  # 스윙 구조는 한 번만 계산해 전 탐지기가 공유
     pats = (
         list(detect_double_patterns(ohlcv, ctx))
@@ -98,7 +93,7 @@ def detect_all_patterns(ohlcv: pd.DataFrame) -> list:
     )
     # 걸러내기는 병합보다 먼저 — 병합은 겹치는 후보 중 대표 1개를 고르므로,
     # 탈락할 후보가 대표로 뽑히면 그 자리의 멀쩡한 형제까지 같이 사라진다.
-    pats = [p for p in pats if _span(p)[1] - _span(p)[0] + 1 >= config.PATTERN_MIN_BARS]
+    pats = [p for p in pats if within_pattern_limits(p, len(ohlcv))]
     pats = score_shapes(ohlcv, pats)   # 형태 통과선 (차트·스크리너 공통 집합)
     pats = dedupe_patterns(pats)
     pats.sort(key=lambda p: p.completed_at if p.completed_at is not None else len(ohlcv))

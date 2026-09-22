@@ -25,11 +25,8 @@ import pandas as pd
 from batch import config
 from batch.patterns.swing import SwingCtx, build_ctx
 
-# 두 바닥(꼭대기) 사이 간격 [min, max]봉 — 스케일별. 기존 PAT_MIN_GAP/MAX_GAP
-# (10/60)을 대체한다. minor 하한 10은 이식 전과 동일 — 스윙 임계를 넘는 진짜
-# 반등이라도 5봉짜리 초미니 W는 일봉 스크리너에선 잡음이다. 상한은 스케일
-# 성격에 맞게 넓혔다 (기존 60봉 상한은 큰 구조를 원천 차단했음).
-DB_GAP = {"minor": (10, 90), "major": (20, 250)}
+# 양 끝 포함 20~200봉. 아래 값은 기존 비교식에 맞춘 인덱스 차이다.
+DB_GAP = {"minor": (19, 89), "major": (19, config.PATTERN_MAX_BARS - 1)}
 
 
 @dataclass
@@ -94,7 +91,8 @@ def _detect_one_side(ctx: SwingCtx, *, bottom: bool) -> list[DoublePattern]:
             confirmed_at = int(s2.confirmed_at)
             completed_at = None
             invalidated = False
-            deadline = min(confirmed_at + config.PAT_BREAKOUT_WINDOW, n - 1)
+            deadline = min(confirmed_at + config.PAT_BREAKOUT_WINDOW,
+                           s1.idx + config.PATTERN_MAX_BARS - 1, n - 1)
             floor = min(pa, pb) if bottom else max(pa, pb)
             for j in range(confirmed_at, deadline + 1):
                 c = closes[j]

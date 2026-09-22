@@ -13,11 +13,12 @@ import numpy as np
 import pandas as pd
 
 from batch.patterns.cup import _round_ok
+from batch import config
 from batch.patterns.swing import SwingCtx, build_ctx
 from batch.patterns.util import PatternHit
 
 RB_MIN_LEN = 60
-RB_MAX_LEN = 240
+RB_MAX_LEN = config.PATTERN_MAX_BARS - 1
 RB_RIM_TOL_PCT = 8.0        # 우측 회복 지점이 좌측 림 대비 이 이내로 근접
 RB_MIN_DEPTH_PCT = 15.0
 RB_MAX_DEPTH_PCT = 30.0     # 40%+ 깊이는 라운드바텀이 아니라 급락 후 반등 — 실측 -6.01%p, 승률 27%
@@ -38,6 +39,7 @@ def detect_round(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Pattern
     major_highs = [s.idx for s in ctx.major if s.is_high and s.confirmed_at is not None]
     major_lows = [s.idx for s in ctx.major if not s.is_high and s.confirmed_at is not None]
 
+    rim_confirmed = {s.idx: s.confirmed_at for s in ctx.major if s.confirmed_at is not None}
     out: list[PatternHit] = []
 
     def scan(bottom: bool):
@@ -50,7 +52,7 @@ def detect_round(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Pattern
             if rim_l <= 0:
                 continue
             # 우측 회복 지점: l 이후 rim 레벨 재접근 (RB_MIN_LEN~RB_MAX_LEN)
-            lo_j = l + RB_MIN_LEN
+            lo_j = max(l + RB_MIN_LEN, rim_confirmed[l])
             hi_j = min(l + RB_MAX_LEN, n - 1)
             if lo_j >= n:
                 continue
@@ -82,7 +84,7 @@ def detect_round(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Pattern
                     continue
 
                 # 완성: r 이후 림 레벨 돌파
-                deadline = min(r + RB_BREAK_WINDOW, n - 1)
+                deadline = min(r + RB_BREAK_WINDOW, l + config.PATTERN_MAX_BARS - 1, n - 1)
                 completed_at = None
                 invalidated = False
                 mid_level = extreme + depth_abs * 0.5 if bottom else extreme - depth_abs * 0.5

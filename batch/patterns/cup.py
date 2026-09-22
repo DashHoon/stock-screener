@@ -16,9 +16,8 @@
 5. 완성: 우림 이후 HANDLE_MIN_LEN~HANDLE_MAX_LEN 봉 안에 종가가 우림 고가를 상향
    돌파한 날. 형성 중: 핸들 구간 진행 중(무효화 전, 대기 기한 내).
 
-미래 참조: 돌파 스캔은 우림 다음 봉부터지만 HANDLE_MIN_LEN(5)이 스윙 확정 지연의
-역할을 해 왔으므로 현행 유지. 잠정 스윙(confirmed_at=None)은 림으로 쓰지 않는다
-— forming도 '구조 확정 후 돌파 전' 상태여야 하므로 (공통 규칙 3·4).
+미래 참조: 좌우 림의 실제 confirmed_at와 최소 핸들 길이가 모두 충족된
+시점부터 완성을 인정한다. 그 이전에 돌파한 구조는 소급 완성하지 않는다.
 
 같은 우림을 공유하는 후보 중에는 림 높이 차가 가장 작은 것 하나만 남긴다.
 """
@@ -45,9 +44,8 @@ class CupPattern:
     points: list         # [(idx, price), ...]
     shape: int = 0       # 형태 신뢰도 (shape.score_shapes가 채움)
 
-    @property
-    def confirmed_at(self) -> int:
-        return self.i_right
+    confirmed_at: int = 0
+    structure_span: tuple[int, int] | None = None
 
 
 def _round_ok(closes: np.ndarray) -> bool:
@@ -75,17 +73,21 @@ def _round_ok(closes: np.ndarray) -> bool:
     return (r2_par - r2_lin) >= config.CUP_MIN_CURVE_GAIN
 
 
-def _rim_candidates(ctx: SwingCtx) -> tuple[list[int], dict[int, bool]]:
+def _rim_candidates(ctx: SwingCtx) -> tuple[list[int], dict[int, int | None]]:
     """림 후보 = minor ∪ major 스윙 고점 idx (오름차순, 중복 제거).
 
     같은 idx가 두 스케일에 다 있으면 하나로 합치고, 어느 한 스케일에서라도
     확정(confirmed_at is not None)이면 확정으로 본다.
     """
-    confirmed: dict[int, bool] = {}
+    confirmed: dict[int, int | None] = {}
     for s in ctx.minor + ctx.major:
         if not s.is_high:
             continue
-        confirmed[s.idx] = confirmed.get(s.idx, False) or (s.confirmed_at is not None)
+        previous = confirmed.get(s.idx)
+        if s.confirmed_at is not None:
+            confirmed[s.idx] = min(previous, s.confirmed_at) if previous is not None else s.confirmed_at
+        elif s.idx not in confirmed:
+            confirmed[s.idx] = None
     return sorted(confirmed), confirmed
 
 
@@ -103,10 +105,10 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
     best_by_rim: dict[int, tuple[float, CupPattern]] = {}  # 우림별 최적 후보
 
     for ri, r in enumerate(rim_idx):
-        if not rim_confirmed[r]:
+        if rim_confirmed[r] is None:
             continue  # 잠정 우림 = 구조 미확정 → 완성·forming 모두 불가
         for l in reversed(rim_idx[:ri]):
-            if not rim_confirmed[l]:
+            if rim_confirmed[l] is None:
                 continue  # 잠정 스윙은 구조(좌림)에 못 쓴다
             span = r - l
             if span < config.CUP_MIN_LEN:
@@ -141,10 +143,10 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
             if not _round_ok(closes[l : r + 1]):
                 continue
 
-            # 핸들·돌파 스캔 — HANDLE_MIN_LEN이 스윙 확정 지연 역할 (모듈 docstring)
+            # 핸들 깊이는 우림 직후부터, 완성은 실제 림 확정 이후부터 검증
             neckline = float(rim_r)
             invalid_level = bottom + depth_abs * config.HANDLE_MAX_DEPTH_FRAC
-            deadline = min(r + config.HANDLE_MAX_LEN, n - 1)
+            deadline = min(r + config.HANDLE_MAX_LEN, l + config.PATTERN_MAX_BARS - 1, n - 1)
             completed_at = None
             invalidated = False
             handle_low_idx = None
@@ -155,13 +157,16 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
                 if closes[j] < invalid_level:
                     invalidated = True  # 핸들이 너무 깊음 → 컵 실패
                     break
-                if j - r >= config.HANDLE_MIN_LEN and closes[j] > neckline:
+                if closes[j] > neckline:
+                    if j < max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_MIN_LEN):
+                        invalidated = True
+                        break
                     completed_at = j
                     break
 
             forming = bool(
                 completed_at is None and not invalidated and deadline == n - 1
-                and r + 1 <= n - 1
+                and max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_MIN_LEN) <= n - 1
             )
             if completed_at is None and not forming:
                 continue
@@ -178,6 +183,8 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
                 completed_at=completed_at,
                 forming=forming,
                 points=points,
+                confirmed_at=max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_MIN_LEN),
+                structure_span=(int(l), int(completed_at - 1 if completed_at is not None else n - 1)),
             )
             prev = best_by_rim.get(r)
             if prev is None or rim_diff_pct < prev[0]:

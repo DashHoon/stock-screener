@@ -95,13 +95,15 @@ SWING_TOUCH_ATR = 0.5       # 추세선 '터치' 인정 거리 (ATR 배수)
 SWING_VIOL_ATR = 0.25       # 추세선 위반(잘못된 쪽 이탈) 허용 한도 (ATR 배수)
 
 # --- 차트 패턴 (공통) ---
-# 패턴이 성립하려면 최소한 이만큼의 봉을 걸쳐야 한다 (2주).
-# 패턴은 '구조'이고, 구조는 잡음과 구분될 만큼의 기간을 필요로 한다. 3~4봉짜리
-# 채널은 어떤 종가 배열에도 선 두 개를 끼워 맞출 수 있어 형태 측정이 성립하지
-# 않는다 (2026-08-25 실측: 상승플래그 5,015건 중 67%가 10봉 미만, 최소 3봉).
-# 그려지는 구조 구간(points 첫 점~끝 점) 기준이며 플래그는 깃대를 제외한
-# 조정 구간만 그리므로 이 컷을 가장 많이 받는다.
-PATTERN_MIN_BARS = 10
+# 양 끝 포함 실제 구조 봉 수. 돌파 대기/표시용 선 연장은 구조에 포함하지 않는다.
+PATTERN_MIN_BARS = 20
+PATTERN_MAX_BARS = 200
+PATTERN_TOUCH_GAP = 3
+PATTERN_CONTAIN_MIN = 0.90
+PATTERN_CLOSE_TOL_ATR = 0.25
+PATTERN_WICK_VIOL_ATR = 1.0
+PATTERN_BREAK_ATR = 0.5
+PATTERN_STRONG_BREAK_ATR = 1.5
 
 # --- 차트 패턴 (쌍바닥/더블탑) ---
 # 피벗 lookback·간격 상수는 스윙 이식(2026-07-28)으로 제거 — 간격은
@@ -134,7 +136,8 @@ RECENT_MAX_BARS = 63        # '최근 발생' 추적 상한 (~3개월). 이보�
 # 10년을 유지하지만, 배포 산출물에는 싣지 않는다. 앱이 종목을 넘길 때마다 받는
 # 파일이라 봉 수가 곧 전송량이고, Vercel 배포 저장소도 매일 같은 비율로 늘어난다.
 # 2026-08-25: 앱이 일봉만 쓰기로 하면서 주봉·월봉 산출도 중단했다.
-CHART_DAILY_BARS = 250
+# A 200-bar pattern completed up to 63 bars ago must still fit the detail chart.
+CHART_DAILY_BARS = PATTERN_MAX_BARS + RECENT_MAX_BARS
 
 # 검색 결과 격자(바둑판)에 그릴 미니 차트. 종목당 별도 파일로 빼서 화면에 보이는
 # 12개만 받는다. 종목 차트(93KB)를 12개 받으면 1.1MB라 페이지를 넘길 때마다 무겁다.

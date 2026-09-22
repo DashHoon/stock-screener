@@ -1,6 +1,6 @@
 """플래그/페넌트 (급등락 깃대 + 짧은 조정 후 재돌파). 페넌트(수렴형)도 포함해 판정.
 
-- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 9~60봉 얕은 조정(깃대의
+- 상승 플래그: 깃대(POLE_BARS 내 +POLE_MIN_PCT%) → 20~60봉 얕은 조정(깃대의
   상위 FLAG_MAX_RETRACE 이내, 고점 갱신 없음) → 조정 구간 고점 상향 돌파 = 완성
 - 하락 플래그: 대칭 (급락 → 짧은 반등/횡보 → 저점 하향 이탈)
 """
@@ -17,12 +17,8 @@ POLE_MIN_PCT = 20.0
 # 상승플래그는 사용자가 가장 신뢰하는 패턴 — 재현율 우선으로 폴대 기준을 완화한다
 # (2026-07-26 결정). 하락플래그는 기존 유지.
 POLE_MIN_PCT_BULL = 15.0
-# 깃발(조정) 최소 길이. 그려지는 구조는 깃대를 뺀 이 구간뿐이라 config.PATTERN_MIN_BARS
-# (10봉)에 맞춘다 — 돌파봉을 포함해 span = FLAG_MIN_LEN + 1.
-# 예전에는 상승플래그만 3봉으로 완화해 두었는데, 3~4봉 채널은 어떤 종가 배열에도
-# 선 두 개가 맞아 들어가 형태 측정이 성립하지 않았다 (2026-08-25 실측: 상승플래그
-# 5,015건 중 67%가 10봉 미만). 방향별 완화를 철회하고 하나로 되돌린다.
-FLAG_MIN_LEN = 9
+# 돌파봉/대기 기간으로 짧은 조정 구간을 부풀리지 않는다.
+FLAG_MIN_LEN = config.PATTERN_MIN_BARS
 # 같은 방향 플래그 중복 방지 간격. FLAG_MAX_LEN(60)과 묶여 있으면 강한 추세에서
 # 연속으로 나오는 플래그를 3개월씩 놓친다 — 별도 상수로 분리.
 FLAG_DEDUP_GAP = 15
@@ -77,7 +73,7 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             # 깃발 없이 곧장 이어간 것은 플래그가 아니라 깃대의 연장이다.
             completed_at = None
             flag_ext_i = None
-            deadline = min(e + FLAG_MAX_LEN, n - 1)
+            deadline = min(e + FLAG_MAX_LEN, j0 + config.PATTERN_MAX_BARS - 1, n - 1)
             ok = True
             for j in range(e + 1, deadline + 1):
                 if bull:
@@ -165,6 +161,8 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
                 neckline=pole_top,
                 points=pts_u,     # 깃발 고점선
                 points2=pts_l,    # 깃발 저점선
-                confirmed_at=int(i),
+                confirmed_at=fit_end,
+                structure_span=(f0, fit_end),
+                score_span=(f0, fit_end),
             ))
     return out

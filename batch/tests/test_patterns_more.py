@@ -122,11 +122,7 @@ def test_broadening_wedge_fall():
 
 
 def test_broadening_wedge_with_curved_boundary():
-    # 감속 상승 랠리 — 고점열(110→121.5→130)이 곡선을 그려 한 직선에 0.5 ATR
-    # 터치 3개가 정렬될 수 없다 (코스피 2026-05~07 실측 기하의 축소판: 세 번째
-    # 극점이 선에서 ~0.6 ATR). 확대 쐐기의 터치 게이트는 지지 판정(1 ATR 근접)
-    # 기준이므로 이 구조를 잡아야 한다 — 엄격 터치(합5)로 되돌리면 이 테스트가
-    # 깨진다.
+    # 곡선 경계를 억지로 직선에 맞추지 않는다: 독립 접촉 5회 미달.
     seq = [97.0] * 3
     tops = [110, 121.5, 130]
     bots = [100, 104.5, 109]
@@ -135,7 +131,7 @@ def test_broadening_wedge_with_curved_boundary():
     seq += _leg(seq[-1], 102, 9) + [102.0] * 8    # 상승 지지선 하향 이탈
     df = _df(seq)
     hits = [p for p in detect_trendline_patterns(df) if p.kind == "pat_bwedge_rise"]
-    assert hits and hits[0].completed_at is not None
+    assert hits == []
 
 
 def test_trend_engulfing_fan_is_not_broadening_wedge(monkeypatch):
@@ -197,9 +193,9 @@ def test_parallel_channel_is_not_broadening_wedge(monkeypatch):
 
 
 def test_bull_flag():
-    # 깃대 +30% (15봉) → 11봉 얕은 조정 → 재돌파
+    # 깃대 +30% (15봉) → 25봉 얕은 조정 → 재돌파
     seq = [100.0] * 5 + _leg(100, 130, 15)
-    seq += [130 - 3 * (i % 4) / 3 - i * 0.3 for i in range(1, 12)]  # 얕은 눌림
+    seq += [130 - 3 * (i % 4) / 3 - i * 0.3 for i in range(1, 26)]  # 20봉 이상 실제 조정
     seq += _leg(seq[-1], 133, 3) + [133.0] * 8
     df = _df(seq)
     hits = [p for p in detect_flags(df) if p.kind == "pat_flag_bull"]

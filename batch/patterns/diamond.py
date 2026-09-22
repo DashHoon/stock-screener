@@ -33,12 +33,12 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
     closes = ind["close"].astype(float).to_numpy()
     highs = ind["high"].astype(float).to_numpy()
     lows = ind["low"].astype(float).to_numpy()
-    # head 후보: minor ∪ major 스윙 고점 (idx 정렬 합집합, 중복 제거).
-    # 잠정 스윙(confirmed_at=None)도 포함 — 구조 확정은 스윙 확정이 아니라
-    # 구간 끝 b 도달로 판정하므로 미래 참조가 생기지 않고, head가 구간 최고인지는
-    # 아래에서 재검증한다.
-    ph = sorted({s.idx for s in ctx.minor if s.is_high}
-                | {s.idx for s in ctx.major if s.is_high})
+    # A head must have actually been confirmed by the end of its structure.
+    confirmed = {}
+    for swing in ctx.minor + ctx.major:
+        if swing.is_high and swing.confirmed_at is not None:
+            confirmed[swing.idx] = min(confirmed.get(swing.idx, swing.confirmed_at), swing.confirmed_at)
+    ph = sorted(confirmed)
 
     out: list[PatternHit] = []
     used: set[int] = set()
@@ -46,7 +46,7 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
     for head in ph:
         for half in (DIA_HALF_MIN, 30, DIA_HALF_MAX):
             a, b = head - half, head + half
-            if a < 0 or b >= n:
+            if a < 0 or b >= n or confirmed[head] > b:
                 continue
             if highs[head] < np.max(highs[a : b + 1]) * 0.999:
                 continue  # 중심이 구간 최고가 아니면 다이아몬드 탑 아님
@@ -66,13 +66,15 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
             support = float(np.min(lows[b - q : b + 1]))
             deadline = min(b + DIA_BREAK_WINDOW, n - 1)
             completed_at = None
+            invalidated = False
             for j in range(b, deadline + 1):
                 if closes[j] < support:
                     completed_at = j
                     break
                 if closes[j] > highs[head]:  # 신고가 돌파 → 무효
+                    invalidated = True
                     break
-            forming = bool(completed_at is None and deadline == n - 1)
+            forming = bool(completed_at is None and not invalidated and deadline == n - 1)
             if completed_at is None and not forming:
                 continue
             if completed_at is not None:

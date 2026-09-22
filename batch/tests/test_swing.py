@@ -105,10 +105,9 @@ def test_fit_swing_trendline_no_violation():
 
 
 def test_fit_swing_trendline_degenerate_same_x():
-    # 모든 점이 같은 x — 앵커 쌍이 없어도 크래시 없이 폴백해야 한다
+    # 서로 다른 앵커가 없으면 유효 직선이 아니다.
     atr = np.full(10, 1.0)
-    line, touches = fit_swing_trendline([3, 3], [100.0, 105.0], atr, upper=True)
-    assert line is not None and touches == 2
+    assert fit_swing_trendline([3, 3], [100.0, 105.0], atr, upper=True) is None
 
 
 def test_zigzag_invariants_and_degenerate_inputs():

@@ -14,12 +14,13 @@
 """
 
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
 
 from batch import config
-from batch.patterns.util import Line, fit_line
+from batch.patterns.util import Line
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,13 @@ class SwingCtx:
     atr: np.ndarray
     minor: list[Swing]
     major: list[Swing]
+
+    @cached_property
+    def line_atr(self) -> np.ndarray:
+        """Previous-bar ATR shared by all boundary candidates."""
+        if not len(self.atr):
+            return self.atr
+        return np.maximum(np.r_[self.atr[0], self.atr[:-1]], 1e-8)
 
     def swings(self, scale: str) -> list[Swing]:
         return self.minor if scale == "minor" else self.major
@@ -152,18 +160,19 @@ def build_ctx(ohlcv: pd.DataFrame) -> SwingCtx:
 
 def fit_swing_trendline(
     xs: list[int], ys: list[float], atr: np.ndarray, upper: bool,
-) -> tuple[Line, int]:
+) -> tuple[Line, int] | None:
     """스윙 극점들로 사람이 긋는 방식의 추세선을 긋는다. (선, 터치 수) 반환.
 
     회귀가 아니라 두 극점을 앵커로 직선을 긋고, 나머지 극점의 위반(저항선 위로
     삐져나옴 등)이 없으면서 터치가 가장 많은 선을 고른다. 회귀 방식의 고질병 —
     이상치 하나가 기울기를 왜곡하는 문제 — 이 사라진다.
 
+    유효한 두 앵커가 없거나 모든 선이 위반하면 None을 반환한다.
     터치 = 극점이 선에서 SWING_TOUCH_ATR×ATR 이내. 위반 = 잘못된 쪽으로
     SWING_VIOL_ATR×ATR 초과 이탈. r2는 참고용으로 채운다 (판정에 쓰지 말 것).
     """
-    if len(xs) < 2:
-        return fit_line(xs, ys), len(xs)
+    if len(set(xs)) < 2 or len(xs) != len(ys):
+        return None
     pts = list(zip(xs, ys))
     best: tuple | None = None  # (유효, 터치수, 스팬, -총편차, Line)
     for a in range(len(pts) - 1):
@@ -175,13 +184,15 @@ def fit_swing_trendline(
             slope = (y1 - y0) / (x1 - x0)
             line = Line(slope, y0 - slope * x0, 0.0)
             touches = 0
+            last_touch = -config.PATTERN_TOUCH_GAP
             viol = 0.0
             dev_sum = 0.0
             for x, y in pts:
                 d = y - line.at(x)          # 양수 = 선 위
                 tol = float(atr[min(x, len(atr) - 1)])
-                if abs(d) <= tol * config.SWING_TOUCH_ATR:
+                if abs(d) <= tol * config.SWING_TOUCH_ATR and x - last_touch >= config.PATTERN_TOUCH_GAP:
                     touches += 1
+                    last_touch = x
                 excess = d - tol * config.SWING_VIOL_ATR if upper else -d - tol * config.SWING_VIOL_ATR
                 if excess > 0:
                     viol += excess
@@ -189,9 +200,8 @@ def fit_swing_trendline(
             cand = (viol <= 0, touches, x1 - x0, -dev_sum, line)
             if best is None or cand[:4] > best[:4]:
                 best = cand
-    if best is None:  # 모든 쌍이 동일 x — 퇴화 입력 (호출자 병합 목록 방어)
-        level = max(ys) if upper else min(ys)
-        return Line(0.0, float(level), 0.0), len(xs)
+    if best is None or not best[0]:
+        return None  # No valid line: never silently return a violating fit.
     line = best[4]
     # r2는 정보용 (기존 Line 소비자 호환)
     y_arr = np.asarray(ys, dtype=float)

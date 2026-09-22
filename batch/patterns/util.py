@@ -29,6 +29,10 @@ class PatternHit:
     # 연장해 그리므로 points 범위로 채점하면 '돌파 대기 드리프트'가 점수를
     # 오염시킨다 — 채점은 이 구간으로 한정한다. None이면 points 범위 그대로.
     score_span: tuple | None = None
+    structure_span: tuple[int, int] | None = None
+    touch_points: list = field(default_factory=list)
+    quality: float = 0.0
+    shape_locked: bool = False
 
 
 @dataclass
@@ -75,3 +79,24 @@ def slope_pct(line: Line, ref_price: float) -> float:
     if ref_price <= 0:
         return 0.0
     return line.slope / ref_price * 100
+
+
+def structure_span(pattern) -> tuple[int, int]:
+    """Actual geometry, never the extension drawn while awaiting a breakout."""
+    span = getattr(pattern, "structure_span", None) or getattr(pattern, "score_span", None)
+    if span is not None:
+        return int(span[0]), int(span[1])
+    return int(pattern.points[0][0]), int(pattern.points[-1][0])
+
+
+def within_pattern_limits(pattern, n: int) -> bool:
+    from batch import config
+
+    start, end = structure_span(pattern)
+    observed = pattern.completed_at if pattern.completed_at is not None else n - 1
+    return (
+        0 <= start <= end <= observed < n
+        and config.PATTERN_MIN_BARS <= end - start + 1 <= config.PATTERN_MAX_BARS
+        and observed - start + 1 <= config.PATTERN_MAX_BARS
+        and getattr(pattern, "confirmed_at", end) <= observed
+    )

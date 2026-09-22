@@ -13,6 +13,7 @@ H&S와 트리플탑은 같은 5-스윙을 두고 경합할 수 있다 — kind�
 import numpy as np
 import pandas as pd
 
+from batch import config
 from batch.patterns.swing import SwingCtx, build_ctx
 from batch.patterns.util import PatternHit, fit_line
 
@@ -27,11 +28,11 @@ def _true_extreme(arr: np.ndarray, lo: int, hi: int, is_max: bool) -> tuple[int,
 HS_SHOULDER_TOL_PCT = 8.0    # 양 어깨 높이 차 허용 %
 HS_HEAD_MIN_PCT = 3.0        # 머리가 어깨 평균보다 최소 이만큼 높아야(낮아야) 함
 HS_MAX_SPAN = 140            # 첫 어깨→끝 어깨 최대 봉수 (minor)
-HS_MAX_SPAN_MAJOR = 300      # (major)
+HS_MAX_SPAN_MAJOR = config.PATTERN_MAX_BARS - 1      # (major)
 HS_BREAK_WINDOW = 40
 
 TRI_TOL_PCT = 3.5            # 3중바닥/트리플탑: 세 극값 유사 허용 %
-TRI_SPAN = {"minor": (20, 120), "major": (40, 300)}  # 첫 극값→끝 극값 봉수 범위
+TRI_SPAN = {"minor": (19, 119), "major": (39, config.PATTERN_MAX_BARS - 1)}  # 첫 극값→끝 극값 봉수 범위
 TRI_MIN_DEPTH_PCT = 5.0
 TRI_BREAK_WINDOW = 40
 
@@ -75,7 +76,7 @@ def detect_head_shoulders(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> lis
                     continue
                 if s2.confirmed_at is None:
                     continue  # 잠정 스윙 — 구조 미확정 (미래 참조 방지)
-                if s2.idx - s1.idx > max_span:
+                if not config.PATTERN_MIN_BARS <= s2.idx - s1.idx + 1 <= max_span + 1:
                     continue
                 v1, vh, v2 = s1.price, hd.price, s2.price
                 if v1 <= 0:
@@ -95,7 +96,7 @@ def detect_head_shoulders(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> lis
                 neck = fit_line([n1_idx, n2_idx], [n1_val, n2_val])
 
                 start = int(s2.confirmed_at)
-                deadline = min(start + HS_BREAK_WINDOW, n - 1)
+                deadline = min(start + HS_BREAK_WINDOW, s1.idx + config.PATTERN_MAX_BARS - 1, n - 1)
                 completed_at, invalidated = _scan_break(
                     closes, start, deadline,
                     level_fn=neck.at, upward=not tops,
@@ -176,7 +177,7 @@ def detect_triple(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Patter
                     continue
 
                 start = int(sc.confirmed_at)
-                deadline = min(start + TRI_BREAK_WINDOW, n - 1)
+                deadline = min(start + TRI_BREAK_WINDOW, sa.idx + config.PATTERN_MAX_BARS - 1, n - 1)
                 floor = vmin if bottoms else vmax
                 completed_at, invalidated = _scan_break(
                     closes, start, deadline,

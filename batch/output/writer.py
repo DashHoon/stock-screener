@@ -7,6 +7,7 @@ import pandas as pd
 
 from batch import config
 from batch.indicators.divergence import Divergence
+from batch.patterns.util import structure_span
 
 
 def _round(v, nd=2):
@@ -109,14 +110,19 @@ def timeframe_payload(
         pts = [(i - offset, price) for i, price in p.points]
         if not pts or pts[0][0] < 0:
             continue  # 차트 범위 밖에서 시작한 패턴 제외
+        start, end = structure_span(p)
         entry = {
+            "structure_start": ind["date"].iloc[start],
+            "structure_end": ind["date"].iloc[end],
+            "structure_bars": end - start + 1,
+            "recognized_date": ind["date"].iloc[p.confirmed_at],
             "kind": p.kind,
             "points": [[dates[i], round(float(v), 2)] for i, v in pts],
             "neckline": p.neckline,
             "shape": int(getattr(p, "shape", 0)),
             "completed_date": (
                 dates[p.completed_at - offset]
-                if p.completed_at is not None and p.completed_at - offset < len(dates)
+                if p.completed_at is not None and 0 <= p.completed_at - offset < len(dates)
                 else None
             ),
             "forming": p.forming,

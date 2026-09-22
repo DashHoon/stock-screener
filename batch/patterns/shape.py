@@ -205,6 +205,9 @@ def score_shapes(ohlcv: pd.DataFrame, pats: list) -> list:
     closes = ohlcv["close"].astype(float).to_numpy()
     kept = []
     for p in pats:
+        if getattr(p, "shape_locked", False):
+            kept.append(p)  # Evaluated at registration; render extension must not rescore it.
+            continue
         p.shape = score_shape(
             closes, p.points, float(p.neckline),
             getattr(p, "points2", None), p.kind,
