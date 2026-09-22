@@ -22,7 +22,7 @@ RB_MAX_LEN = config.PATTERN_MAX_BARS - 1
 RB_RIM_TOL_PCT = 8.0        # 우측 회복 지점이 좌측 림 대비 이 이내로 근접
 RB_MIN_DEPTH_PCT = 15.0
 RB_MAX_DEPTH_PCT = 30.0     # 40%+ 깊이는 라운드바텀이 아니라 급락 후 반등 — 실측 -6.01%p, 승률 27%
-RB_BOTTOM_ZONE = (0.30, 0.70)   # 바닥이 가운데 — 치우치면 U자가 아니다
+RB_BOTTOM_ZONE = (0.20, 0.80)   # 비대칭 회복 허용, 끝에 붙은 극점은 제외
 RB_FLAT_FRAC = 0.25          # 바닥권(깊이 하위 20%) 체류 비율 — 컵보다 넓고 완만해야
 RB_FLAT_ZONE = 0.20
 RB_BREAK_WINDOW = 60
@@ -71,10 +71,14 @@ def detect_round(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Pattern
                 if not (RB_BOTTOM_ZONE[0] <= pos <= RB_BOTTOM_ZONE[1]):
                     continue
                 depth_abs = abs(rim_l - extreme)
+                # Judge base occupancy without letting one wick define the whole base.
+                a = float(np.median(ctx.line_atr[seg]))
                 if bottom:
-                    near_ext = np.sum(ext[seg] <= extreme + RB_FLAT_ZONE * depth_abs)
+                    base = max(extreme, float(np.min(closes[seg])) - a)
+                    near_ext = np.sum(ext[seg] <= base + RB_FLAT_ZONE * abs(rim_l - base))
                 else:
-                    near_ext = np.sum(ext[seg] >= extreme - RB_FLAT_ZONE * depth_abs)
+                    base = min(extreme, float(np.max(closes[seg])) + a)
+                    near_ext = np.sum(ext[seg] >= base - RB_FLAT_ZONE * abs(rim_l - base))
                 if near_ext < max(6, RB_FLAT_FRAC * span):
                     continue
                 seg_closes = closes[seg].copy()

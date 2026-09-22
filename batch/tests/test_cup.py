@@ -81,3 +81,43 @@ def test_reject_shallow_cup():
     # 깊이 5%는 컵으로 보기엔 얕음 (최소 10%)
     df = _df(_cup_shape(depth_pct=5))
     assert detect_cup_handle(df) == []
+
+
+def _asymmetric_cup(bottom_at=.25, breakout=True):
+    seq = _cup_shape(breakout=breakout)
+    for i in range(1, 60):
+        t = i / 60
+        side = (bottom_at - t) / bottom_at if t <= bottom_at else (t - bottom_at) / (1 - bottom_at)
+        seq[10 + i] = 80 + 20 * side ** 2
+    return seq
+
+
+def test_asymmetric_round_cups_survive_full_pipeline():
+    from batch.patterns import detect_all_patterns
+    for pos in (.25, .75):
+        df = _df(_asymmetric_cup(pos))
+        hits = [h for h in detect_all_patterns(df) if h.kind == 'pat_cup_handle']
+        assert len(hits) == 1 and hits[0].completed_at == 80
+        prefix = [h for h in detect_all_patterns(df.iloc[:81]) if h.kind == 'pat_cup_handle']
+        assert prefix[0].points == hits[0].points
+
+
+def test_early_confirmed_handle_is_forming_not_completed():
+    from batch.patterns import detect_all_patterns
+    seq = _cup_shape()
+    hits = [h for h in detect_all_patterns(_df(seq[:74])) if h.kind == 'pat_cup_handle']
+    assert len(hits) == 1 and hits[0].forming
+    assert hits[0].completed_at is None and hits[0].confirmed_at == 73
+    assert not detect_cup_handle(_df(seq[:72]))
+
+
+def test_single_bottom_wick_does_not_hide_a_rounded_base():
+    df = _df(_cup_shape())
+    df.loc[40, 'low'] = 75
+    assert detect_cup_handle(df)
+
+
+def test_extreme_asymmetry_and_early_break_remain_excluded():
+    assert not detect_cup_handle(_df(_asymmetric_cup(.1)))
+    seq = _cup_shape()[:74] + [104., 105., 106.]
+    assert not detect_cup_handle(_df(seq))

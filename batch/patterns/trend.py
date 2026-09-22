@@ -27,8 +27,8 @@ BREAK_WINDOW = 25
 BREAK_WINDOW_LOOSE = 40
 BWEDGES = ("pat_bwedge_rise", "pat_bwedge_fall")
 FAVORED = ("pat_tri_asc", "pat_tri_sym")
-WINDOW_SIZES = (5, 6, 7, 8, 9, 10, 12)
-SPAN_LIMITS = {"minor": (20, 120), "major": (40, 200)}  # inclusive bar counts
+WINDOW_SIZES = (4, 5, 6, 7, 8, 9, 10, 12)
+SPAN_LIMITS = {"minor": (20, 200), "major": (20, 200)}  # inclusive bar counts
 CHAIN_OVERLAP = 0.50
 
 
@@ -46,7 +46,7 @@ def _touches(line: Line, swings: list[Swing], atr: np.ndarray) -> list[int]:
     return result
 
 
-def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *, broadening=False):
+def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *, allow_internal_swings=False):
     """Replay fixed lines, retaining termination even when no hit is published."""
     n = len(ctx.closes)
     atr = _tolerance(ctx)
@@ -89,7 +89,7 @@ def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *
             line = upper if swing.is_high else lower
             touches = abs(swing.price - line.at(swing.idx)) <= config.SWING_TOUCH_ATR * atr[swing.idx]
             misses[swing.is_high] = 0 if touches else misses[swing.is_high] + 1
-            if not broadening and misses[swing.is_high] >= 2:
+            if not allow_internal_swings and misses[swing.is_high] >= 2:
                 return "invalidated", j, None, "lost_support"
     if n - 1 > deadline:
         return "expired", deadline + 1, None, "max_age"
@@ -143,11 +143,17 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     bw_angled = min(abs(su), abs(sl)) <= max(abs(su), abs(sl)) * BWEDGE_SLOPE_K
     kind = None
     break_up: bool | None = None  # True=위 돌파가 완성, False=아래 이탈, None=양방향(수렴)
-    if upper.slope == 0 and sl >= RISE_EPS and converging_loose:
+    # Measure meaningful support rise over the structure, not per-day speed.
+    support_rise = lower.slope * span_w
+    asc_rising = lower.slope > 0 and support_rise >= max(
+        0.01 * ref, float(np.median(atr[x_first:x_last + 1])))
+    desc_falling = upper.slope < 0 and -upper.slope * span_w >= max(
+        0.01 * ref, float(np.median(atr[x_first:x_last + 1])))
+    if upper.slope == 0 and asc_rising and converging_loose:
         kind, break_up = "pat_tri_asc", True
-    elif lower.slope == 0 and su <= -TREND_EPS and converging_loose:
+    elif lower.slope == 0 and desc_falling and converging_loose:
         kind, break_up = "pat_tri_desc", False
-    elif su <= -RISE_EPS and sl >= RISE_EPS and converging_loose:
+    elif desc_falling and asc_rising and converging_loose:
         kind, break_up = "pat_tri_sym", None
     elif su >= TREND_EPS and sl >= TREND_EPS and converging and sl > su:
         kind, break_up = "pat_wedge_rise", False
@@ -167,7 +173,10 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         return None
 
     is_bwedge = kind in BWEDGES
-    if not is_bwedge and not span_lim[0] <= span_w + 1 <= span_lim[1]:
+    is_triangle = kind in ("pat_tri_asc", "pat_tri_desc", "pat_tri_sym")
+    if len(win) == 4 and not is_triangle:
+        return None
+    if not (is_bwedge or is_triangle) and not span_lim[0] <= span_w + 1 <= span_lim[1]:
         return None
 
     # 추세 잠식 게이트 (모듈 상수 BWEDGE_TRAVEL_MAX_PCT 주석 참고)
@@ -181,19 +190,13 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         if w_end / ref * 100 > BWEDGE_WIDTH_MAX_PCT:
             return None
 
-    if kind not in FAVORED + BWEDGES and (len(hs) < 3 or len(ls) < 3):
-        return None
     # Revalidate final horizontal/diagonal lines, not the discarded original fit.
     touch_u, touch_l = _touches(upper, hs, atr), _touches(lower, ls, atr)
-    if min(len(touch_u), len(touch_l)) < 2 or len(touch_u) + len(touch_l) < 5:
+    if min(len(touch_u), len(touch_l)) < 2 or len(touch_u) + len(touch_l) < (4 if is_triangle else 5):
         return None
-    # Contact distribution ranks broadening candidates; 3+2 contacts can be valid.
+    # Independent contacts establish the lines; their spread ranks quality.
+    # Internal swings are valid and need not touch the envelope every time.
     coverage = min((touch_u[-1] - touch_u[0]), (touch_l[-1] - touch_l[0])) / span_w
-    for touches in (() if is_bwedge else (touch_u, touch_l)):
-        if touches[-1] - touches[0] < 0.50 * span_w:
-            return None
-        if touches[0] > x_first + 0.40 * span_w or touches[-1] < x_last - 0.40 * span_w:
-            return None
     grid = np.arange(x_first, x_last + 1)
     hi_line, lo_line = upper.slope * grid + upper.intercept, lower.slope * grid + lower.intercept
     a = atr[grid]
@@ -220,13 +223,19 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         return None
     residual = float(np.mean([abs(s.price - (upper if s.is_high else lower).at(s.idx)) / atr[s.idx] for s in win]))
     quality = len(touch_u) + len(touch_l) + inside - residual
-    if is_bwedge:
-        quality += coverage
+    quality += coverage
     status, terminal, direction, reason = _scan_structure(
         ctx, upper, lower, x_first, x_last, recognized, break_up,
-        BREAK_WINDOW_LOOSE if kind in FAVORED else BREAK_WINDOW, broadening=is_bwedge)
+        BREAK_WINDOW_LOOSE if kind in FAVORED else BREAK_WINDOW, allow_internal_swings=True)
     if terminal < recognized:
         return None  # Never admitted: cannot act as a tombstone for a valid structure.
+    # An unconfirmed first expected-direction close stays on the watchlist.
+    # Pending opposite-direction failures are not advertised as forming.
+    if status == "pending" and (
+        break_up is None or (break_up and closes[terminal] > upper.at(terminal))
+        or (break_up is False and closes[terminal] < lower.at(terminal))
+    ):
+        status = "forming"
     completed = terminal if status == "completed" else None
     out_kind = kind + ("_up" if direction else "_down") if kind == "pat_tri_sym" and completed is not None else kind
     return dict(kind=kind, out_kind=out_kind, completed_at=completed,

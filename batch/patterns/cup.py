@@ -9,12 +9,12 @@
 2. 컵 깊이: 림 평균 대비 CUP_MIN_DEPTH_PCT~CUP_MAX_DEPTH_PCT
 3. U자형 검증 (V자 반등 배제):
    - 바닥 위치가 컵 구간의 가운데(CUP_BOTTOM_ZONE)
-   - 바닥권(바닥에서 깊이의 25% 이내)에 머문 봉이 컵 길이의 CUP_FLAT_FRAC 이상
-   - 컵 구간 종가의 2차 곡선(포물선) 적합 R² ≥ CUP_ROUND_R2 (위로 오목)
+   - 바닥권(바닥에서 깊이의 25% 이내)에 머문 봉이 컵 길이의 CUP_FLAT_FRAC 이상 (단일 아래꼬리는 ATR로 보정)
+   - 좌우 시간을 정규화한 컵 구간 종가의 2차 곡선(포물선) 적합 R² ≥ CUP_ROUND_R2 (위로 오목)
 4. 핸들: 우림 이후 얕은 눌림 — 핸들 저점이 컵 깊이의 상위 절반(HANDLE_MAX_DEPTH_FRAC)
    유지. 컵 중단 아래로 내려가면 무효.
 5. 완성: 우림 이후 HANDLE_MIN_LEN~HANDLE_MAX_LEN 봉 안에 종가가 우림 고가를 상향
-   돌파한 날. 형성 중: 핸들 구간 진행 중(무효화 전, 대기 기한 내).
+   돌파한 날. 형성 중: 확정된 우림 뒤 3봉부터 관찰(완성은 최소 5봉 유지).
 
 미래 참조: 좌우 림의 실제 confirmed_at와 최소 핸들 길이가 모두 충족된
 시점부터 완성을 인정한다. 그 이전에 돌파한 구조는 소급 완성하지 않는다.
@@ -58,7 +58,12 @@ def _round_ok(closes: np.ndarray) -> bool:
     n = len(closes)
     if n < 10:
         return False
-    x = np.arange(n, dtype=float)
+    # Normalize each side separately: a sound cup need not be time-symmetric.
+    bottom_idx = int(np.argmin(closes))
+    if not 0.20 <= bottom_idx / (n - 1) <= 0.80:
+        return False
+    x = np.r_[np.linspace(-1, 0, bottom_idx + 1),
+              np.linspace(0, 1, n - bottom_idx)[1:]]
     y = closes / closes.mean()  # 스케일 정규화
     coef = np.polyfit(x, y, 2)
     if coef[0] <= 0:  # 위로 볼록(뒤집힌 U)은 컵이 아님
@@ -119,7 +124,10 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
             if rim_l <= 0:
                 continue
             rim_diff_pct = abs(rim_r - rim_l) / rim_l * 100
-            if rim_diff_pct > config.CUP_RIM_TOL_PCT:
+            # Permit modest rim variation in volatile stocks, with a hard 10% cap.
+            rim_tolerance = min(10.0, max(config.CUP_RIM_TOL_PCT,
+                2.0 * float(np.median(ctx.line_atr[l:r + 1])) / rim_l * 100))
+            if rim_diff_pct > rim_tolerance:
                 continue
 
             seg_lows = lows[l : r + 1]
@@ -136,7 +144,10 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
                 continue
 
             depth_abs = rim_avg - bottom
-            near_bottom = np.sum(seg_lows <= bottom + config.CUP_FLAT_ZONE * depth_abs)
+            # A single deep wick must not make an otherwise broad base disappear.
+            body_bottom = float(np.min(closes[l:r + 1]))
+            base_level = max(bottom, body_bottom - float(np.median(ctx.line_atr[l:r + 1])))
+            near_bottom = np.sum(seg_lows <= base_level + config.CUP_FLAT_ZONE * (rim_avg - base_level))
             if near_bottom < max(4, config.CUP_FLAT_FRAC * span):
                 continue
 
@@ -166,7 +177,7 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
 
             forming = bool(
                 completed_at is None and not invalidated and deadline == n - 1
-                and max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_MIN_LEN) <= n - 1
+                and max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_FORMING_MIN_LEN) <= n - 1
             )
             if completed_at is None and not forming:
                 continue
@@ -183,7 +194,8 @@ def detect_cup_handle(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Cu
                 completed_at=completed_at,
                 forming=forming,
                 points=points,
-                confirmed_at=max(rim_confirmed[r], rim_confirmed[l], r + config.HANDLE_MIN_LEN),
+                confirmed_at=max(rim_confirmed[r], rim_confirmed[l],
+                                 r + (config.HANDLE_MIN_LEN if completed_at is not None else config.HANDLE_FORMING_MIN_LEN)),
                 structure_span=(int(l), int(completed_at - 1 if completed_at is not None else n - 1)),
             )
             prev = best_by_rim.get(r)

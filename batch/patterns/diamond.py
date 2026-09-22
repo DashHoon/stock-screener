@@ -44,7 +44,7 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
     used: set[int] = set()
 
     for head in ph:
-        for half in (DIA_HALF_MIN, 30, DIA_HALF_MAX):
+        for half in range(DIA_HALF_MIN, DIA_HALF_MAX + 1, 5):
             a, b = head - half, head + half
             if a < 0 or b >= n or confirmed[head] > b:
                 continue

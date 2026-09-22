@@ -26,7 +26,7 @@ from batch import config
 from batch.patterns.swing import SwingCtx, build_ctx
 
 # 양 끝 포함 20~200봉. 아래 값은 기존 비교식에 맞춘 인덱스 차이다.
-DB_GAP = {"minor": (19, 89), "major": (19, config.PATTERN_MAX_BARS - 1)}
+DB_GAP = {"minor": (19, config.PATTERN_MAX_BARS - 1), "major": (19, config.PATTERN_MAX_BARS - 1)}
 
 
 @dataclass
