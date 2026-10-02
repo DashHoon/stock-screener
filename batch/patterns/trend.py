@@ -10,7 +10,7 @@ import pandas as pd
 
 from batch import config
 from batch.patterns.shape import SHAPE_CUTS, SHAPE_MIN, score_shape
-from batch.patterns.swing import Swing, SwingCtx, build_ctx, fit_swing_trendline
+from batch.patterns.swing import Swing, SwingCtx, build_ctx, fit_swing_trendline, zigzag
 from batch.patterns.util import Line, PatternHit, slope_pct
 
 FLAT_EPS = 0.10
@@ -97,7 +97,7 @@ def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *
 
 
 def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
-                 span_lim: tuple[int, int]) -> dict | None:
+                 span_lim: tuple[int, int], *, ascending_only: bool = False) -> dict | None:
     # The initial ZigZag seed has no preceding reversal; it is not a proven touch.
     if win[0].idx == 0 or any(s.confirmed_at is None for s in win):
         return None
@@ -131,6 +131,16 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         upper = Line(0.0, max(s.price for s in hs), upper.r2)
     if abs(sl) <= FLAT_EPS and abs(lower.slope * span_w) <= flat_limit:
         lower = Line(0.0, min(s.price for s in ls), lower.r2)
+    if ascending_only:
+        # Test the observed resistance band, not a two-point slope extrapolated
+        # back to the first low. Interior highs need not reach the ceiling.
+        ceiling = max(s.price for s in hs)
+        band = min(0.03 * ref, 0.75 * float(np.median(atr[x_first:x_last + 1])))
+        contacts = [s for s in hs if ceiling - s.price <= min(band, config.SWING_TOUCH_ATR * atr[s.idx])]
+        if len(contacts) < 2 or contacts[-1].idx - contacts[0].idx < max(
+                config.PATTERN_TOUCH_GAP, span_w * 0.5):
+            return None
+        upper = Line(0.0, ceiling, upper.r2)
     su, sl = slope_pct(upper, ref), slope_pct(lower, ref)
     w_start = upper.at(x_first) - lower.at(x_first)
     w_end = upper.at(x_last) - lower.at(x_last)
@@ -170,6 +180,8 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     elif su >= TREND_EPS and sl <= -TREND_EPS and diverging:
         kind, break_up = "pat_broadening", False
     if kind is None:
+        return None
+    if ascending_only and kind != "pat_tri_asc":
         return None
 
     is_bwedge = kind in BWEDGES
@@ -245,6 +257,7 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
                 points2=[(x_first, float(lower.at(x_first))), (terminal, float(lower.at(terminal)))],
                 confirmed_at=recognized, touches=len(touch_u) + len(touch_l),
                 span=(x_first, x_last), anchors=frozenset(s.idx for s in win),
+                boundary_touches=(tuple(touch_u), tuple(touch_l)),
                 touch_points=[(i, float(upper.at(i))) for i in touch_u] + [(i, float(lower.at(i))) for i in touch_l],
                 quality=quality, shape=shape)
 
@@ -262,6 +275,18 @@ def _register_candidates(cands: list[dict]) -> list[dict]:
             # Distinct broadening hypotheses may coexist; never move an old boundary.
             if c["kind"] in BWEDGES and c["anchors"] != previous["anchors"]:
                 continue
+            if (c["kind"] == "pat_tri_asc"
+                    and previous["status"] in ("invalidated", "expired")
+                    and c["confirmed_at"] > previous["terminal"]):
+                # A failed early, steep triangle must not suppress a newly
+                # established one forever. Require a NEW confirmed contact on
+                # BOTH boundaries at/after that failure; old anchors alone may
+                # never rescue a broken line. This does not rewrite the old hit.
+                sides = c.get("boundary_touches", ())
+                if len(sides) == 2 and all(any(
+                        i >= previous["terminal"] and i not in previous["anchors"]
+                        for i in side) for side in sides):
+                    continue
             s2, structure_end = previous["span"]
             # Existing fixed boundaries remain active beyond their last anchor.
             # Only their life up to this admission date may influence selection.
@@ -291,6 +316,21 @@ def detect_trendline_patterns(ind: pd.DataFrame, ctx: SwingCtx | None = None) ->
                 if e + 1 < m:
                     continue
                 candidate = _eval_window(swings[e - m + 1:e + 1], ctx, len(ind), span_lim)
+                if candidate is not None:
+                    cands.append(candidate)
+    # Tight late-stage triangles can reverse by only one ATR. Keep this extra
+    # causal scale local to ascending triangles; other pattern families retain
+    # their existing pivots and admission rules.
+    fine = zigzag(ctx.highs, ctx.lows, ctx.closes, ctx.atr, 1.0, 3.0)
+    for swings in (ctx.minor, fine):
+        for e, swing in enumerate(swings):
+            if swing.confirmed_at is None:
+                continue
+            for m in WINDOW_SIZES:
+                if e + 1 < m:
+                    continue
+                candidate = _eval_window(swings[e - m + 1:e + 1], ctx, len(ind),
+                                         (20, 200), ascending_only=True)
                 if candidate is not None:
                     cands.append(candidate)
     return [PatternHit(
