@@ -33,6 +33,10 @@ on:
         description: "같은 기준일에도 재계산한 데이터 배포 (로직 변경 반영)"
         type: boolean
         default: false
+      recover_recent:
+        description: "공공 API 장애 시 보조 경로로 누락된 일봉만 수집"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -80,6 +84,11 @@ jobs:
           fi
           if [[ "${{ github.event.schedule }}" == "11 16 * * 5" || "${{ inputs.rebuild }}" == "true" ]]; then
             uv run python -m batch.run --rebuild-all
+          elif [[ "${{ inputs.recover_recent }}" == "true" ]]; then
+            # 공공 API 장애의 수동 복구: 10년 재수집 대신 기존 캐시에
+            # 누락된 최신 봉만 보조 경로로 보충하고 새 로직으로 계산한다.
+            uv run python -m batch.run --backfill
+            uv run python -m batch.run --no-collect
           else
             uv run python -m batch.run
           fi
