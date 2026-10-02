@@ -115,15 +115,25 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     if recognized >= n or recognized - x_first + 1 > config.PATTERN_MAX_BARS:
         return None
     atr = _tolerance(ctx)
+    closes = ctx.closes
+    ref = float(closes[x_last])
+    if not np.isfinite(ref) or ref <= 0:
+        return None
+    if ascending_only:
+        # Test the observed resistance band, not a two-point slope extrapolated
+        # back to the first low. Interior highs need not reach the ceiling.
+        # Reject absent bands BEFORE fitting every possible pair of boundaries.
+        ceiling = max(s.price for s in hs)
+        band = min(0.03 * ref, 0.75 * float(np.median(atr[x_first:x_last + 1])))
+        contacts = [s for s in hs if ceiling - s.price <= min(band, config.SWING_TOUCH_ATR * atr[s.idx])]
+        if len(contacts) < 2 or contacts[-1].idx - contacts[0].idx < max(
+                config.PATTERN_TOUCH_GAP, span_w * 0.5):
+            return None
     up_fit = fit_swing_trendline([s.idx for s in hs], [s.price for s in hs], atr, True)
     lo_fit = fit_swing_trendline([s.idx for s in ls], [s.price for s in ls], atr, False)
     if up_fit is None or lo_fit is None:
         return None
     upper, lower = up_fit[0], lo_fit[0]
-    closes = ctx.closes
-    ref = float(closes[x_last])
-    if not np.isfinite(ref) or ref <= 0:
-        return None
     su, sl = slope_pct(upper, ref), slope_pct(lower, ref)
     # A nearly flat daily slope must also be flat across the complete structure.
     flat_limit = min(0.02 * ref, 1.5 * float(np.median(atr[x_first:x_last + 1])))
@@ -132,14 +142,6 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     if abs(sl) <= FLAT_EPS and abs(lower.slope * span_w) <= flat_limit:
         lower = Line(0.0, min(s.price for s in ls), lower.r2)
     if ascending_only:
-        # Test the observed resistance band, not a two-point slope extrapolated
-        # back to the first low. Interior highs need not reach the ceiling.
-        ceiling = max(s.price for s in hs)
-        band = min(0.03 * ref, 0.75 * float(np.median(atr[x_first:x_last + 1])))
-        contacts = [s for s in hs if ceiling - s.price <= min(band, config.SWING_TOUCH_ATR * atr[s.idx])]
-        if len(contacts) < 2 or contacts[-1].idx - contacts[0].idx < max(
-                config.PATTERN_TOUCH_GAP, span_w * 0.5):
-            return None
         upper = Line(0.0, ceiling, upper.r2)
     su, sl = slope_pct(upper, ref), slope_pct(lower, ref)
     w_start = upper.at(x_first) - lower.at(x_first)
