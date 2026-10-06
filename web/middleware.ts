@@ -39,6 +39,9 @@ const PUBLIC_PREFIXES = [
 // 앱이 쓰는 경로. 앱 열쇠나 주인 비밀번호가 있어야 한다.
 const APP_PREFIXES = ["/data", "/api/news"];
 
+// 주인 입장 경로. 여기서 Basic 인증을 받고 스크리너('/')로 보낸다.
+const OWNER_ENTRY = "/owner";
+
 // 정확히 일치할 때만 여는 파일
 const PUBLIC_FILES = new Set([
   "/ads.txt",      // 애드센스가 직접 읽는다
@@ -94,7 +97,15 @@ export function middleware(req: NextRequest) {
   }
 
   if (!password) return NextResponse.next();          // 미설정이면 잠금 없음
-  if (hasPassword(req, password)) return NextResponse.next();
+  if (hasPassword(req, password)) {
+    return pathname === OWNER_ENTRY
+      ? NextResponse.redirect(new URL("/", req.url))
+      : NextResponse.next();
+  }
+  // 첫 화면은 비밀번호 창 대신 사업자 소개를 보인다. 구글 금융 서비스 인증(G2RS)이
+  // 주 도메인에서 사업자 정보를 대조하기 때문이다 (2026-10). 잠긴 콘텐츠는 그대로다.
+  // 주인은 OWNER_ENTRY에서 인증하면 브라우저가 이후 '/'에도 비밀번호를 실어 보낸다.
+  if (pathname === "/") return NextResponse.rewrite(new URL("/company.html", req.url));
   return deny(true);
 }
 
