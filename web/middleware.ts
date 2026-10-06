@@ -45,6 +45,7 @@ const OWNER_ENTRY = "/owner";
 // 정확히 일치할 때만 여는 파일
 const PUBLIC_FILES = new Set([
   "/ads.txt",      // 애드센스가 직접 읽는다
+  "/app-ads.txt",  // AdMob이 직접 읽는다 (스토어 개발자 웹사이트의 루트)
   "/robots.txt",
   "/sitemap.xml",
 ]);
