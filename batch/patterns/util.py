@@ -33,6 +33,10 @@ class PatternHit:
     touch_points: list = field(default_factory=list)
     quality: float = 0.0
     shape_locked: bool = False
+    # 형성 중인데 마지막 종가가 경계 밖에 처음 나간 상태 ("up"=위, "down"=아래).
+    # 한 번 더 닫히면 완성 또는 무효 — 그 전까지는 차트에 '돌파/이탈 대기'로 보인다.
+    pending: str | None = None
+    pending_against: bool = False  # 기대 방향의 반대쪽 대기 (= 패턴 실패 쪽)
 
 
 @dataclass

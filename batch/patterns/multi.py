@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from batch import config
-from batch.patterns.swing import SwingCtx, build_ctx
+from batch.patterns.swing import SwingCtx, approached_from_beyond, build_ctx
 from batch.patterns.util import PatternHit, fit_line
 
 
@@ -30,6 +30,7 @@ HS_HEAD_MIN_PCT = 3.0        # 머리가 어깨 평균보다 최소 이만큼 �
 HS_MAX_SPAN = config.PATTERN_MAX_BARS - 1            # 첫 어깨→끝 어깨 최대 봉수 (minor)
 HS_MAX_SPAN_MAJOR = config.PATTERN_MAX_BARS - 1      # (major)
 HS_BREAK_WINDOW = 40
+HS_HEAD_EACH_MIN_PCT = 1.5   # 머리가 '각' 어깨보다 최소 이만큼 (평균만 보면 한쪽 어깨=머리가 통과)
 
 TRI_TOL_PCT = 3.5            # 3중바닥/트리플탑: 세 극값 유사 허용 %
 TRI_SPAN = {"minor": (19, config.PATTERN_MAX_BARS - 1), "major": (19, config.PATTERN_MAX_BARS - 1)}  # 첫 극값→끝 극값 봉수 범위
@@ -94,6 +95,13 @@ def detect_head_shoulders(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> lis
                 n1_idx, n1_val = _true_extreme(opp, s1.idx, hd.idx, is_max=not tops)
                 n2_idx, n2_val = _true_extreme(opp, hd.idx, s2.idx, is_max=not tops)
                 neck = fit_line([n1_idx, n2_idx], [n1_val, n2_val])
+                # 머리는 두 어깨 각각보다 뚜렷해야 하고, 왼쪽 어깨로 들어온 흐름은
+                # 넥라인 너머에서 와야 한다 (되돌릴 추세가 있는 반전).
+                head_gap = min(abs(vh - v1) / v1, abs(vh - v2) / v2) * 100
+                if head_gap < HS_HEAD_EACH_MIN_PCT:
+                    continue
+                if not approached_from_beyond(swings, i, neck.at(s1.idx), not tops):
+                    continue
 
                 start = int(s2.confirmed_at)
                 deadline = min(start + HS_BREAK_WINDOW, s1.idx + config.PATTERN_MAX_BARS - 1, n - 1)
@@ -174,6 +182,8 @@ def detect_triple(ind: pd.DataFrame, ctx: SwingCtx | None = None) -> list[Patter
                     else (base - neckline) / neckline * 100
                 )
                 if depth < TRI_MIN_DEPTH_PCT:
+                    continue
+                if not approached_from_beyond(swings, i, neckline, bottoms):
                     continue
 
                 start = int(sc.confirmed_at)

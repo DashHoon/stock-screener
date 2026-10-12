@@ -10,6 +10,7 @@ import pandas as pd
 
 from batch import config
 
+from batch.patterns.swing import wilder_atr
 from batch.patterns.util import PatternHit, fit_envelope_line
 
 POLE_BARS = 15
@@ -30,11 +31,27 @@ FLAG_MAX_RETRACE = 0.62  # 조정 깊이 ≤ 깃대의 62% (피보나치 61.8% �
 FLAG_COUNTER_EPS = 0.10
 
 
+def _line_touches(line, xs, values, atr) -> int:
+    """채널선에 실제로 닿은 봉 묶음 수 (PATTERN_TOUCH_GAP 이상 떨어진 것만 따로 센다).
+
+    봉 하나(튀는 꼬리)에 맞춰 밀어 올린 선은 나머지 가격과 동떨어져 떠 있다 —
+    추세선처럼 양쪽 선 모두 독립된 두 번 이상의 접촉으로 서 있어야 깃발이다.
+    """
+    count, last = 0, -(10**9)
+    for k, v in zip(xs, values):
+        if abs(line.at(k) - v) <= config.SWING_TOUCH_ATR * atr[k]:
+            if k - last >= config.PATTERN_TOUCH_GAP:
+                count += 1
+            last = k
+    return count
+
+
 def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
     n = len(ind)
     closes = ind["close"].astype(float).to_numpy()
     highs = ind["high"].astype(float).to_numpy()
     lows = ind["low"].astype(float).to_numpy()
+    atr = wilder_atr(highs, lows, closes)
 
     out: list[PatternHit] = []
     last_end = {"bull": -(10**9), "bear": -(10**9)}
@@ -128,6 +145,10 @@ def detect_flags(ind: pd.DataFrame) -> list[PatternHit]:
             xs = list(range(f0, fit_end + 1))
             up = fit_envelope_line(xs, [float(highs[k]) for k in xs], upper=True)
             lo = fit_envelope_line(xs, [float(lows[k]) for k in xs], upper=False)
+
+            hs_, ls_ = [float(highs[k]) for k in xs], [float(lows[k]) for k in xs]
+            if min(_line_touches(up, xs, hs_, atr), _line_touches(lo, xs, ls_, atr)) < 2:
+                continue
 
             # 깃발 방향 검증: 폴대 반대(또는 횡보)여야 진짜 플래그다.
             ref = float(closes[fit_end]) or 1.0

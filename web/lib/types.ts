@@ -142,6 +142,8 @@ export interface PatternMark {
   neckline: number;
   completed_date: string | null;
   forming: boolean;
+  /** 형성 중인데 마지막 종가가 경계 밖으로 처음 나간 상태. 한 번 더 닫히면 완성 또는 무효 */
+  pending?: "up" | "down";
   /** 형태 점수 0~100 (참고용). 통과선 미만은 배치에서 이미 걸러져 여기 오지 않는다 */
   shape?: number;
 }

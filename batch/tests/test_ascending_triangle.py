@@ -22,6 +22,7 @@ def test_four_confirmed_contacts_form_then_break_without_moving_lines():
     pending = hits(seq + [101.5])
     assert len(pending) == 1 and pending[0].forming
     assert pending[0].completed_at is None
+    assert pending[0].pending == 'up' and not pending[0].pending_against
     completed = hits(seq + [101.5, 102.])
     assert len(completed) == 1 and completed[0].completed_at == len(seq) + 1
     assert completed[0].touch_points == forming[0].touch_points

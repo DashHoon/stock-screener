@@ -127,6 +127,8 @@ def timeframe_payload(
             ),
             "forming": p.forming,
         }
+        if getattr(p, "pending", None):
+            entry["pending"] = p.pending  # "up"=돌파 대기, "down"=이탈 대기
         pts2 = [
             (i - offset, price)
             for i, price in getattr(p, "points2", []) or []

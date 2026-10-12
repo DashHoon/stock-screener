@@ -48,6 +48,13 @@ class SwingCtx:
             return self.atr
         return np.maximum(np.r_[self.atr[0], self.atr[:-1]], 1e-8)
 
+    @cached_property
+    def true_range(self) -> np.ndarray:
+        """Per-bar true range, for volatility measured inside one structure."""
+        prev_close = np.r_[self.closes[:1], self.closes[:-1]]
+        return np.maximum(self.highs - self.lows, np.maximum(
+            np.abs(self.highs - prev_close), np.abs(self.lows - prev_close)))
+
     def swings(self, scale: str) -> list[Swing]:
         return self.minor if scale == "minor" else self.major
 
@@ -209,3 +216,15 @@ def fit_swing_trendline(
     ss_tot = float(np.sum((y_arr - y_arr.mean()) ** 2))
     r2 = 1.0 if ss_tot <= 0 else max(0.0, 1 - float(np.sum((y_arr - fit) ** 2)) / ss_tot)
     return Line(line.slope, line.intercept, r2), int(best[1])
+
+
+def approached_from_beyond(swings: list[Swing], k: int, level: float, bottom: bool) -> bool:
+    """swings[k]로 들어온 흐름이 level 너머에서 시작했는가 (반전 패턴의 선행 추세).
+
+    바닥형(bottom)은 직전 고점이 level 이상, 천장형은 직전 저점이 level 이하여야
+    한다. 직전 스윙이 없으면 무엇을 되돌리는지 알 수 없으므로 False.
+    """
+    if k < 1:
+        return False
+    prior = swings[k - 1]
+    return prior.price >= level if bottom else prior.price <= level

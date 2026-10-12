@@ -26,6 +26,35 @@ DIA_END_TOL_PCT = 6.0   # 좌우 꼭짓점 종가 유사성
 DIA_BREAK_WINDOW = 25
 
 
+def _diamond_frame(swings, a: int, head: int, b: int, head_price: float):
+    """마름모의 스윙 골격과 테두리. 아니면 None.
+
+    왼쪽은 확산(머리보다 낮은 고점, 낮아지는 저점), 오른쪽은 수렴(머리보다 낮은
+    고점, 높아지는 저점)이어야 한다. 폭 4분할 비교만 하면 급등 후 급락(역V)
+    하나로도 '가운데가 넓다'가 성립한다 — 곧게 오르내린 구간에는 낮아지는/
+    높아지는 저점 쌍이 없다.
+
+    반환: (윗선 [(idx, price)...], 아랫선 [...]) — 바깥 고점·머리·바깥 고점,
+    바깥 저점·최저점·바깥 저점을 잇는 마름모 테두리.
+    """
+    # 구조는 b 시점에 확정된다 — 그때까지 확정된 스윙만 쓴다 (미래 참조 방지)
+    known = [s for s in swings if s.confirmed_at is not None and s.confirmed_at <= b]
+    left = [s for s in known if a <= s.idx < head]
+    right = [s for s in known if head < s.idx <= b]
+    ll = [s for s in left if not s.is_high]
+    rl = [s for s in right if not s.is_high]
+    lh = [s for s in left if s.is_high and s.price < head_price]
+    rh = [s for s in right if s.is_high and s.price < head_price]
+    if not (lh and len(ll) >= 2 and ll[-1].price < ll[0].price):
+        return None
+    if not (rh and len(rl) >= 2 and rl[-1].price > rl[0].price):
+        return None
+    low = min(ll[-1], rl[0], key=lambda s: s.price)
+    upper = [(lh[0].idx, lh[0].price), (head, head_price), (rh[-1].idx, rh[-1].price)]
+    lower = [(ll[0].idx, ll[0].price), (low.idx, low.price), (rl[-1].idx, rl[-1].price)]
+    return upper, lower
+
+
 def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
     if ctx is None:
         ctx = build_ctx(ind)
@@ -62,6 +91,9 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
                 continue
             if abs(closes[b] - closes[a]) / closes[a] * 100 > DIA_END_TOL_PCT:
                 continue
+            frame = _diamond_frame(ctx.minor, a, head, b, float(highs[head]))
+            if frame is None:
+                continue
 
             support = float(np.min(lows[b - q : b + 1]))
             deadline = min(b + DIA_BREAK_WINDOW, n - 1)
@@ -81,19 +113,15 @@ def detect_diamond(ind: pd.DataFrame, ctx=None) -> list[PatternHit]:
                 if completed_at in used:
                     break
                 used.add(completed_at)
-            mid_low = a + int(np.argmin(lows[a : b + 1]))
-            pts = sorted(
-                [(int(a), float(closes[a])), (int(head), float(highs[head])),
-                 (int(mid_low), float(lows[mid_low])), (int(b), float(closes[b]))],
-                key=lambda t: t[0],
-            )
             out.append(PatternHit(
                 kind="pat_diamond",
                 completed_at=completed_at,
                 forming=forming,
                 neckline=support,
-                points=pts,
+                points=frame[0],    # 마름모 윗테두리
+                points2=frame[1],   # 마름모 아랫테두리
                 confirmed_at=int(b),
+                structure_span=(int(a), int(b)),
             ))
             break  # 이 head에서는 한 사이즈만
     return out

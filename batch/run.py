@@ -290,7 +290,8 @@ def compute_and_write(stocks) -> dict:
                         ago = n_bars - 1 - p.completed_at
                         if ago <= config.RECENT_MAX_BARS:
                             sig[p.kind] = min(sig.get(p.kind, ago), ago)
-                    elif p.forming:
+                    elif p.forming and not getattr(p, "pending_against", False):
+                        # 실패 쪽으로 처음 이탈한 패턴은 차트에만 '이탈 대기'로 보인다
                         sig[p.kind + "_form"] = 0
 
             entries.append(

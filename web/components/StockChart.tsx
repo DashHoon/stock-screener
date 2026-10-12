@@ -36,6 +36,9 @@ const DIV_LABEL: Record<string, string> = {
   div_hid_bear: "히든 하락",
 };
 
+// 형성 중 패턴의 마지막 종가가 경계 밖으로 처음 나갔을 때 (확정 전)
+const PENDING_LABEL = { up: "돌파 대기", down: "이탈 대기" } as const;
+
 // 패턴 kind별 [완성 라벨, 형성중 라벨, 차트칩 짧은라벨]
 const PATTERN_LABEL: Record<string, [string, string, string]> = {
   pat_double_bottom: ["쌍바닥 돌파", "쌍바닥 형성중", "쌍바닥"],
@@ -359,6 +362,13 @@ export default function StockChart({ data }: { data: ChartData }) {
 
   const base: TimeframeData = data.tf[tfKey] ?? data.tf.d;
   const current: TimeframeData = base;
+  // 형성 중 패턴의 이름표는 마지막 봉에 붙는다. 오른쪽 끝에 붙으면 글자가 잘리므로
+  // 그런 패턴이 보일 때만 오른쪽에 빈 봉 몇 칸을 둔다.
+  const labelPad =
+    settings.pattern &&
+    (current.patterns ?? []).some((p) => p.forming && !hiddenPat.has(p.kind))
+      ? 8
+      : 0;
   const availableTfs = (["d", "w", "m"] as TimeframeKey[]).filter((k) => data.tf[k]);
   // 현재 차트에 실제로 그려질 패턴 종류들 (겹침 정리용 개별 토글 대상).
   const patternKinds = [...new Set((current.patterns ?? []).map((p) => p.kind))];
@@ -423,16 +433,18 @@ export default function StockChart({ data }: { data: ChartData }) {
   function setPeriod(days: number | null) {
     const chart = chartRef.current;
     if (!chart) return;
+    const n = current.dates.length;
     if (days == null) {
       // 서비스에 배포된 최근 1년 전체를 맞춘다.
-      chart.timeScale().fitContent();
+      chart.timeScale().setVisibleLogicalRange({ from: 0, to: n - 1 + labelPad });
       return;
     }
-    const last = current.dates[current.dates.length - 1];
-    const from = new Date(Date.parse(last) - days * 86400_000);
-    chart.timeScale().setVisibleRange({
-      from: (from.getTime() / 1000) as UTCTimestamp,
-      to: ts(last),
+    const last = current.dates[n - 1];
+    const from = new Date(Date.parse(last) - days * 86400_000).toISOString().slice(0, 10);
+    const i = current.dates.findIndex((d) => d >= from);
+    chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, i),
+      to: n - 1 + labelPad,
     });
   }
 
@@ -598,7 +610,9 @@ export default function StockChart({ data }: { data: ChartData }) {
               position: bottom ? "belowBar" : "aboveBar",
               color: color.muted,
               shape: "circle",
-              text: PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind,
+              text: pat.pending
+                ? `${PATTERN_LABEL[pat.kind]?.[2] ?? pat.kind} ${PENDING_LABEL[pat.pending]}`
+                : PATTERN_LABEL[pat.kind]?.[1] ?? pat.kind,
             },
           ]);
         }
@@ -745,9 +759,12 @@ export default function StockChart({ data }: { data: ChartData }) {
           const n = current.dates.length;
           chart
             .timeScale()
-            .setVisibleLogicalRange({ from: n - INITIAL_DAILY_BARS, to: n - 1 });
+            .setVisibleLogicalRange({ from: n - INITIAL_DAILY_BARS, to: n - 1 + labelPad });
         } else {
-          chart.timeScale().fitContent();
+          chart.timeScale().setVisibleLogicalRange({
+            from: 0,
+            to: current.dates.length - 1 + labelPad,
+          });
         }
         const ps = chart.panes();
         if (ps.length >= 4) {

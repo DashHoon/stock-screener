@@ -30,6 +30,15 @@ FAVORED = ("pat_tri_asc", "pat_tri_sym")
 WINDOW_SIZES = (4, 5, 6, 7, 8, 9, 10, 12)
 SPAN_LIMITS = {"minor": (20, 200), "major": (20, 200)}  # inclusive bar counts
 CHAIN_OVERLAP = 0.50
+# Before both boundaries have a contact, one of them is only an extension.
+# A textbook four-contact triangle opens with one of three legs (1/3); beyond
+# this the line reaches back over a leg it never touched, e.g. a crash peak
+# joined to a later rebound.
+HEAD_MAX_FRAC = 0.40
+# Converging boundaries must end well before they meet; near the apex the lines
+# are within noise of each other and no longer describe a structure.
+APEX_MAX_FRAC = 0.80
+ORDER_AGAINST_MAX = 0.50
 
 
 def _tolerance(ctx: SwingCtx) -> np.ndarray:
@@ -63,7 +72,7 @@ def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *
     misses = {True: 0, False: 0}
     for j in range(end + 1, min(deadline, n - 1) + 1):
         u, l, a = upper.at(j), lower.at(j), atr[j]
-        if u <= l:
+        if u - l < config.PATTERN_BREAK_ATR * a:
             return "expired", j, None, "apex_cross"
         up_wick = ctx.highs[j] > u + config.PATTERN_WICK_VIOL_ATR * a
         dn_wick = ctx.lows[j] < l - config.PATTERN_WICK_VIOL_ATR * a
@@ -156,11 +165,12 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     kind = None
     break_up: bool | None = None  # True=위 돌파가 완성, False=아래 이탈, None=양방향(수렴)
     # Measure meaningful support rise over the structure, not per-day speed.
+    # Compare it with the structure's own daily range: ATR still carries the
+    # volatility of the move that preceded a calm consolidation.
     support_rise = lower.slope * span_w
-    asc_rising = lower.slope > 0 and support_rise >= max(
-        0.01 * ref, float(np.median(atr[x_first:x_last + 1])))
-    desc_falling = upper.slope < 0 and -upper.slope * span_w >= max(
-        0.01 * ref, float(np.median(atr[x_first:x_last + 1])))
+    move_min = max(0.01 * ref, float(np.median(ctx.true_range[x_first + 1:x_last + 1])))
+    asc_rising = lower.slope > 0 and support_rise >= move_min
+    desc_falling = upper.slope < 0 and -upper.slope * span_w >= move_min
     if upper.slope == 0 and asc_rising and converging_loose:
         kind, break_up = "pat_tri_asc", True
     elif lower.slope == 0 and desc_falling and converging_loose:
@@ -186,6 +196,18 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     if ascending_only and kind != "pat_tri_asc":
         return None
 
+    # Swings on a sloped boundary must mostly step the same way as the line;
+    # a falling wedge cannot be built from a run of rising lows.
+    move_floor = float(np.median(atr[x_first:x_last + 1]))
+    for side, line in ((hs, upper), (ls, lower)):
+        if abs(line.slope * span_w) <= move_floor:
+            continue
+        sign = 1 if line.slope > 0 else -1
+        against = sum((b.price - a.price) * sign < -config.SWING_TOUCH_ATR * atr[b.idx]
+                      for a, b in zip(side, side[1:]))
+        if against > (len(side) - 1) * ORDER_AGAINST_MAX:
+            return None
+
     is_bwedge = kind in BWEDGES
     is_triangle = kind in ("pat_tri_asc", "pat_tri_desc", "pat_tri_sym")
     if len(win) == 4 and not is_triangle:
@@ -208,6 +230,16 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     touch_u, touch_l = _touches(upper, hs, atr), _touches(lower, ls, atr)
     if min(len(touch_u), len(touch_l)) < 2 or len(touch_u) + len(touch_l) < (4 if is_triangle else 5):
         return None
+    # Each boundary starts at its side's first swing; an earlier swing far
+    # inside the line means the line was extended back over a different move.
+    if touch_u[0] != hs[0].idx or touch_l[0] != ls[0].idx:
+        return None
+    if max(touch_u[0], touch_l[0]) - x_first > HEAD_MAX_FRAC * span_w:
+        return None
+    if upper.slope < lower.slope:
+        apex = x_first + w_start / (lower.slope - upper.slope)
+        if span_w > APEX_MAX_FRAC * (apex - x_first):
+            return None
     # Independent contacts establish the lines; their spread ranks quality.
     # Internal swings are valid and need not touch the envelope every time.
     coverage = min((touch_u[-1] - touch_u[0]), (touch_l[-1] - touch_l[0])) / span_w
@@ -243,17 +275,19 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
         BREAK_WINDOW_LOOSE if kind in FAVORED else BREAK_WINDOW, allow_internal_swings=True)
     if terminal < recognized:
         return None  # Never admitted: cannot act as a tombstone for a valid structure.
-    # An unconfirmed first expected-direction close stays on the watchlist.
-    # Pending opposite-direction failures are not advertised as forming.
-    if status == "pending" and (
-        break_up is None or (break_up and closes[terminal] > upper.at(terminal))
-        or (break_up is False and closes[terminal] < lower.at(terminal))
-    ):
+    # A first close outside a boundary is unconfirmed either way: the structure
+    # stays on the chart, marked with the side it is testing. The screener only
+    # advertises the expected direction (see batch.run).
+    pending = None
+    if status == "pending":
+        pending = "up" if closes[terminal] > upper.at(terminal) else "down"
         status = "forming"
     completed = terminal if status == "completed" else None
     out_kind = kind + ("_up" if direction else "_down") if kind == "pat_tri_sym" and completed is not None else kind
     return dict(kind=kind, out_kind=out_kind, completed_at=completed,
-                forming=status == "forming", status=status, terminal=terminal, reason=reason,
+                forming=status == "forming", pending=pending, against=pending is not None and (
+                    break_up is not None and (pending == "up") != break_up),
+                status=status, terminal=terminal, reason=reason,
                 neckline=float((upper if direction is True or (direction is None and break_up in (True, None)) else lower).at(terminal)),
                 points=[(x_first, float(upper.at(x_first))), (terminal, float(upper.at(terminal)))],
                 points2=[(x_first, float(lower.at(x_first))), (terminal, float(lower.at(terminal)))],
@@ -340,4 +374,5 @@ def detect_trendline_patterns(ind: pd.DataFrame, ctx: SwingCtx | None = None) ->
         neckline=c["neckline"], points=c["points"], points2=c["points2"],
         confirmed_at=c["confirmed_at"], score_span=c["span"], structure_span=c["span"],
         touch_points=c["touch_points"], quality=c["quality"], shape=c["shape"], shape_locked=True,
+        pending=c["pending"], pending_against=c["against"],
     ) for c in _register_candidates(cands) if c["status"] in ("forming", "completed")]

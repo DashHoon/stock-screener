@@ -49,7 +49,7 @@ def reference_cases():
         seq+=_leg(seq[-1],top,8)+_leg(top,bot,8)
     cases['pat_broadening']=('브로드닝 · 하단 이탈',seq+_leg(seq[-1],60,5)+[60.]*5)
     half=25
-    seq=[100.]*5+[100+(2+18*(1-abs(i-half)/half))*np.cos((i-half)*np.pi/10) for i in range(2*half+1)]
+    seq=[100.]*5+[100+(2+18*(1-abs(i-half)/half))*np.cos((i-half)*np.pi/5) for i in range(2*half+1)]
     cases['pat_diamond']=('다이아몬드 탑',seq+[90.,85.,80.,80.])
     return cases
 

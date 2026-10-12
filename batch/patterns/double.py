@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 from batch import config
-from batch.patterns.swing import SwingCtx, build_ctx
+from batch.patterns.swing import SwingCtx, approached_from_beyond, build_ctx
 
 # 양 끝 포함 20~200봉. 아래 값은 기존 비교식에 맞춘 인덱스 차이다.
 DB_GAP = {"minor": (19, config.PATTERN_MAX_BARS - 1), "major": (19, config.PATTERN_MAX_BARS - 1)}
@@ -86,6 +86,12 @@ def _detect_one_side(ctx: SwingCtx, *, bottom: bool) -> list[DoublePattern]:
             else:
                 depth = (base - neckline) / neckline * 100
             if depth < config.PAT_MIN_DEPTH_PCT:
+                continue
+
+            # 반전 패턴은 되돌릴 흐름이 있어야 한다: 첫 바닥으로 내려온 하락은
+            # 넥라인 위에서 시작했어야 한다 (더블탑은 대칭). 하락 추세 속 반등의
+            # 고점 두 개를 더블탑으로 부르는 오검출을 막는다.
+            if not approached_from_beyond(swings, k, neckline, bottom):
                 continue
 
             confirmed_at = int(s2.confirmed_at)
