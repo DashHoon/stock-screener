@@ -338,15 +338,20 @@ def compute_and_write(stocks) -> dict:
             failed += 1
 
     # 코스피/코스닥 지수: 초기 화면 카드 + 상세 차트(종목 차트 파이프라인 재사용)
-    from batch.collector.indices import INDICES, fetch_index_ohlcv, fetch_indices
-    try:
-        indices = fetch_indices()
-    except Exception:
-        log.exception("지수 수집 실패")
-        indices = []
+    from batch.collector.indices import INDICES, fetch_index_ohlcv, summarize
+    indices = []
     for sym, name in INDICES:
         try:
             iohlcv = fetch_index_ohlcv(sym)
+            if iohlcv is not None and latest_date:
+                # 종목 수집이 늦어진 날 지수만 하루 앞서 나가지 않게 같은 날짜로 맞춘다
+                iohlcv = iohlcv[iohlcv["date"] <= latest_date].reset_index(drop=True)
+            card = summarize(sym, name, iohlcv)
+            if card:
+                indices.append(card)
+                if card["date"] < latest_date:
+                    log.warning("지수 %s 마지막 봉 %s — 종목(%s)보다 뒤처짐",
+                                sym, card["date"], latest_date)
             if iohlcv is None or len(iohlcv) < config.MIN_ROWS_FOR_INDICATORS:
                 continue
             i_ind = compute_indicators(iohlcv)
