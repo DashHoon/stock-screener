@@ -1,15 +1,13 @@
 """배치 파이프라인 진입점.
 
 사용:
-  python -m batch.run                  # 전체 (수집 갱신 → 계산 → JSON 산출)
-  python -m batch.run --backfill       # 백필만 (최초 1회)
-  python -m batch.run --rebuild-all    # 전 종목 캐시 전체 재수집 후 계산·산출 (주 1회 수정주가 보정)
-  python -m batch.run --no-collect     # 캐시 그대로 계산·산출만
+  python -m batch.run                  # 전체 (일자별 시세 동기화 → 계산 → JSON 산출)
+  python -m batch.run --backfill       # 일자별 시세 동기화만
+  python -m batch.run --rebuild-all    # 창 안의 일자별 시세를 전부 다시 받은 뒤 계산·산출
+  python -m batch.run --no-collect     # 받아 둔 시세 그대로 계산·산출만
   python -m batch.run --limit 50      # 앞 50종목만 (개발용)
 
-수집 소스:
-  1) DATA_GO_KR_API_KEY가 있으면 공공 API 하루치 수집 → 캐시 병합
-  2) 없거나 미갱신이면 FinanceDataReader 증분 갱신 폴백
+수집 소스: 공공데이터포털 일자별 전 종목 시세 하나 (batch/collector/daystore.py).
 """
 
 import argparse
@@ -22,7 +20,7 @@ import time
 from dotenv import load_dotenv
 
 from batch import config
-from batch.collector import backfill, daily, master
+from batch.collector import backfill, daily, daystore, master
 from batch.indicators.candles import detect_candles
 from batch.indicators.core import compute_indicators
 from batch.indicators.divergence import detect_divergences
@@ -33,81 +31,6 @@ from batch.patterns import detect_all_patterns
 from batch.sectors import ETC, sector_slug
 
 log = logging.getLogger("batch")
-
-
-def repair_gaps(codes: list[str], target_date: str, empty_only: bool = False) -> None:
-    """캐시가 없거나 target_date보다 뒤처진 종목을 fdr로 백필한다.
-
-    첫 실행(빈 캐시) 부트스트랩과, 수집 실패로 생긴 공백 보정을 겸한다.
-    공공 API는 하루치만 주므로 과거 구간은 여기서 채워야 한다.
-
-    empty_only=True면 '캐시가 아예 없는' 종목만 채운다 (신규 상장·첫 실행).
-    하루 이틀 뒤처진 정도는 건드리지 않는다 — 일별 갱신을 fdr로 메우려 들면
-    전 종목을 네이버에서 받게 되고, 그 경로가 막히면 배치가 통째로 실패한다
-    (2026-08-03 CI 실패). 뒤처진 구간은 다음 공공 API 수집에서 따라잡는다.
-    """
-    stale = []
-    for code in codes:
-        cached = backfill.load_cached(code)
-        if cached is None or len(cached) == 0:
-            stale.append(code)
-        elif not empty_only and cached["date"].iloc[-1] < target_date:
-            stale.append(code)
-    if stale:
-        log.info("캐시 없음%s %d종목 → fdr 백필",
-                 "" if empty_only else "/공백", len(stale))
-        backfill.update_all(stale)
-
-
-# 구멍 메우기 한도. 포털은 하루 1만 건 수준이고 하루치가 3페이지쯤 되니
-# 10일이면 30건 남짓 — 넉넉하다. 그래도 상한을 두는 건 긴 장애 뒤에
-# 한 회차가 과거를 끝없이 파고들지 않게 하기 위해서다.
-GAP_MAX_DAYS = 10
-GAP_LOOKBACK = 30       # 이보다 오래된 구멍은 주 1회 전체 재백필에 맡긴다
-GAP_REF_CODES = 25      # '가진 날짜'를 알아내는 데 쓸 표본 종목 수
-
-
-# 받아 봤더니 비어 있던 날(휴장일). 매 회차 다시 묻지 않으려고 적어 둔다 —
-# 없으면 대체공휴일 하나를 30일 내내 다시 물어보게 된다.
-NO_TRADE_PATH = config.DATA_DIR / "no_trade_days.json"
-
-
-def _no_trade_days() -> set[str]:
-    try:
-        return set(json.loads(NO_TRADE_PATH.read_text()))
-    except Exception:
-        return set()
-
-
-# 포털이 잠깐 흔들려 빈 응답을 준 날을 휴장일로 굳혀 버리면 그 날은 영영
-# 비어 있게 된다. 충분히 지난 뒤에도 비어 있을 때만 휴장일로 적는다.
-NO_TRADE_CONFIRM_DAYS = 3
-
-
-def _remember_no_trade(day: str) -> None:
-    age = (dt.date.today() - dt.date.fromisoformat(day)).days
-    if age < NO_TRADE_CONFIRM_DAYS:
-        return   # 아직 갱신 중일 수 있다 — 다음 회차에 다시 물어본다
-    days = _no_trade_days()
-    days.add(day)
-    NO_TRADE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    NO_TRADE_PATH.write_text(json.dumps(sorted(days)))
-
-
-def _cached_dates(codes: list[str]) -> set[str]:
-    """캐시가 어느 날짜를 갖고 있는지. 표본 몇 종목의 합집합으로 본다 —
-    하루치는 전 종목이 한꺼번에 들어오므로 표본으로 충분하다."""
-    have: set[str] = set()
-    seen = 0
-    for code in codes:
-        df = backfill.load_cached(code)
-        if df is None or df.empty:
-            continue
-        have |= set(df["date"].astype(str).tail(GAP_LOOKBACK * 2))
-        seen += 1
-        if seen >= GAP_REF_CODES:
-            break
-    return have
 
 
 # 지수·업종 지수는 종목 목록에 없지만 정상 산출물이다.
@@ -163,91 +86,25 @@ def drop_retired_outputs() -> int:
     return dropped
 
 
-def fill_gaps(codes: list[str], target_date: str) -> int:
-    """빠진 영업일을 공공 API로 메운다. 메운 날 수를 돌려준다.
+def collect(force: bool = False) -> daystore.SyncResult:
+    """일자별 시세를 창 전체에 걸쳐 맞추고 종목별 캐시를 다시 만든다.
 
-    collect()는 가장 최근 하루만 받는다. 배치가 며칠 돌지 못하면 그 사이
-    날짜는 영영 비어 있게 된다 — 실제로 2026-08-10·11·13·17·18·19 여섯 날이
-    그렇게 비었다. 차트에 이가 빠지고 지표도 그만큼 어긋난다.
-
-    휴장일인지 미수집인지는 받아 봐야 안다. 빈 응답이 오면 휴장일로 보고
-    넘어간다 (한 달 안에 몇 번 없어서 헛호출 부담이 작다).
-    """
-    have = _cached_dates(codes)
-    if not have:
-        return 0
-    have |= _no_trade_days()   # 휴장일로 확인된 날은 다시 묻지 않는다
-
-    target = dt.date.fromisoformat(target_date)
-    missing = [
-        d
-        for i in range(1, GAP_LOOKBACK + 1)
-        if (d := target - dt.timedelta(days=i)).weekday() < 5
-        and d.isoformat() not in have
-    ]
-    if not missing:
-        return 0
-
-    filled = 0
-    # 오래된 것부터 — 중간이 비면 지표 계산이 어긋나므로 앞쪽을 먼저 막는다.
-    for d in sorted(missing)[-GAP_MAX_DAYS:]:
-        try:
-            day = daily.fetch_day(d.strftime("%Y%m%d"))
-        except Exception:
-            log.warning("구멍 메우기 실패 %s — 다음 회차에 다시 시도", d)
-            break       # 포털이 흔들리는 중이면 더 두드리지 않는다
-        if day.empty:
-            _remember_no_trade(d.isoformat())   # 휴장일
-            continue
-        daily.merge_into_cache(day, historical=True)
-        filled += 1
-    if filled:
-        log.info("빠진 영업일 %d일 메움 (후보 %d일)", filled, len(missing))
-    return filled
-
-
-def collect(codes: list[str]) -> None:
-    """일별 수집 — 공공데이터포털 하나만 쓴다.
-
-    2026-08-06 변경. 예전에는 공공 API가 지수(fdr)보다 뒤처지면 그 차이를 fdr로
-    메웠는데, fdr은 네이버 차트 서버를 긁는다. 해외 IP인 GitHub 러너에서 대량으로
-    막혀 배치가 통째로 실패했다(2026-08-03). 없는 데이터를 무리하게 채우기보다
-    그날 수집을 건너뛰고 다음 슬롯을 기다리는 편이 낫다 — 사이트는 원래
-    '전일 기준'이라 하루 늦어도 표시가 모순되지 않는다.
-
-    fdr은 두 곳에만 남긴다: 캐시가 아예 없는 종목(신규 상장·첫 실행)과
-    주 1회 전체 재백필(--rebuild-all, 수정주가 정합성).
+    지난 거래일 중 하나라도 비면 배포하지 않는다. 그 상태로 내보내면 전 종목
+    차트에 같은 날이 빠진다 — 앱에서 보이는 구멍이 신뢰를 가장 크게 깎는다.
+    하루 늦은 데이터는 '전일 기준' 고지와 모순되지 않지만 구멍은 그렇지 않다.
     """
     if not daily.api_key():
-        log.warning("DATA_GO_KR_API_KEY 없음 — 일별 수집 건너뜀")
-        return
-
-    # 어제부터 거슬러 올라가며 가장 최근 거래일 데이터를 찾는다 (최대 5일).
-    # 특정 날짜 요청이 접속 시간초과로 끝나도 더 오래된 날짜를 계속 확인한다.
-    # 주말 날짜 조회가 실패했다고 금요일 자료까지 보지 않고 끝내면, 공급처에는
-    # 금요일 자료가 이미 있어도 다음 예약 실행까지 갱신하지 못한다.
-    failed_days = 0
-    for back in range(1, 6):
-        bas_dt = (dt.date.today() - dt.timedelta(days=back)).strftime("%Y%m%d")
-        try:
-            day = daily.fetch_day(bas_dt)
-        except Exception:
-            # 포털 접속 실패(날짜 내부 재시도 소진). 계산·산출을 죽이지 않되,
-            # 이 날짜 하나 때문에 과거 후보 확인까지 중단하지는 않는다.
-            failed_days += 1
-            log.exception("공공 API 수집 실패 (basDt=%s) — 이전 날짜 계속 확인", bas_dt)
-            continue
-        if not day.empty:
-            daily.merge_into_cache(day)
-            repair_gaps(codes, day["date"].max(), empty_only=True)
-            # 최근 하루만 받고 끝내면 못 받은 날이 영영 남는다.
-            fill_gaps(codes, day["date"].max())
-            return
-    # 연휴이거나 포털 갱신이 늦은 경우. 계산은 기존 캐시로 그대로 진행한다.
-    log.warning(
-        "공공 API 최근 5일 데이터 없음 — 이번 회차 수집 없음 (요청 실패 %d일)",
-        failed_days,
-    )
+        raise SystemExit("DATA_GO_KR_API_KEY 없음 — 수집할 수 없다")
+    res = daystore.sync(force=force)
+    if res.latest is None:
+        raise SystemExit("받아 둔 일자별 시세가 없다")
+    if not res.complete:
+        # 앞쪽만 받고 멈춘 상태로 계산하면 기준일이 거꾸로 돌아간 데이터가 나간다
+        raise SystemExit("공공 API 장애로 수집이 중간에 멈춤 — 다음 회차에 이어서 받는다")
+    if res.gaps:
+        raise SystemExit(f"거래일 {len(res.gaps)}일 미수집: {res.gaps[:10]} — 배포 중단")
+    daystore.build_cache()
+    return res
 
 
 def compute_and_write(stocks) -> dict:
@@ -255,9 +112,10 @@ def compute_and_write(stocks) -> dict:
     entries: list[dict] = []
     skipped = failed = stale = 0
     latest_date = ""
-    # 거래정지 판별 기준: 마지막 데이터가 오늘로부터 12일(달력) 이상 뒤처진 종목.
-    # 이런 종목의 시그널 경과일은 자기 마지막 봉 기준이라 '최근 발생'처럼 보이는
-    # 착시가 생기므로 시그널을 비운다 (차트 페이지는 유지).
+    # 거래정지 판별: 마지막 데이터가 12일(달력) 이상 뒤처졌거나, 최근 봉이 연달아
+    # 거래 없이 평평한 종목. 공공 API는 정지 기간에도 전일 종가로 된 봉을 매일
+    # 주므로 날짜만으로는 안 잡힌다. 이런 종목은 평평한 봉 때문에 스퀴즈 같은
+    # 시그널이 거짓으로 켜지므로 시그널을 비운다 (차트 페이지는 유지).
     stale_cutoff = (dt.date.today() - dt.timedelta(days=12)).isoformat()
 
     # 일봉만 만든다. 주봉·월봉은 앱이 쓰지 않으면서 파일의 58%를 차지했다.
@@ -270,7 +128,10 @@ def compute_and_write(stocks) -> dict:
         try:
             ind = compute_indicators(ohlcv)
             _flags, events = compute_flags(ind)  # events는 차트 마킹·최근 발생 계산에 재사용
-            is_stale = ohlcv["date"].iloc[-1] < stale_cutoff  # 거래정지 등
+            is_stale = (
+                ohlcv["date"].iloc[-1] < stale_cutoff
+                or bool((ohlcv["volume"].iloc[-config.HALT_ZERO_VOLUME_BARS:] == 0).all())
+            )
             sig = {} if is_stale else compute_recent(ind, events)
             if is_stale:
                 stale += 1
@@ -442,15 +303,15 @@ def compute_and_write(stocks) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backfill", action="store_true", help="백필만 수행")
+    parser.add_argument("--backfill", action="store_true", help="일자별 시세 동기화만")
     parser.add_argument(
         "--rebuild-all", action="store_true",
-        help="전 종목 캐시를 새로 받아 교체 (수정주가 보정) 후 계산·산출",
+        help="창 안의 일자별 시세를 전부 다시 받은 뒤 계산·산출",
     )
     parser.add_argument("--no-collect", action="store_true", help="수집 생략")
     parser.add_argument(
         "--collect-only", action="store_true",
-        help="시세 수집만 하고 계산·산출은 생략 (저녁 워밍업 슬롯용)",
+        help="--backfill과 같다 (워크플로 워밍업 슬롯 호환)",
     )
     parser.add_argument("--limit", type=int, default=0, help="앞 N종목만 (개발용)")
     args = parser.parse_args()
@@ -464,23 +325,15 @@ def main() -> None:
     stocks = master.load_or_fetch_master()
     if args.limit:
         stocks = stocks.head(args.limit)
-    codes = stocks["code"].tolist()
-    log.info("대상 종목 %d개", len(codes))
+    log.info("대상 종목 %d개", len(stocks))
 
-    if args.backfill:
-        backfill.update_all(codes)
-        log.info("백필 완료 (%.0f초)", time.time() - t0)
-        return
-
-    if args.collect_only:
-        collect(codes)
+    if args.backfill or args.collect_only:
+        collect()
         log.info("수집만 완료 (%.0f초)", time.time() - t0)
         return
 
-    if args.rebuild_all:
-        backfill.update_all(codes, rebuild=True)
-    elif not args.no_collect:
-        collect(codes)
+    if not args.no_collect:
+        collect(force=args.rebuild_all)
 
     stats = compute_and_write(stocks)
     log.info("완료: %s (%.0f초)", stats, time.time() - t0)

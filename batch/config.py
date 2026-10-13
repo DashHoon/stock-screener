@@ -14,10 +14,11 @@ SIGNALS_DIR = OUTPUT_DIR / "signals"
 CHART_DIR = OUTPUT_DIR / "chart"
 
 # --- 수집 ---
-# 10년: 주봉/월봉 10년 차트·백테스팅용. 긴 구간 수집은 2년 조각으로 분할된다
-# (backfill._fetch_range — 수집원이 대용량 요청 연타를 조르는 문제 대응).
+# 종목 일봉은 공공 API 일자별 시세로 HISTORY_BARS(아래)만큼만 받는다.
+# BACKFILL_YEARS는 이제 지수(KS11/KQ11) 일봉과 옛 스크립트만 쓴다.
 BACKFILL_YEARS = 10
 MIN_ROWS_FOR_INDICATORS = 60  # 이보다 짧은 종목(신규상장 등)은 지표 계산 스킵
+HALT_ZERO_VOLUME_BARS = 5     # 최근 이만큼 연달아 거래량 0이면 거래정지로 본다
 
 # --- RSI ---
 RSI_PERIOD = 14
@@ -75,13 +76,8 @@ DIV_CHAIN_MIN = 3           # 이 개수 이상의 피벗이 이어지면 '연�
 DIV_RSI_BULL_ZONE = 40.0
 DIV_RSI_BEAR_ZONE = 60.0
 
-# --- 수정주가 정합성 ---
-# 전일 종가 대비 이 비율(%) 이상 변동하면 기업행위(증자·분할·감자 등)로 의심하고
-# 해당 종목 캐시를 통째로 재수집한다. 가격제한폭(±30%)을 넘는 변동은 정상 거래로
-# 불가능하므로 확실한 신호. 25%로 낮춰 잡은 이유: 큰 수정주가 조정도 잡기 위해.
-# 실제 급등락(25~30%)이 오탐되어도 비용은 해당 종목 1회 재수집뿐이라 무해하다.
-# 30% 미만의 작은 조정(소규모 증자 등)은 여기서 못 잡고 주 1회 전체 재백필이 보정한다.
-REBUILD_JUMP_PCT = 25.0
+# --- 수정주가 ---
+# 공공 API의 기준가(종가 - 전일 대비)로 계산한다 (batch/collector/daystore.adjust).
 
 # --- 스윙(ZigZag) 구조 — 패턴 탐지 공통 기반 (2026-07-28 방법론 결정) ---
 # 반전 임계 = max(k × ATR14, p% × 종가). 종목 변동성에 자동 적응해
@@ -139,6 +135,12 @@ RECENT_MAX_BARS = 63        # '최근 발생' 추적 상한 (~3개월). 이보�
 # 2026-08-25: 앱이 일봉만 쓰기로 하면서 주봉·월봉 산출도 중단했다.
 # A 200-bar pattern completed up to 63 bars ago must still fit the detail chart.
 CHART_DAILY_BARS = PATTERN_MAX_BARS + RECENT_MAX_BARS
+
+# 수집 창(거래일). 차트 1년 + 지표 예열분. 120일 이평·MACD(26) 지수이동평균이
+# 차트 첫 봉에서 이미 안정돼 있도록 130봉을 앞에 더 받는다. 공공 API는 하루
+# 1회 호출이라 창 전체(~390일)를 처음부터 받아도 일일 한도(1만 건)에 한참 못 미친다.
+INDICATOR_WARMUP_BARS = 130
+HISTORY_BARS = CHART_DAILY_BARS + INDICATOR_WARMUP_BARS
 
 # 검색 결과 격자(바둑판)에 그릴 미니 차트. 종목당 별도 파일로 빼서 화면에 보이는
 # 12개만 받는다. 종목 차트(93KB)를 12개 받으면 1.1MB라 페이지를 넘길 때마다 무겁다.
