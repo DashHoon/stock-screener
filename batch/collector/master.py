@@ -1,8 +1,14 @@
 """종목 마스터: KRX 상장 종목 목록 수집·필터.
 
-시세·시총 목록은 FinanceDataReader의 KRX 목록, 업종·회사 개요는 KRX KIND
-상장법인목록을 직접 받는다.
-pykrx의 get_market_ticker_list는 KRX 엔드포인트 변경으로 빈 값을 돌려줘 사용하지 않음(2026-07 기준).
+종목 목록·시장·시총·상장주식수는 공공 API 일자별 시세(daystore의 최신 거래일
+파일)에서, 업종·회사 개요는 KRX KIND 상장법인목록에서 받는다.
+
+2026-10-13 전환. 예전 목록원(fdr.StockListing("KRX"))은 FDR 저자의 GitHub 캐시를
+읽는데, 하루에도 여러 번 갱신돼 시총이 시세보다 하루 앞선 값이었다 (10-12 데이터에
+10-13 시총 — 하이닉스 -10%). 업종 지수의 주식 수(시총÷종가)도 그만큼 틀어졌다.
+같은 저장소의 회사 정보 폴더는 9/17에 조용히 멈췄다. 이제 목록·시세·시총이 한
+응답에서 나오므로 날짜가 어긋날 수 없고, 목록 = 그날 시세가 있는 종목이라
+상장폐지·신규상장이 바로 반영된다. 전환 시점 대조: 2,579종목·종목명·시장 모두 일치.
 """
 
 import logging
@@ -16,8 +22,8 @@ from batch.sectors import ETC, sector_of
 
 log = logging.getLogger(__name__)
 
-# KOSPI(STK), KOSDAQ(KSQ)만. KONEX(KNX) 제외
-MARKETS = {"STK": "KOSPI", "KSQ": "KOSDAQ"}
+# KOSPI·KOSDAQ만. KONEX 제외
+MARKETS = ("KOSPI", "KOSDAQ")
 
 # KRX KIND 상장법인목록 (엑셀 내려받기 = EUC-KR HTML 표 한 장, 전 법인 1회 호출).
 # 예전엔 fdr.StockListing("KRX-DESC")를 썼는데, 그건 KRX가 아니라 FDR 저자의 GitHub
@@ -102,19 +108,32 @@ def _cached_desc() -> pd.DataFrame | None:
     return prev.set_index("code")[cols].rename(columns=CACHE_COLS)
 
 
-def fetch_stock_master() -> pd.DataFrame:
-    """전 종목 마스터를 수집해 필터링한 DataFrame을 돌려준다.
+def _latest_day() -> pd.DataFrame:
+    """daystore의 가장 최근 거래일 전 종목 행. 마스터 컬럼이 없는 옛 파일이면 예외."""
+    from batch.collector import daystore
 
-    columns: code, name, market, close, change_pct, marcap(억원), industry, sector
+    days = daystore.stored_days()
+    if not days:
+        raise ValueError("일자별 시세가 없다 — 수집 후 마스터를 만든다")
+    day = pd.read_parquet(daystore.day_path(days[-1]))
+    if "name" not in day:
+        raise ValueError(f"{days[-1]} 파일에 종목명이 없다 (전환 전 파일)")
+    return day
+
+
+def fetch_stock_master(day: pd.DataFrame | None = None) -> pd.DataFrame:
+    """전 종목 마스터를 만들어 필터링한 DataFrame을 돌려준다.
+
+    day: 공공 API 하루치 전 종목 (daily.fetch_day 형식). 없으면 daystore의 최신 거래일.
+    columns: code, name, market, close, change_pct, marcap(억원), industry, sector, 회사 개요
     제외: KONEX, 스팩, 우선주(종목코드 끝자리 != '0')
     시가총액 내림차순 정렬 (백테스트 large 유니버스가 순서에 의존).
     """
-    import FinanceDataReader as fdr
-
-    raw = fdr.StockListing("KRX")
-    df = raw[raw["MarketId"].isin(MARKETS)].copy()
+    raw = _latest_day() if day is None else day
+    df = raw[raw["market"].isin(MARKETS)].rename(columns={"code": "Code", "name": "Name"})
+    df = df.copy()
     # 업종(통계청 산업분류)과 회사 개요(주요제품·상장일·대표자·홈페이지·지역)는
-    # KRX 목록에 없고 KIND 상장법인목록에 있다 → code로 조인.
+    # 공공 API 시세에 없고 KIND 상장법인목록에 있다 → code로 조인.
     try:
         df = df.merge(fetch_kind_desc(), on="Code", how="left")
     except Exception:
@@ -137,18 +156,15 @@ def fetch_stock_master() -> pd.DataFrame:
 
     df["Industry"] = df["Industry"].fillna("").astype(str).str.strip()
 
-    # 거래정지·신규상장 종목은 Close/ChagesRatio가 숫자 대신 '-'로 올 수 있다.
-    # 한 종목의 '-' 때문에 전체 마스터 갱신을 버리지 않도록 0으로 정규화한다.
-    close = pd.to_numeric(df.get("Close"), errors="coerce").fillna(0)
-    change_pct = pd.to_numeric(df.get("ChagesRatio"), errors="coerce").fillna(0)
-    # Marcap(원) → 억원. 결측·0은 -1로 두어 필터에서 '알 수 없음'으로 취급
-    marcap_won = pd.to_numeric(df.get("Marcap"), errors="coerce").fillna(0)
+    base = df["base"].astype(float)
+    change_pct = (df["close"] / base.where(base > 0) - 1).mul(100).fillna(0)
+    marcap_won = df["mcap"].astype(float)
     out = pd.DataFrame(
         {
             "code": df["Code"],
             "name": df["Name"],
-            "market": df["MarketId"].map(MARKETS),
-            "close": close.astype("int64"),
+            "market": df["market"],
+            "close": df["close"].astype("int64"),
             "change_pct": change_pct.round(2),
             "marcap": (marcap_won / 1e8).round().astype("int64").where(marcap_won > 0, -1),
             "industry": df["Industry"],

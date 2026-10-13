@@ -107,6 +107,11 @@ def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
             # 기준가 = 종가 - 전일 대비. 평소엔 전일 종가와 같고, 분할·증자 등
             # 권리 변동이 있던 날만 달라진다 — 수정주가 비율이 여기서 나온다.
             "base": pd.to_numeric(df["clpr"]) - pd.to_numeric(df["vs"]),
+            # 종목 마스터용 — 시세와 같은 날의 값이라 시총·주식수가 종가와 어긋나지 않는다
+            "name": df["itmsNm"],
+            "market": df["mrktCtg"],
+            "shares": pd.to_numeric(df["lstgStCnt"], errors="coerce").fillna(0),
+            "mcap": pd.to_numeric(df["mrktTotAmt"], errors="coerce").fillna(0),
         }
     )
     # 거래가 없던 날은 시/고/저가 0으로 오고 종가만 채워진다 (거래량 0).
@@ -119,7 +124,7 @@ def fetch_day(bas_dt: str, timeout: int = 30) -> pd.DataFrame:
         out.loc[no_trade, c] = out.loc[no_trade, "close"]
     # 종가까지 0인 행만 버린다 (상장폐지·데이터 결손)
     out = out[(out[["open", "high", "low", "close"]] != 0).all(axis=1)]
-    for c in ["open", "high", "low", "close", "volume", "base"]:
+    for c in ["open", "high", "low", "close", "volume", "base", "shares", "mcap"]:
         out[c] = out[c].astype("int64")
     log.info("basDt=%s %d종목 수집", bas_dt, len(out))
     return out.reset_index(drop=True)

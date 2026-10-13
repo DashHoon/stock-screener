@@ -322,11 +322,6 @@ def main() -> None:
     load_dotenv()
     t0 = time.time()
 
-    stocks = master.load_or_fetch_master()
-    if args.limit:
-        stocks = stocks.head(args.limit)
-    log.info("대상 종목 %d개", len(stocks))
-
     if args.backfill or args.collect_only:
         collect()
         log.info("수집만 완료 (%.0f초)", time.time() - t0)
@@ -334,6 +329,12 @@ def main() -> None:
 
     if not args.no_collect:
         collect(force=args.rebuild_all)
+
+    # 종목 목록은 방금 받은 최신 거래일 시세에서 만든다 (시세·시총과 같은 날)
+    stocks = master.load_or_fetch_master()
+    if args.limit:
+        stocks = stocks.head(args.limit)
+    log.info("대상 종목 %d개", len(stocks))
 
     stats = compute_and_write(stocks)
     log.info("완료: %s (%.0f초)", stats, time.time() - t0)

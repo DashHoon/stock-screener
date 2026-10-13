@@ -24,9 +24,10 @@ class _FakeResp:
 
 
 def _item(code, name, o, h, l, c, vol, vs=0):
-    return {"srtnCd": code, "itmsNm": name, "basDt": "20260805",
+    return {"srtnCd": code, "itmsNm": name, "basDt": "20260805", "mrktCtg": "KOSPI",
             "mkp": str(o), "hipr": str(h), "lopr": str(l),
-            "clpr": str(c), "vs": str(vs), "trqu": str(vol)}
+            "clpr": str(c), "vs": str(vs), "trqu": str(vol),
+            "lstgStCnt": "1000", "mrktTotAmt": str(c * 1000)}
 
 
 def test_fetch_day_keeps_no_trade_rows(monkeypatch):

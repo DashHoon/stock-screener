@@ -5,45 +5,54 @@ import pandas as pd
 from batch.collector import master
 
 
-def test_master_keeps_rows_with_dash_prices(monkeypatch):
-    """거래정지 종목의 '-' 가격이 전체 마스터 갱신을 실패시키지 않는다."""
-    import FinanceDataReader as fdr
-
-    listing = pd.DataFrame(
-        [
-            {
-                "Code": "005930", "Name": "삼성전자", "MarketId": "STK",
-                "Close": "70000", "ChagesRatio": "1.25", "Marcap": "400000000000000",
-            },
-            {
-                "Code": "123450", "Name": "거래정지종목", "MarketId": "KSQ",
-                "Close": "-", "ChagesRatio": "-", "Marcap": "-",
-            },
-        ]
-    )
-    desc = pd.DataFrame([
-        {
-            "Code": "005930", "Industry": "전자부품 제조업", "Products": "제품",
-            "ListingDate": "2020-01-01", "Representative": "대표",
-            "HomePage": "", "Region": "서울",
-        },
-        {
-            "Code": "123450", "Industry": None, "Products": "제품",
-            "ListingDate": "2020-01-01", "Representative": "대표",
-            "HomePage": "", "Region": "서울",
-        },
+def _day(rows):
+    """daily.fetch_day 형식의 하루치 (code, name, market, close, base, mcap …)."""
+    return pd.DataFrame([
+        {"code": code, "date": "2026-10-12", "open": c, "high": c, "low": c, "close": c,
+         "volume": 1, "base": b, "name": name, "market": mkt, "shares": 10, "mcap": mcap}
+        for code, name, mkt, c, b, mcap in rows
     ])
-    monkeypatch.setattr(fdr, "StockListing", lambda kind: listing.copy())
-    monkeypatch.setattr(master, "fetch_kind_desc", lambda: desc.copy())
 
-    got = master.fetch_stock_master().set_index("code")
 
-    assert got.loc["005930", "close"] == 70000
-    assert got.loc["005930", "change_pct"] == 1.25
-    assert got.loc["123450", "close"] == 0
-    assert got.loc["123450", "change_pct"] == 0
-    assert got.loc["123450", "marcap"] == -1
-    assert got.loc["123450", "sector"]  # NaN 업종도 예외 없이 '기타'로 분류
+DESC = pd.DataFrame([
+    {"Code": "005930", "Industry": "통신 및 방송 장비 제조업", "Products": "반도체",
+     "ListingDate": "1975-06-11", "Representative": "대표", "HomePage": None, "Region": "경기도"},
+])
+
+
+def test_master_from_public_day(monkeypatch):
+    """목록·시장·시총·등락률이 같은 날 시세에서 나오고, 코넥스·스팩·우선주는 빠진다."""
+    monkeypatch.setattr(master, "fetch_kind_desc", lambda: DESC.copy())
+    monkeypatch.setattr(master, "_cached_desc", lambda: None)
+    day = _day([
+        ("005930", "삼성전자", "KOSPI", 250500, 262000, 1464492700000000),
+        ("123450", "업종미상", "KOSDAQ", 1000, 1000, 0),
+        ("005935", "삼성전자우", "KOSPI", 200000, 200000, 1),   # 우선주
+        ("440790", "어떤스팩1호", "KOSDAQ", 2000, 2000, 1),       # 스팩
+        ("217880", "코넥스종목", "KONEX", 3000, 3000, 1),
+    ])
+    got = master.fetch_stock_master(day).set_index("code")
+
+    assert sorted(got.index) == ["005930", "123450"]
+    assert got.loc["005930", "market"] == "KOSPI"
+    assert got.loc["005930", "marcap"] == 14644927          # 억원, 그날 시총 그대로
+    assert got.loc["005930", "change_pct"] == -4.39          # 기준가 대비
+    assert got.loc["005930", "sector"] == "반도체"
+    assert got.loc["123450", "marcap"] == -1                 # 시총 0 = 알 수 없음
+    assert got.loc["123450", "sector"]                       # 업종 없음도 '기타'로 분류
+    assert got.index[0] == "005930"                          # 시총 내림차순
+
+
+def test_master_rejects_pre_migration_day_file(tmp_path, monkeypatch):
+    """종목명이 없는 옛 일자별 파일로는 마스터를 만들지 않는다 (캐시 마스터로 폴백)."""
+    import pytest
+
+    from batch.collector import daystore
+
+    monkeypatch.setattr(daystore, "DAY_DIR", tmp_path)
+    _day([("005930", "x", "KOSPI", 1, 1, 1)]).drop(columns=["name"]).to_parquet(tmp_path / "2026-10-12.parquet")
+    with pytest.raises(ValueError):
+        master.fetch_stock_master()
 
 
 KIND_HTML = """<html><head><meta charset="euc-kr"></head><body><table>
@@ -92,8 +101,6 @@ def test_fetch_kind_desc_rejects_changed_format(monkeypatch):
 
 def test_master_falls_back_to_cached_desc(tmp_path, monkeypatch):
     """KIND가 실패하면 업종과 회사 개요를 마지막 캐시 값으로 채운다."""
-    import FinanceDataReader as fdr
-
     from batch import config
 
     cache = tmp_path / "stocks.parquet"
@@ -101,15 +108,12 @@ def test_master_falls_back_to_cached_desc(tmp_path, monkeypatch):
                    "products": "반도체", "listing_date": "1975-06-11", "ceo": "대표",
                    "homepage": "http://www.samsung.com", "region": "경기도"}]).to_parquet(cache)
     monkeypatch.setattr(config, "STOCKS_CACHE", cache)
-    monkeypatch.setattr(fdr, "StockListing", lambda kind: pd.DataFrame([{
-        "Code": "005930", "Name": "삼성전자", "MarketId": "STK",
-        "Close": "70000", "ChagesRatio": "0", "Marcap": "1"}]))
 
     def boom():
         raise ValueError("404")
 
     monkeypatch.setattr(master, "fetch_kind_desc", boom)
-    got = master.fetch_stock_master().set_index("code")
+    got = master.fetch_stock_master(_day([("005930", "삼성전자", "KOSPI", 70000, 70000, 1)])).set_index("code")
     assert got.loc["005930", "industry"] == "통신 및 방송 장비 제조업"
     assert got.loc["005930", "products"] == "반도체"
     assert got.loc["005930", "sector"] == "반도체"
