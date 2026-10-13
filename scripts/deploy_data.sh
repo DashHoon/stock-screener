@@ -32,7 +32,7 @@ echo "[2/4] 공개 백테스트 요약 통계"
 .venv/bin/python -m batch.backtest.run
 
 echo "[2.5/4] 산출물 검사 (빠진 날·멈춘 지수·값 불일치가 있으면 여기서 중단)"
-.venv/bin/python -m batch.audit
+node web/scripts/audit-data.mjs
 
 echo "[3/4] data 브랜치 구성"
 WT=$(mktemp -d)/data-wt

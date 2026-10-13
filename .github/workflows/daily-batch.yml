@@ -113,7 +113,7 @@ jobs:
       # 정상 데이터를 계속 보여 준다. 실패는 GitHub 알림 메일로 온다.
       - name: Audit outputs
         if: env.IS_WARMUP != 'true'
-        run: uv run python -m batch.audit
+        run: node web/scripts/audit-data.mjs  # Vercel 빌드(prebuild)도 같은 검사를 한 번 더 한다
 
       - name: Check output freshness
         id: fresh
