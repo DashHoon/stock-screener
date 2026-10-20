@@ -58,6 +58,15 @@ def test_wick_noise_and_large_rejected_wick_are_different():
     assert _scan([102], highs=[103], lows=[88])[3] == "both_boundaries"
 
 
+def test_long_wick_closing_beyond_the_expected_side_is_an_attempt():
+    # Close above the ceiling (but < 0.5 ATR) with a high > 1 ATR above it:
+    # a breakout attempt for an upward pattern, damage for a downward one.
+    assert _scan([100.3], highs=[101.5])[0] == "forming"
+    assert _scan([100.3], highs=[101.5], break_up=False)[3] == "extreme_violation"
+    assert _scan([89.7], lows=[88.5], break_up=False)[0] == "forming"
+    assert _scan([89.7], lows=[88.5])[3] == "extreme_violation"
+
+
 def test_broken_structure_is_not_replaced_by_better_later_fit():
     old = dict(confirmed_at=30, quality=5, span=(0, 29),
                anchors=frozenset([0, 7, 14, 22, 29]), kind="pat_tri_asc",

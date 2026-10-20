@@ -39,6 +39,7 @@ HEAD_MAX_FRAC = 0.40
 # are within noise of each other and no longer describe a structure.
 APEX_MAX_FRAC = 0.80
 ORDER_AGAINST_MAX = 0.50
+FIRST_LEG_MAX = 2.0
 
 
 def _tolerance(ctx: SwingCtx) -> np.ndarray:
@@ -92,7 +93,12 @@ def _scan_structure(ctx, upper, lower, start, end, recognized, break_up, wait, *
             return "invalidated", j, None, "opposite_break"
         pending = run_up > 0 or run_down > 0
         # A moderate first close outside is pending; a large rejected wick is damage.
-        if (up_wick and not run_up) or (dn_wick and not run_down):
+        # In the expected break direction a long wick with a close beyond the
+        # line is a breakout attempt, not damage (a strong breakout bar often
+        # closes well below its high).
+        up_try = break_up is not False and ctx.closes[j] > u
+        dn_try = break_up is not True and ctx.closes[j] < l
+        if (up_wick and not run_up and not up_try) or (dn_wick and not run_down and not dn_try):
             return "invalidated", j, None, "extreme_violation"
         for swing in confirmations.get(j, []):
             line = upper if swing.is_high else lower
@@ -113,6 +119,12 @@ def _eval_window(win: list[Swing], ctx: SwingCtx, n: int,
     hs = [s for s in win if s.is_high]
     ls = [s for s in win if not s.is_high]
     if len(hs) < 2 or len(ls) < 2:
+        return None
+    # The opening leg may be the move INTO the structure (a crash or a rally
+    # that ends at the first contact), not a swing inside it. If it dwarfs the
+    # swings that follow, the structure starts after it, not at its extreme.
+    legs = np.abs(np.diff([s.price for s in win]))
+    if len(legs) >= 3 and legs[0] > FIRST_LEG_MAX * float(np.median(legs[1:])):
         return None
     # Keep every anchor inside the declared structure; never hide early violations
     # by trimming while continuing to count the discarded points as support.
