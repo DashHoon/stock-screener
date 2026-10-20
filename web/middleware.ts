@@ -8,7 +8,7 @@ import type { NextRequest } from "next/server";
  *  통째로 내려받아지던 상태였다.
  *
  *   1. 공개 — 블로그·가이드·ads.txt. 애드센스 심사자가 봐야 하고 수익원이다
- *   2. 앱 전용 — /data, /api/news. x-app-key 머리말이 맞아야 한다
+ *   2. 앱 전용 — /data, /api/news, /api/report. x-app-key 머리말이 맞아야 한다
  *   3. 주인 전용 — 나머지 전부. SITE_PASSWORD로 Basic 인증
  *      /main(앱 웹 열람판)은 APP_WEB_PASSWORD로도 열린다 — 주인 비밀번호를
  *      내주지 않고 앱 화면만 보여 줄 수 있게 (심사자·지인 등)
@@ -39,7 +39,7 @@ const PUBLIC_PREFIXES = [
 ];
 
 // 앱이 쓰는 경로. 앱 열쇠나 주인 비밀번호가 있어야 한다.
-const APP_PREFIXES = ["/data", "/api/news"];
+const APP_PREFIXES = ["/data", "/api/news", "/api/report"];
 
 // 앱 웹 열람판 (next.config의 APP_WEB_ORIGIN 프록시). 별도 비밀번호를 받는다.
 const APP_WEB_PREFIXES = ["/main"];

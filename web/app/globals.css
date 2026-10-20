@@ -1851,3 +1851,16 @@ a.tm-tile:hover {
 .app-cta-sub { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .app-cta-links { margin: 0; font-size: 14px; }
 .app-cta-links.muted { color: var(--muted); font-size: 13px; }
+
+/* 패턴 오류 제보 목록 (/reports) — 칸이 많아 글 폭 제한을 푼다 */
+.prose.reports-page {
+  max-width: none;
+}
+.reports-page .stock-table td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+.reports-page .stock-table td.report-note {
+  white-space: pre-wrap;
+  min-width: 180px;
+}

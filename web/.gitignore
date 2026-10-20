@@ -25,6 +25,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# 로컬 개발용 제보 저장 (lib/reports.ts)
+/.data/
+
 # local env files
 .env*.local
 
