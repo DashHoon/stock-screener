@@ -1,13 +1,16 @@
 /** 앱에서 보낸 패턴 오류 제보.
  *
- *  저장은 Supabase(Postgres) REST로 한다. 상시 서버 없이 API 함수가 호출될 때만
- *  쓰고, 주인 페이지(/reports)가 읽는다. 테이블은 supabase/pattern_reports.sql.
+ *  저장은 Upstash Redis REST로 한다. 상시 서버 없이 API 함수가 호출될 때만
+ *  쓰고, 주인 페이지(/reports)가 읽는다. 제보 하나를 JSON 문자열로 리스트
+ *  `pattern_reports` 맨 앞에 넣고, 최근 MAX_KEPT건만 남긴다.
  *
- *  환경변수 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (Vercel, 서버 전용).
- *  service_role 키는 RLS를 건너뛰므로 브라우저·앱으로 절대 내보내지 않는다 —
- *  이 파일은 서버(API 라우트·서버 컴포넌트)에서만 import한다.
+ *  Supabase를 쓰려 했으나 무료 프로젝트 한도(계정당 2개)가 다른 서비스로 차
+ *  있어(2026-10-20), Vercel Storage의 Upstash 연동으로 바꿨다. 연동이
+ *  KV_REST_API_URL · KV_REST_API_TOKEN을 환경변수로 넣어 준다 (접두어를 바꿔
+ *  만들면 UPSTASH_REDIS_REST_URL · _TOKEN). 토큰은 서버 전용 — 이 파일은
+ *  API 라우트·서버 컴포넌트에서만 import한다.
  *
- *  로컬 개발에서 두 값이 없으면 web/.data/pattern-reports.json에 쌓는다
+ *  로컬 개발에서 값이 없으면 web/.data/pattern-reports.json에 쌓는다
  *  (앱 → 사이트 → 목록을 끝까지 확인하려고). 운영에서 없으면 받지 않는다.
  */
 import { promises as fs } from "fs";
@@ -87,15 +90,36 @@ export function parseReport(body: unknown): PatternReport | string {
   };
 }
 
-function supabase(): { url: string; key: string } | null {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && key ? { url: url.replace(/\/$/, ""), key } : null;
+const KEY = "pattern_reports";
+const ID_KEY = "pattern_reports:id";
+/** 이보다 오래된 제보는 지운다 (무료 한도 256MB에 한참 못 미치지만 끝은 둔다). */
+const MAX_KEPT = 5000;
+
+function redis(): { url: string; token: string } | null {
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
 }
 
-/** 저장할 곳이 있는가. 운영에서 Supabase 설정이 없으면 false. */
+/** 명령 여러 개를 한 번에 보낸다 (Upstash REST /pipeline). 결과를 차례대로. */
+async function pipeline(cmds: (string | number)[][]): Promise<unknown[]> {
+  const r = redis()!;
+  const res = await fetch(`${r.url}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${r.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(cmds),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`upstash ${res.status}: ${await res.text()}`);
+  const out = (await res.json()) as { result?: unknown; error?: string }[];
+  const err = out.find((o) => o.error);
+  if (err) throw new Error(`upstash: ${err.error}`);
+  return out.map((o) => o.result);
+}
+
+/** 저장할 곳이 있는가. 운영에서 Redis 설정이 없으면 false. */
 export function canStore(): boolean {
-  return supabase() !== null || process.env.NODE_ENV !== "production";
+  return redis() !== null || process.env.NODE_ENV !== "production";
 }
 
 const DEV_FILE = path.join(process.cwd(), ".data", "pattern-reports.json");
@@ -109,20 +133,13 @@ async function readDev(): Promise<PatternReport[]> {
 }
 
 export async function saveReport(r: PatternReport): Promise<void> {
-  const sb = supabase();
-  if (sb) {
-    const res = await fetch(`${sb.url}/rest/v1/pattern_reports`, {
-      method: "POST",
-      headers: {
-        apikey: sb.key,
-        Authorization: `Bearer ${sb.key}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify(r),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`supabase ${res.status}: ${await res.text()}`);
+  if (redis()) {
+    const [id] = await pipeline([["INCR", ID_KEY]]);
+    const row = { ...r, id: Number(id), created_at: new Date().toISOString() };
+    await pipeline([
+      ["LPUSH", KEY, JSON.stringify(row)],
+      ["LTRIM", KEY, 0, MAX_KEPT - 1],
+    ]);
     return;
   }
   if (process.env.NODE_ENV === "production") throw new Error("저장소 미설정");
@@ -134,17 +151,9 @@ export async function saveReport(r: PatternReport): Promise<void> {
 
 /** 최근 제보부터. 저장소가 없으면 null (페이지가 설정 안내를 띄운다). */
 export async function listReports(limit = 300): Promise<PatternReport[] | null> {
-  const sb = supabase();
-  if (sb) {
-    const res = await fetch(
-      `${sb.url}/rest/v1/pattern_reports?select=*&order=created_at.desc&limit=${limit}`,
-      {
-        headers: { apikey: sb.key, Authorization: `Bearer ${sb.key}` },
-        cache: "no-store",
-      },
-    );
-    if (!res.ok) throw new Error(`supabase ${res.status}: ${await res.text()}`);
-    return (await res.json()) as PatternReport[];
+  if (redis()) {
+    const [rows] = await pipeline([["LRANGE", KEY, 0, limit - 1]]);
+    return ((rows as string[]) ?? []).map((t) => JSON.parse(t) as PatternReport);
   }
   if (process.env.NODE_ENV === "production") return null;
   return (await readDev()).reverse().slice(0, limit);

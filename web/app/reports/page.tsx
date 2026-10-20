@@ -53,9 +53,9 @@ export default async function ReportsPage() {
       <h1>패턴 오류 제보</h1>
       {reports === null ? (
         <p>
-          저장소가 설정되지 않았습니다. <code>supabase/pattern_reports.sql</code>을 실행하고
-          Vercel 환경변수 <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>를
-          넣어 주세요.
+          저장소가 설정되지 않았습니다. Vercel 프로젝트의 Storage에서 Upstash Redis를
+          연결해 <code>KV_REST_API_URL</code>, <code>KV_REST_API_TOKEN</code>이 들어가게
+          한 뒤 다시 배포해 주세요.
         </p>
       ) : error ? (
         <p>제보를 읽지 못했습니다: {error}</p>
