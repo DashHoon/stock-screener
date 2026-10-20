@@ -610,6 +610,8 @@ const FORM_BASE: Record<string, string> = {
   pat_tri_asc_form: "pat_tri_asc",
   pat_tri_desc_form: "pat_tri_desc",
   pat_tri_sym_form: "pat_tri_sym",
+  pat_tri_sym_up_form: "pat_tri_sym_up",
+  pat_tri_sym_down_form: "pat_tri_sym_down",
   pat_wedge_rise_form: "pat_wedge_rise",
   pat_wedge_fall_form: "pat_wedge_fall",
   pat_bwedge_rise_form: "pat_bwedge_rise",

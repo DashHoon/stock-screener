@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppCta from "@/components/AppCta";
 import Spark from "@/components/Spark";
-import { FLAG_GROUPS } from "@/lib/flags";
+import { ALL_FLAGS } from "@/lib/flags";
 import { loadLatest } from "@/lib/data";
 import type { FlagKey, StockSignal } from "@/lib/types";
 
@@ -23,7 +23,7 @@ export const dynamicParams = false;
 
 const META: Record<string, { label: string; desc: string; bullish: boolean | null }> =
   Object.fromEntries(
-    FLAG_GROUPS.flatMap((g) => g.flags).map((f) => [
+    ALL_FLAGS.filter((f) => !f.mirrorOf).map((f) => [
       f.key,
       { label: f.label, desc: f.desc, bullish: f.bullish },
     ]),

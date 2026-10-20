@@ -6,6 +6,9 @@ export interface FlagMeta {
   short: string; // 테이블 배지용
   bullish: boolean | null; // true=상승, false=하락, null=중립
   desc: string; // 지표설명 팝오버용 (한 문장)
+  // 다른 시그널을 검색용으로 나눈 키. 같은 종목에 원래 키도 함께 붙어 있으므로
+  // 배지·요약에는 원래 키만 보이고 이 키는 숨긴다.
+  mirrorOf?: FlagKey;
 }
 
 export interface FlagGroup {
@@ -15,6 +18,10 @@ export interface FlagGroup {
 
 const FORMING_DESC =
   "패턴이 아직 완성(돌파/이탈) 전으로 형성 중인 상태입니다. 확정 신호가 아니라 진행 여부를 지켜봐야 합니다.";
+
+// 대칭삼각형은 완성돼야 방향이 정해진다 (위로 뚫으면 수렴↑, 아래로 이탈하면 수렴↓).
+const TRI_SYM_FORM_DESC =
+  "대칭삼각형이 수렴 중인 상태입니다. 아직 방향이 정해지지 않아 같은 종목이 상향·하향 형성 중에 함께 나옵니다. 먼저 한쪽으로 닫힌 종목은 반대쪽에서 빠집니다.";
 
 export const FLAG_GROUPS: FlagGroup[] = [
   {
@@ -153,6 +160,7 @@ export const FLAG_GROUPS: FlagGroup[] = [
       { key: "pat_wedge_fall_form", label: "하락쐐기 형성 중", short: "하락쐐기 형성중", bullish: true, desc: FORMING_DESC },
       { key: "pat_bwedge_fall_form", label: "하락 확대쐐기 형성 중", short: "하락확대쐐기 형성중", bullish: true, desc: FORMING_DESC },
       { key: "pat_tri_asc_form", label: "상승삼각형 형성 중", short: "상승삼각 형성중", bullish: true, desc: FORMING_DESC },
+      { key: "pat_tri_sym_up_form", label: "삼각수렴 상향 돌파 형성 중", short: "수렴↑ 형성중", bullish: true, desc: TRI_SYM_FORM_DESC, mirrorOf: "pat_tri_sym_form" },
       { key: "pat_flag_bull_form", label: "상승 플래그 형성 중", short: "상승플래그 형성중", bullish: true, desc: FORMING_DESC },
     ],
   },
@@ -166,27 +174,38 @@ export const FLAG_GROUPS: FlagGroup[] = [
       { key: "pat_wedge_rise_form", label: "상승쐐기 형성 중", short: "상승쐐기 형성중", bullish: false, desc: FORMING_DESC },
       { key: "pat_bwedge_rise_form", label: "상승 확대쐐기 형성 중", short: "상승확대쐐기 형성중", bullish: false, desc: FORMING_DESC },
       { key: "pat_tri_desc_form", label: "하락삼각형 형성 중", short: "하락삼각 형성중", bullish: false, desc: FORMING_DESC },
+      { key: "pat_tri_sym_down_form", label: "삼각수렴 하향 이탈 형성 중", short: "수렴↓ 형성중", bullish: false, desc: TRI_SYM_FORM_DESC, mirrorOf: "pat_tri_sym_form" },
       { key: "pat_flag_bear_form", label: "하락 플래그 형성 중", short: "하락플래그 형성중", bullish: false, desc: FORMING_DESC },
       { key: "pat_broadening_form", label: "브로드닝 형성 중", short: "브로드닝 형성중", bullish: false, desc: FORMING_DESC },
       { key: "pat_diamond_form", label: "다이아몬드 형성 중", short: "다이아몬드 형성중", bullish: false, desc: FORMING_DESC },
     ],
   },
-  {
-    // 대칭삼각형은 완성돼야 방향이 정해진다 (위로 뚫으면 수렴↑, 아래로 이탈하면 수렴↓).
-    // 형성 중에는 어느 쪽도 아니므로 상승·하락 어디에도 넣지 않는다.
-    name: "형성 중 (방향 미정)",
-    flags: [
-      { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴 형성중", bullish: null, desc: "대칭삼각형이 수렴 중인 상태입니다. 위로 뚫릴지 아래로 이탈할지는 아직 정해지지 않았습니다." },
-    ],
-  },
 ];
 
-export const ALL_FLAGS: FlagMeta[] = FLAG_GROUPS.flatMap((g) => g.flags);
+// 검색 목록에는 없지만 데이터·차트에 남는 키. 대칭삼각형 형성 중은 방향이 없어
+// 검색에서는 위의 수렴↑/수렴↓ 형성 중으로 나눠 상승·하락 양쪽에 둔다
+// (같은 종목이 양쪽에 나온다). 이 키는 배지와 이전 공유 링크용으로 남긴다.
+const UNLISTED_FLAGS: FlagMeta[] = [
+  { key: "pat_tri_sym_form", label: "삼각수렴 형성 중", short: "수렴 형성중", bullish: null, desc: "대칭삼각형이 수렴 중인 상태입니다. 위로 뚫릴지 아래로 이탈할지는 아직 정해지지 않았습니다." },
+];
+
+export const ALL_FLAGS: FlagMeta[] = [...FLAG_GROUPS.flatMap((g) => g.flags), ...UNLISTED_FLAGS];
 export const FLAG_BY_KEY = new Map(ALL_FLAGS.map((f) => [f.key, f]));
+
+// 검색 목록에서 빠진 키 → 지금 고를 수 있는 키 (이전 공유 링크·저장한 조건용)
+const LEGACY_FLAG: Partial<Record<string, FlagKey>> = {
+  pat_tri_sym_form: "pat_tri_sym_up_form",
+};
+const LISTED = new Set<string>(FLAG_GROUPS.flatMap((g) => g.flags.map((f) => f.key)));
+
+export function normalizeFlags(keys: readonly string[]): FlagKey[] {
+  const out = keys
+    .map((k) => LEGACY_FLAG[k] ?? k)
+    .filter((k): k is FlagKey => LISTED.has(k));
+  return [...new Set(out)];
+}
 
 export function parseFlagsParam(param: string | null | undefined): FlagKey[] {
   if (!param) return [];
-  return param
-    .split(",")
-    .filter((k): k is FlagKey => FLAG_BY_KEY.has(k as FlagKey));
+  return normalizeFlags(param.split(","));
 }

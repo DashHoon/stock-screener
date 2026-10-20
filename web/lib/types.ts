@@ -48,6 +48,8 @@ export type FlagKey =
   | "pat_tri_sym_up"
   | "pat_tri_sym_down"
   | "pat_tri_sym_form"
+  | "pat_tri_sym_up_form"
+  | "pat_tri_sym_down_form"
   | "pat_wedge_rise"
   | "pat_wedge_rise_form"
   | "pat_wedge_fall"

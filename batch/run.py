@@ -154,6 +154,15 @@ def compute_and_write(stocks) -> dict:
                     elif p.forming and not getattr(p, "pending_against", False):
                         # 실패 쪽으로 처음 이탈한 패턴은 차트에만 '이탈 대기'로 보인다
                         sig[p.kind + "_form"] = 0
+                        if p.kind == "pat_tri_sym":
+                            # 대칭삼각형은 형성 중에 방향이 없다. 검색에서는 상승(수렴↑)·
+                            # 하락(수렴↓) 양쪽 형성 중 목록에 같은 종목을 둔다. 한쪽으로
+                            # 먼저 닫힌(대기) 것은 반대쪽 목록에서 뺀다.
+                            # pat_tri_sym_form은 이전 앱 버전과 차트 라벨용으로 유지.
+                            if getattr(p, "pending", None) != "down":
+                                sig["pat_tri_sym_up_form"] = 0
+                            if getattr(p, "pending", None) != "up":
+                                sig["pat_tri_sym_down_form"] = 0
 
             entries.append(
                 writer.stock_entry(

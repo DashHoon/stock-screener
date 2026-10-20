@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FLAG_GROUPS, FLAG_BY_KEY, parseFlagsParam } from "@/lib/flags";
+import { FLAG_GROUPS, FLAG_BY_KEY, normalizeFlags, parseFlagsParam } from "@/lib/flags";
 import type { FlagMeta } from "@/lib/flags";
 import type { FlagKey, LatestSignals, StockSignal } from "@/lib/types";
 import AdSlot from "@/components/AdSlot";
@@ -140,7 +140,7 @@ function Pager({
 
 function badgesWithin(s: StockSignal, bars: number) {
   return (Object.keys(s.sig) as FlagKey[])
-    .filter((k) => (s.sig[k] ?? Infinity) <= bars && FLAG_BY_KEY.has(k))
+    .filter((k) => (s.sig[k] ?? Infinity) <= bars && FLAG_BY_KEY.has(k) && !FLAG_BY_KEY.get(k)!.mirrorOf)
     .sort((a, b) => (s.sig[a] ?? 0) - (s.sig[b] ?? 0))
     .map((k) => ({ meta: FLAG_BY_KEY.get(k)!, ago: s.sig[k]! }));
 }
@@ -295,7 +295,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
 
   // 저장한 조건을 현재 화면에 적용 (재마운트 없이 상태·URL 동기화)
   function applyScreen(s: SavedScreen) {
-    const next = new Set(s.flags.filter((k) => FLAG_BY_KEY.has(k as FlagKey)) as FlagKey[]);
+    const next = new Set(normalizeFlags(s.flags));
     setSelected(next);
     setWindowBars(s.within);
     setMinCap(s.cap);
@@ -318,7 +318,7 @@ export default function Screener({ initialFlags }: { initialFlags?: FlagKey[] })
   // 선택된 패턴 조건(pat_*)을 종목 링크에 실어 보낸다. 형성중(_form)은 기본 키로.
   const selectedPats = [...selected]
     .filter((k) => k.startsWith("pat_"))
-    .map((k) => k.replace(/_form$/, ""));
+    .map((k) => (FLAG_BY_KEY.get(k)?.mirrorOf ?? k).replace(/_form$/, ""));
   // 조건·정렬·기간이 바뀌면 보고 있던 페이지 번호가 의미를 잃는다
   useEffect(() => {
     setPage(0);
