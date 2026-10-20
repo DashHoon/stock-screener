@@ -1864,3 +1864,17 @@ a.tm-tile:hover {
   white-space: pre-wrap;
   min-width: 180px;
 }
+.report-delete {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.report-delete:hover:not(:disabled) {
+  /* 지우는 동작이라 빨강 (이 사이트에서 --up이 빨강이다) */
+  color: var(--up);
+  border-color: var(--up);
+}

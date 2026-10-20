@@ -158,3 +158,27 @@ export async function listReports(limit = 300): Promise<PatternReport[] | null> 
   if (process.env.NODE_ENV === "production") return null;
   return (await readDev()).reverse().slice(0, limit);
 }
+
+/** 처리를 마친 제보 하나를 지운다. 지웠으면 true. */
+export async function deleteReport(id: number): Promise<boolean> {
+  if (redis()) {
+    // 리스트 원소는 JSON 문자열이라, 같은 id를 가진 문자열을 찾아 그대로 지운다
+    const [rows] = await pipeline([["LRANGE", KEY, 0, -1]]);
+    const hit = ((rows as string[]) ?? []).find((t) => {
+      try {
+        return (JSON.parse(t) as PatternReport).id === id;
+      } catch {
+        return false;
+      }
+    });
+    if (!hit) return false;
+    const [removed] = await pipeline([["LREM", KEY, 1, hit]]);
+    return Number(removed) > 0;
+  }
+  if (process.env.NODE_ENV === "production") return false;
+  const all = await readDev();
+  const rest = all.filter((r) => r.id !== id);
+  if (rest.length === all.length) return false;
+  await fs.writeFile(DEV_FILE, JSON.stringify(rest, null, 2));
+  return true;
+}

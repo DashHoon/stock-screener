@@ -3,6 +3,8 @@ import Link from "next/link";
 import { FLAG_BY_KEY } from "@/lib/flags";
 import type { FlagKey } from "@/lib/types";
 import { listReports, type PatternReport } from "@/lib/reports";
+import { removeReport } from "./actions";
+import DeleteButton from "./DeleteButton";
 
 /** 앱에서 들어온 패턴 오류 제보 (주인 전용 — middleware의 SITE_PASSWORD 층). */
 
@@ -63,11 +65,15 @@ export default async function ReportsPage() {
         <p>아직 들어온 제보가 없습니다.</p>
       ) : (
         <>
-          <p>최근 {reports.length}건 · 종목을 누르면 그 패턴을 강조한 차트가 열립니다.</p>
+          <p>
+            최근 {reports.length}건 · 종목을 누르면 그 패턴을 강조한 차트가 열립니다. 처리를 마친
+            제보는 맨 앞의 삭제로 지웁니다.
+          </p>
           <div className="table-wrap">
             <table className="stock-table">
               <thead>
                 <tr>
+                  <th></th>
                   <th>접수</th>
                   <th>종목</th>
                   <th>유형</th>
@@ -81,6 +87,15 @@ export default async function ReportsPage() {
               <tbody>
                 {reports.map((r) => (
                   <tr key={r.id ?? `${r.created_at}${r.code}`}>
+                    <td>
+                      {r.id != null && (
+                        <DeleteButton
+                          id={r.id}
+                          label={`${r.name} ${patternLabel(r)}`}
+                          action={removeReport}
+                        />
+                      )}
+                    </td>
                     <td>{when(r.created_at)}</td>
                     <td className="name">
                       <Link href={`/stock/${r.code}?pat=${r.pattern}`}>{r.name}</Link>{" "}
