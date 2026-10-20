@@ -3,6 +3,12 @@
 // 리라이트와 링크만 배포되면 /blog 가 통째로 404가 되기 때문이다.
 const BLOG_ORIGIN = process.env.BLOG_ORIGIN;
 
+// 앱(Flutter) 웹 빌드의 오리진. 앱 저장소(kscreener-app)가 별도 Vercel 프로젝트로
+// 올리고, 여기서 /main 아래로 프록시한다. 앱 코드는 비공개 저장소에 두기 위해
+// 이 공개 저장소에 빌드 산출물을 넣지 않는다. 미설정이면 /main 배선이 꺼진다.
+// 잠금은 middleware.ts가 맡는다 (/main은 공개 경로가 아니다).
+const APP_WEB_ORIGIN = process.env.APP_WEB_ORIGIN;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // 정적 데이터는 빌드 시 읽고 public 자산으로 별도 배포된다. 서버 함수 추적에
@@ -29,6 +35,15 @@ const nextConfig = {
       { source: "/data/chart2y/:path*", destination: "/data/chart/:path*" },
       ...(BLOG_ORIGIN
         ? [{ source: "/blog:path((?:/.*)?)", destination: `${BLOG_ORIGIN}/blog:path` }]
+        : []),
+      // 앱은 <base href="/main/">로 빌드돼 있어 주소창이 /main이어도 자산을
+      // /main/… 에서 찾는다. 그래서 /main 자체는 슬래시 없이 index.html로 바로 잇는다
+      // (오리진의 /main → /main/ 리다이렉트는 절대 URL이라 오리진 주소가 드러난다).
+      ...(APP_WEB_ORIGIN
+        ? [
+            { source: "/main", destination: `${APP_WEB_ORIGIN}/main/index.html` },
+            { source: "/main/:path+", destination: `${APP_WEB_ORIGIN}/main/:path+` },
+          ]
         : []),
     ];
   },

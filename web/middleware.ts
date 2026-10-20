@@ -10,6 +10,8 @@ import type { NextRequest } from "next/server";
  *   1. 공개 — 블로그·가이드·ads.txt. 애드센스 심사자가 봐야 하고 수익원이다
  *   2. 앱 전용 — /data, /api/news. x-app-key 머리말이 맞아야 한다
  *   3. 주인 전용 — 나머지 전부. SITE_PASSWORD로 Basic 인증
+ *      /main(앱 웹 열람판)은 APP_WEB_PASSWORD로도 열린다 — 주인 비밀번호를
+ *      내주지 않고 앱 화면만 보여 줄 수 있게 (심사자·지인 등)
  *
  *  주인은 앱 전용 경로도 볼 수 있어야 하므로(브라우저에서 데이터 확인),
  *  2층은 '앱 열쇠 또는 Basic 비밀번호'로 판정한다.
@@ -39,6 +41,9 @@ const PUBLIC_PREFIXES = [
 // 앱이 쓰는 경로. 앱 열쇠나 주인 비밀번호가 있어야 한다.
 const APP_PREFIXES = ["/data", "/api/news"];
 
+// 앱 웹 열람판 (next.config의 APP_WEB_ORIGIN 프록시). 별도 비밀번호를 받는다.
+const APP_WEB_PREFIXES = ["/main"];
+
 // 주인 입장 경로. 여기서 Basic 인증을 받고 스크리너('/')로 보낸다.
 const OWNER_ENTRY = "/owner";
 
@@ -64,7 +69,7 @@ function hasPassword(req: NextRequest, password: string): boolean {
   return given === password;
 }
 
-function deny(basic: boolean): NextResponse {
+function deny(basic: boolean, realm = "chartcatch"): NextResponse {
   return new NextResponse("Authentication required", {
     status: 401,
     headers: {
@@ -73,7 +78,7 @@ function deny(basic: boolean): NextResponse {
       // realm은 ASCII만 담을 수 있다. 한글을 넣으면 헤더를 만들다 500이 난다
       // (2026-08-25 로컬 검증에서 잡음 — 배포했으면 전 페이지가 죽었다).
       ...(basic
-        ? { "WWW-Authenticate": 'Basic realm="chartcatch", charset="UTF-8"' }
+        ? { "WWW-Authenticate": `Basic realm="${realm}", charset="UTF-8"` }
         : {}),
       // 잠긴 경로는 검색에 남기지 않는다
       "X-Robots-Tag": "noindex, nofollow",
@@ -95,6 +100,16 @@ export function middleware(req: NextRequest) {
     if (req.headers.get("x-app-key") === appKey) return NextResponse.next();
     if (password && hasPassword(req, password)) return NextResponse.next();
     return deny(false);
+  }
+
+  if (matches(APP_WEB_PREFIXES, pathname)) {
+    // 이 경로는 비밀번호 없이 열리면 안 된다 — 앱 화면 전체가 공개된다.
+    // 다른 층과 달리 둘 다 미설정이면 닫는다.
+    const appWebPassword = process.env.APP_WEB_PASSWORD;
+    const ok =
+      (appWebPassword && hasPassword(req, appWebPassword)) ||
+      (password && hasPassword(req, password));
+    return ok ? NextResponse.next() : deny(true, "chartcatch-app");
   }
 
   if (!password) return NextResponse.next();          // 미설정이면 잠금 없음
