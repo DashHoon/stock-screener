@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차트캐치 앱 받기</title>
+<meta name="description" content="국내주식 차트 패턴과 RSI·MACD·볼린저밴드 시그널로 종목을 찾는 차트캐치 앱. Google Play와 App Store에서 받을 수 있습니다.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="차트캐치">
+<meta property="og:title" content="차트캐치 — 주식 차트 패턴 검색 앱">
+<meta property="og:description" content="차트 모양과 지표 시그널로 국내주식 2,500여 종목을 한 번에 걸러냅니다.">
+<meta property="og:url" content="https://kscreener.com/app">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.ico">
+<!-- 홍보용 원링크(kscreener.com/app)의 PC·미확인 기기용 화면.
+     안드로이드·아이폰은 middleware가 이 파일까지 오지 않고 스토어로 바로 보낸다.
+     company.html처럼 잠긴 사이트 레이아웃을 타지 않도록 독립 HTML로 둔다.
+     스토어 주소는 web/lib/app-links.ts와 같아야 한다. -->
+<script>
+  // iPadOS 사파리는 맥으로 자칭해 서버에서 못 가린다. 터치가 되는 '맥'이면 아이패드다.
+  if (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) {
+    location.replace("https://apps.apple.com/kr/app/id6811464402");
+  }
+</script>
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --text:#111827; --muted:#6b7280;
+  --line:#e5e7eb; --accent:#2563eb; --accent-text:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0b0f17; --card:#111827; --text:#e5e7eb; --muted:#9ca3af;
+         --line:#243244; --accent:#60a5fa; --accent-text:#0b0f17; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.7;
+  font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Segoe UI",Roboto,sans-serif;
+  word-break:keep-all;overflow-wrap:anywhere}
+.wrap{max-width:560px;margin:0 auto;padding:64px 16px 40px;text-align:center}
+h1{font-size:28px;line-height:1.3;margin:0 0 12px;letter-spacing:-.02em}
+.lead{font-size:17px;margin:0 0 28px;color:var(--muted)}
+.stores{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto 28px}
+.stores a{display:block;padding:13px 18px;border-radius:10px;background:var(--accent);
+  color:var(--accent-text);text-decoration:none;font-weight:600}
+.stores a:hover{opacity:.9}
+.note{font-size:13px;color:var(--muted);margin:0}
+.note a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>차트캐치</h1>
+  <p class="lead">차트 모양과 지표 시그널로 국내주식 2,500여 종목을 한 번에 걸러내는 앱입니다.</p>
+  <div class="stores">
+    <a href="https://play.google.com/store/apps/details?id=com.nbros.chartcatch">Google Play에서 받기</a>
+    <a href="https://apps.apple.com/kr/app/id6811464402">App Store에서 받기</a>
+  </div>
+  <p class="note">휴대폰에서 이 주소(kscreener.com/app)를 열면 기기에 맞는 스토어로 바로 이동합니다.</p>
+  <p class="note">전일 종가 기준 정보이며 투자 자문이나 종목 추천이 아닙니다. · <a href="/">엔브로스</a></p>
+</main>
+</body>
+</html>

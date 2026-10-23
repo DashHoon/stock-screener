@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { AOS_URL, IOS_URL } from "@/lib/app-links";
 
 /** 세 층으로 나눈다: 공개 콘텐츠 · 앱 전용 · 주인 전용.
  *
@@ -47,6 +48,10 @@ const APP_WEB_PREFIXES = ["/main"];
 // 주인 입장 경로. 여기서 Basic 인증을 받고 스크리너('/')로 보낸다.
 const OWNER_ENTRY = "/owner";
 
+// 홍보용 원링크. 휴대폰이면 그 기기의 스토어로 바로 보내고, 그 밖(PC·링크 미리보기
+// 크롤러)은 두 스토어를 고르는 페이지를 보인다. SNS 프로필·카드에 이 주소 하나만 건다.
+const APP_LINK = "/app";
+
 // 정확히 일치할 때만 여는 파일
 const PUBLIC_FILES = new Set([
   "/ads.txt",      // 애드센스가 직접 읽는다
@@ -86,8 +91,33 @@ function deny(basic: boolean, realm = "chartcatch"): NextResponse {
   });
 }
 
+/** 원링크의 행선지. 기기를 모르면 null — 고르는 페이지로 보낸다.
+ *  iPadOS 사파리는 맥으로 자칭해 여기서 못 가린다. app.html이 터치 여부로 다시 본다.
+ *  utm_*는 플레이 스토어 referrer로 넘긴다. 앱의 Firebase가 설치 경로로 읽는다
+ *  (앱스토어는 제공자 토큰 pt가 있어야 캠페인을 잡아서 넘기지 않는다). */
+function storeFor(req: NextRequest): string | null {
+  const ua = req.headers.get("user-agent") || "";
+  if (/android/i.test(ua) && AOS_URL) {
+    const utm = new URLSearchParams();
+    req.nextUrl.searchParams.forEach((v, k) => {
+      if (k.startsWith("utm_")) utm.set(k, v);
+    });
+    const referrer = utm.toString();
+    return referrer ? `${AOS_URL}&referrer=${encodeURIComponent(referrer)}` : AOS_URL;
+  }
+  if (/iPhone|iPad|iPod/.test(ua) && IOS_URL) return IOS_URL;
+  return null;
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (pathname === APP_LINK) {
+    const store = storeFor(req);
+    // 302 — 영구 이동으로 두면 브라우저가 기억해 행선지를 바꿀 수 없다
+    return store
+      ? NextResponse.redirect(store, 302)
+      : NextResponse.rewrite(new URL("/app.html", req.url));
+  }
   if (PUBLIC_FILES.has(pathname) || matches(PUBLIC_PREFIXES, pathname)) {
     return NextResponse.next();
   }
